@@ -1,0 +1,176 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import java.lang.String?>
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.CheckBox?>
+<?import javafx.scene.control.ComboBox?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ListView?>
+<?import javafx.scene.control.Separator?>
+<?import javafx.scene.control.Tab?>
+<?import javafx.scene.control.TabPane?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.layout.ColumnConstraints?>
+<?import javafx.scene.layout.GridPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.RowConstraints?>
+<?import javafx.scene.layout.VBox?>
+
+<TabPane maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" tabClosingPolicy="UNAVAILABLE" xmlns="http://javafx.com/javafx/10.0.1" xmlns:fx="http://javafx.com/fxml/1" fx:controller="suiryc.dl.mngr.controllers.OptionsController">
+   <tabs>
+      <Tab text="%Main">
+         <content>
+            <GridPane hgap="10.0" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" vgap="10.0">
+              <columnConstraints>
+                <ColumnConstraints hgrow="NEVER" minWidth="-Infinity" />
+                  <ColumnConstraints hgrow="SOMETIMES" maxWidth="1.7976931348623157E308" minWidth="-Infinity" />
+              </columnConstraints>
+              <rowConstraints>
+                <RowConstraints minHeight="-Infinity" vgrow="NEVER" />
+                  <RowConstraints minHeight="-Infinity" vgrow="NEVER" />
+                  <RowConstraints minHeight="-Infinity" vgrow="NEVER" />
+                <RowConstraints minHeight="-Infinity" vgrow="NEVER" />
+                  <RowConstraints minHeight="-Infinity" vgrow="NEVER" />
+                  <RowConstraints minHeight="-Infinity" vgrow="NEVER" />
+                  <RowConstraints minHeight="-Infinity" vgrow="NEVER" />
+                  <RowConstraints minHeight="-Infinity" vgrow="NEVER" />
+                  <RowConstraints minHeight="-Infinity" vgrow="NEVER" />
+                  <RowConstraints minHeight="-Infinity" vgrow="NEVER" />
+                  <RowConstraints minHeight="-Infinity" vgrow="NEVER" />
+                  <RowConstraints minHeight="-Infinity" vgrow="NEVER" />
+                  <RowConstraints minHeight="-Infinity" vgrow="NEVER" />
+                  <RowConstraints minHeight="-Infinity" vgrow="NEVER" />
+              </rowConstraints>
+               <children>
+                  <Label text="%Language:" />
+                  <ComboBox fx:id="languageChoice" GridPane.columnIndex="1" />
+                  <CheckBox fx:id="debugField" mnemonicParsing="false" text="%Debug" GridPane.columnSpan="2" GridPane.rowIndex="1" />
+                  <Separator GridPane.columnSpan="2" GridPane.rowIndex="2" />
+                  <Label text="%Download folder:" GridPane.rowIndex="3" />
+                  <HBox alignment="CENTER_LEFT" maxWidth="1.7976931348623157E308" spacing="10.0" GridPane.columnIndex="1" GridPane.hgrow="ALWAYS" GridPane.rowIndex="3">
+                     <children>
+                        <TextField fx:id="downloadFolderField" maxWidth="1.7976931348623157E308" HBox.hgrow="ALWAYS" />
+                        <Button fx:id="downloadFolderSelectButton" mnemonicParsing="false" onAction="#onDownloadFolderSelect">
+                           <styleClass>
+                              <String fx:value="icon-save" />
+                              <String fx:value="button-square-icon" />
+                           </styleClass>
+                        </Button>
+                     </children>
+                  </HBox>
+                  <Label text="%File extension:" GridPane.rowIndex="4" />
+                  <TextField fx:id="fileExtensionField" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" GridPane.columnIndex="1" GridPane.rowIndex="4" />
+                  <CheckBox fx:id="removeCompletedField" mnemonicParsing="false" text="%Remove completed" GridPane.columnSpan="2" GridPane.rowIndex="5" />
+                  <Separator GridPane.columnSpan="2" GridPane.rowIndex="6" />
+                  <Label text="%Downloads max:" GridPane.rowIndex="7" />
+                  <TextField fx:id="maxDownloadsField" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" GridPane.columnIndex="1" GridPane.rowIndex="7" />
+                  <Label text="%Max connections:" GridPane.rowIndex="8" />
+                  <TextField fx:id="maxCnxField" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" GridPane.columnIndex="1" GridPane.rowIndex="8" />
+                  <Label text="%Max server connections:" GridPane.rowIndex="9" />
+                  <TextField fx:id="maxServerCnxField" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" GridPane.columnIndex="1" GridPane.rowIndex="9" />
+                  <Label text="%Max segments:" GridPane.rowIndex="10" />
+                  <TextField fx:id="maxSegmentsField" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" GridPane.columnIndex="1" GridPane.rowIndex="10" />
+                  <Label text="%Min segment size:" GridPane.rowIndex="11" />
+                  <TextField fx:id="minSegmentSizeField" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" GridPane.columnIndex="1" GridPane.rowIndex="11" />
+                  <Separator GridPane.columnSpan="2" GridPane.rowIndex="12" />
+                  <Label text="%Write buffer size:" GridPane.rowIndex="13" />
+                  <TextField fx:id="writeBufferSizeField" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" GridPane.columnIndex="1" GridPane.rowIndex="13" />
+               </children>
+               <padding>
+                  <Insets bottom="15.0" left="15.0" right="15.0" top="15.0" />
+               </padding>
+            </GridPane>
+         </content>
+      </Tab>
+      <Tab text="%Connection">
+        <content>
+            <GridPane hgap="10.0" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" vgap="10.0">
+               <columnConstraints>
+                  <ColumnConstraints hgrow="NEVER" minWidth="-Infinity" />
+                  <ColumnConstraints hgrow="SOMETIMES" maxWidth="1.7976931348623157E308" minWidth="-Infinity" />
+               </columnConstraints>
+               <rowConstraints>
+                  <RowConstraints minHeight="-Infinity" vgrow="NEVER" />
+                  <RowConstraints minHeight="-Infinity" vgrow="NEVER" />
+                  <RowConstraints minHeight="-Infinity" vgrow="NEVER" />
+                  <RowConstraints minHeight="-Infinity" vgrow="NEVER" />
+                  <RowConstraints minHeight="-Infinity" vgrow="NEVER" />
+                  <RowConstraints minHeight="-Infinity" vgrow="NEVER" />
+                  <RowConstraints minHeight="-Infinity" vgrow="NEVER" />
+                  <RowConstraints minHeight="-Infinity" vgrow="NEVER" />
+                  <RowConstraints minHeight="-Infinity" vgrow="NEVER" />
+                  <RowConstraints minHeight="-Infinity" vgrow="NEVER" />
+                  <RowConstraints minHeight="-Infinity" vgrow="NEVER" />
+                  <RowConstraints minHeight="-Infinity" vgrow="NEVER" />
+               </rowConstraints>
+               <children>
+                  <Label text="%Proxy:" />
+                  <TextField fx:id="proxyField" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" GridPane.columnIndex="1" />
+                  <Separator prefWidth="200.0" GridPane.columnSpan="2" GridPane.rowIndex="1" />
+                  <Label text="%Max errors:" GridPane.rowIndex="2" />
+                  <TextField fx:id="maxErrorsField" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" GridPane.columnIndex="1" GridPane.rowIndex="2" />
+                  <Label text="%Attempt delay:" GridPane.rowIndex="3" />
+                  <TextField fx:id="attemptDelayField" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" GridPane.columnIndex="1" GridPane.rowIndex="3" />
+                  <Separator prefWidth="200.0" GridPane.columnSpan="2" GridPane.rowIndex="4" />
+                  <Label text="%Connection request timeout:" GridPane.rowIndex="5" />
+                  <TextField fx:id="cnxRequestTimeoutField" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" GridPane.columnIndex="1" GridPane.rowIndex="5" />
+                  <Label text="%Connection timeout:" GridPane.rowIndex="6" />
+                  <TextField fx:id="cnxTimeoutField" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" GridPane.columnIndex="1" GridPane.rowIndex="6" />
+                  <Label text="%Socket timeout:" GridPane.rowIndex="7" />
+                  <TextField fx:id="socketTimeoutField" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" GridPane.columnIndex="1" GridPane.rowIndex="7" />
+                  <Label text="%Idle timeout:" GridPane.rowIndex="8" />
+                  <TextField fx:id="idleTimeoutField" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" GridPane.columnIndex="1" GridPane.rowIndex="8" />
+                  <Separator prefWidth="200.0" GridPane.columnSpan="2" GridPane.rowIndex="9" />
+                  <Label text="%Buffer min size:" GridPane.rowIndex="10" />
+                  <TextField fx:id="bufferMinSizeField" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" GridPane.columnIndex="1" GridPane.rowIndex="10" />
+                  <Label text="%Buffer max size:" GridPane.rowIndex="11" />
+                  <TextField fx:id="bufferMaxSizeField" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" GridPane.columnIndex="1" GridPane.rowIndex="11" />
+               </children>
+               <padding>
+                  <Insets bottom="15.0" left="15.0" right="15.0" top="15.0" />
+               </padding>
+            </GridPane>
+        </content>
+      </Tab>
+      <Tab fx:id="sitesTab" text="%Sites">
+         <content>
+            <HBox maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308">
+               <children>
+                  <GridPane hgap="10.0" vgap="10.0" HBox.hgrow="ALWAYS">
+                     <HBox.margin>
+                        <Insets bottom="10.0" left="10.0" right="10.0" top="10.0" />
+                     </HBox.margin>
+                     <columnConstraints>
+                        <ColumnConstraints hgrow="ALWAYS" maxWidth="1.7976931348623157E308" />
+                        <ColumnConstraints hgrow="NEVER" minWidth="-Infinity" />
+                     </columnConstraints>
+                     <rowConstraints>
+                        <RowConstraints maxHeight="-Infinity" vgrow="NEVER" />
+                        <RowConstraints maxHeight="1.7976931348623157E308" vgrow="ALWAYS" />
+                     </rowConstraints>
+                     <children>
+                        <ListView fx:id="sitesField" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" minHeight="200.0" minWidth="150.0" GridPane.columnSpan="2" GridPane.rowIndex="1" />
+                        <Button mnemonicParsing="false" onAction="#onSiteAdd" text="%Add" GridPane.halignment="RIGHT" />
+                        <Button fx:id="siteRemoveButton" mnemonicParsing="false" onAction="#onSiteRemove" text="%Remove" GridPane.columnIndex="1" GridPane.halignment="RIGHT" />
+                     </children>
+                  </GridPane>
+                  <VBox maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" spacing="5.0">
+                     <children>
+                        <Label text="%Site" />
+                        <TextField fx:id="siteNameField" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" />
+                        <Label text="%Max connections:" />
+                        <TextField fx:id="siteMaxCnxField" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" />
+                        <Label text="%Max segments:" />
+                        <TextField fx:id="siteMaxSegmentsField" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" />
+                     </children>
+                     <HBox.margin>
+                        <Insets bottom="10.0" left="10.0" right="10.0" top="10.0" />
+                     </HBox.margin>
+                  </VBox>
+               </children>
+            </HBox>
+         </content>
+      </Tab>
+   </tabs>
+</TabPane>

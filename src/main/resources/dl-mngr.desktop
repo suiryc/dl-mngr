@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=dl-mngr
+GenericName=Download Manager
+Exec=bash -c '~/progs/dl-mngr/dl-mngr.py'
+Icon=dl-mngr.svg
+StartupWMClass=suiryc.dl.mngr.Main
+Terminal=false
+Type=Application
+Categories=Network;FileTransfer;
+Keywords=filetransfer;download files;download manager;

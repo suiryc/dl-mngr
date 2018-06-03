@@ -1,0 +1,79 @@
+/* Progress cell: remove padding so that progress bar fills the whole space. */
+.table-cell-downloaded {
+    -fx-padding: 0;
+}
+
+/* Progress cell: translate back text a bit due to padding removal.
+ * For some reason, removing padding (2px) in the cell makes the text appear 1px
+ * below what it should ...
+ */
+.table-cell-downloaded .text {
+    -fx-translate-y: -0.083em;
+}
+
+/* Override table view selected row CSS.
+ * Use much lighter background color, and don't change the border color.
+ */
+.table-view:focused > .virtual-flow > .clipped-container > .sheet > .table-row-cell:filled:selected,
+.table-view:focused > .virtual-flow > .clipped-container > .sheet > .table-row-cell .table-cell:selected {
+  -fx-background: derive(-fx-selection-bar, 100%);
+  -fx-table-cell-border-color: derive(-fx-color, 5%);
+}
+
+/* Override table view focused row CSS.
+ * Don't change background color/insets.
+ */
+.table-view:focused:row-selection > .virtual-flow > .clipped-container > .sheet > .table-row-cell:focused,
+.table-view:focused:cell-selection > .virtual-flow > .clipped-container > .sheet > .table-row-cell > .table-cell:focused {
+  -fx-background-color: -fx-table-cell-border-color, -fx-background;
+  -fx-background-insets: 0, 0 0 1 0;
+}
+
+/* Override progress bar CSS.
+ * Use greenish color instead of blueish.
+ */
+.progress-bar > .bar {
+  -fx-accent: #40E090;
+}
+
+.root {
+  color-success: #40E040;
+  color-pending: #E0E040;
+  color-warning: #E09040;
+  color-failure: #E04040;
+  color-neutral: #555555;
+  /*color-neutral-light: #777777;*/
+}
+
+/* Default CSS for SVG groups. */
+.svg-group .svg-path {
+  -fx-fill: color-neutral;
+}
+
+.icon-check-square .svg-path {
+  -fx-fill: color-success;
+}
+
+.icon-exclamation-triangle .svg-path {
+  -fx-fill: color-failure;
+}
+
+.icon-exclamation-triangle-warning .svg-path {
+  -fx-fill: color-warning;
+}
+
+.icon-play .svg-path {
+  -fx-fill: color-success;
+}
+
+.icon-play-started .svg-path {
+  -fx-fill: color-pending;
+}
+
+.icon-stop .svg-path {
+  -fx-fill: color-neutral;
+}
+
+.icon-undo .svg-path {
+  -fx-fill: color-neutral;
+}

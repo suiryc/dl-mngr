@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.ChoiceBox?>
+<?import javafx.scene.control.CustomMenuItem?>
+<?import javafx.scene.control.Menu?>
+<?import javafx.scene.control.MenuBar?>
+<?import javafx.scene.control.MenuItem?>
+<?import javafx.scene.control.SeparatorMenuItem?>
+<?import javafx.scene.control.SplitPane?>
+<?import javafx.scene.control.TableView?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.input.KeyCodeCombination?>
+<?import javafx.scene.layout.AnchorPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.VBox?>
+
+<AnchorPane maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" minHeight="360.0" minWidth="600.0" xmlns="http://javafx.com/javafx/10.0.1" xmlns:fx="http://javafx.com/fxml/1" fx:controller="suiryc.dl.mngr.controllers.MainController">
+   <children>
+      <VBox maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
+         <children>
+            <MenuBar fx:id="menuBar">
+              <menus>
+                <Menu mnemonicParsing="false" text="%File">
+                  <items>
+                        <MenuItem mnemonicParsing="false" onAction="#onOptions" styleClass="icon-cog" text="%Options" />
+                        <SeparatorMenuItem mnemonicParsing="false" />
+                        <MenuItem mnemonicParsing="false" onAction="#onExit" styleClass="icon-sign-out" text="%Exit">
+                           <accelerator>
+                              <KeyCodeCombination alt="UP" code="Q" control="DOWN" meta="UP" shift="UP" shortcut="UP" />
+                           </accelerator>
+                        </MenuItem>
+                  </items>
+                </Menu>
+                  <Menu fx:id="downloadsMenu" mnemonicParsing="false" text="%Downloads">
+                     <items>
+                        <MenuItem mnemonicParsing="false" onAction="#onDownloadsAdd" styleClass="icon-download" text="%Add" />
+                        <SeparatorMenuItem mnemonicParsing="false" />
+                        <MenuItem fx:id="downloadsStopAllMenu" mnemonicParsing="false" onAction="#onDownloadsStopAll" styleClass="icon-stop" text="%Stop all" />
+                        <MenuItem fx:id="downloadsResumeAllMenu" mnemonicParsing="false" onAction="#onDownloadsResumeAll" styleClass="icon-play" text="%Resume all" />
+                        <MenuItem fx:id="downloadsRemoveCompletedMenu" mnemonicParsing="false" onAction="#onDownloadsRemoveCompleted" styleClass="icon-eraser" text="%Remove completed" />
+                        <MenuItem fx:id="downloadsRemoveMenu" mnemonicParsing="false" onAction="#onDownloadsRemove" styleClass="icon-minus" text="%Remove" />
+                        <SeparatorMenuItem mnemonicParsing="false" />
+                        <CustomMenuItem hideOnClick="false" mnemonicParsing="false">
+                           <content>
+                              <HBox maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity">
+                                 <children>
+                                    <TextField fx:id="rateLimitField" alignment="CENTER_RIGHT" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" />
+                                    <ChoiceBox fx:id="rateLimitUnitField" HBox.hgrow="NEVER" />
+                                 </children>
+                              </HBox>
+                           </content>
+                        </CustomMenuItem>
+                     </items>
+                  </Menu>
+              </menus>
+            </MenuBar>
+            <SplitPane fx:id="splitPane" dividerPositions="0.5" orientation="VERTICAL" VBox.vgrow="ALWAYS">
+              <items>
+                  <TableView fx:id="downloadsTable" prefHeight="200.0" prefWidth="200.0" />
+                  <TableView fx:id="logsTable" prefHeight="200.0" prefWidth="200.0" />
+              </items>
+            </SplitPane>
+         </children>
+      </VBox>
+   </children>
+</AnchorPane>
