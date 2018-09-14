@@ -66,7 +66,15 @@ object FileDownloader {
 
     updateMaxSegments()
 
-    def getMaxSegments: Int = maxSegments.getOrElse(download.maxSegments)
+    def getMaxSegments: Int = {
+      // If the server does not accept ranges, maxSegments is automatically 1.
+      if (download.info.acceptRanges.contains(false)) 1
+      else maxSegments.getOrElse(download.maxSegments)
+    }
+
+    def setMaxSegments(max: Int): State = {
+      copy(maxSegments = Some(max)).updateMaxSegments()
+    }
 
     def updateMaxSegments(): State = {
       download.info.maxSegments.set(getMaxSegments)
@@ -473,13 +481,19 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
       download.info.addLog(LogKind.Info, message)
 
       if (contentLength < 0) download.info.addLog(LogKind.Warning, "Download size is unknown")
-      if (!acceptRanges) download.info.addLog(LogKind.Warning, "Download resuming is not supported")
 
       download.info.size.set(contentLength)
       download.info.remainingRanges = if (contentLength >= 0) Some(new SegmentRanges(contentLength)) else None
       download.info.rangeValidator = validator
       download.info.acceptRanges = Some(acceptRanges)
       download.info.lastModified = lastModified
+
+      if (!acceptRanges) {
+        download.info.addLog(LogKind.Warning, "Download resuming is not supported")
+        // maxSegments will automatically be 1 now
+        state0.updateMaxSegments()
+      }
+
       // If 'downloaded' is already set, we are resuming an existing file
       // assuming its current size was already downloaded.
       val downloaded = download.info.downloaded.get
@@ -500,7 +514,7 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
     // Only try a new segment when applicable.
     val active = download.info.activeSegments.get
     if (state2.segmentConsumers(consumer).forced && (active > state2.getMaxSegments)) {
-      state2.copy(maxSegments = Some(active)).updateMaxSegments()
+      state2.setMaxSegments(active)
     } else {
       trySegment(state2)
     }
@@ -678,7 +692,7 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
           val message = s"Too many errors; set maxSegments=<$maxSegments>"
           logger.warn(s"${download.context} $message")
           state0.download.info.addLog(LogKind.Warning, message)
-          state0.copy(maxSegments = Some(maxSegments))
+          state0.setMaxSegments(maxSegments)
         } else {
           // Segment had an issue after successfully starting.
           val message = "Too many errors"
@@ -705,8 +719,7 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
       state0
     }
     // Reduce the segments limit (relatively to the current number of segments)
-    val limit = math.max(1, segments - 1)
-    state.copy(maxSegments = Some(limit)).updateMaxSegments()
+    state.setMaxSegments(math.max(1, segments - 1))
   }
 
   def done(state0: State): State = {
