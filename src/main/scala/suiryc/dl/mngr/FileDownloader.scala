@@ -68,7 +68,7 @@ object FileDownloader {
 
     def getMaxSegments: Int = {
       // If the server does not accept ranges, maxSegments is automatically 1.
-      if (download.info.acceptRanges.contains(false)) 1
+      if (download.acceptRanges.contains(false)) 1
       else maxSegments.getOrElse(download.maxSegments)
     }
 
@@ -287,7 +287,7 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
       ok
     }
     lazy val canStartSegment = !state0.stopping && state0.trySegment.isEmpty && (force || canAddSegment)
-    if (download.info.acceptRanges.contains(true) && canStartSegment) {
+    if (download.acceptRanges.contains(true) && canStartSegment) {
       // Clone the current remaining ranges (we will work with it)
       download.info.remainingRanges.map(_.clone()).flatMap { remainingRanges ⇒
         val minSize = download.minSegmentSize
@@ -486,7 +486,7 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
       download.info.size.set(contentLength)
       download.info.remainingRanges = if (contentLength >= 0) Some(new SegmentRanges(contentLength)) else None
       download.info.rangeValidator = validator
-      download.info.acceptRanges = Some(acceptRanges)
+      download.acceptRanges(acceptRanges)
       download.info.lastModified = lastModified
 
       if (!acceptRanges) {
@@ -687,7 +687,7 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
           state0.download.info.addLog(LogKind.Warning, message)
           stop(state0, ex, abort = true)
         } else {
-          download.info.acceptRanges = Some(false)
+          download.acceptRanges(accept = false)
           // maxSegments will automatically be 1 now
           state0.updateMaxSegments()
           val message = "Too many errors; assume server does not accept ranges"

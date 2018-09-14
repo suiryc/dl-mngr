@@ -62,7 +62,7 @@ class DownloadInfo {
   /** Range validator (if applicable) */
   var rangeValidator: Option[String] = None
   /** Whether server accept ranges */
-  var acceptRanges: Option[Boolean] = None
+  var acceptRanges: SimpleObjectProperty[Option[Boolean]] = new SimpleObjectProperty(None)
   /** File last modified time on server */
   var lastModified: Option[Date] = None
 
@@ -74,7 +74,7 @@ class DownloadInfo {
   def restart(): Unit = {
     remainingRanges = None
     rangeValidator = None
-    acceptRanges = None
+    acceptRanges.set(None)
     lastModified = None
     downloaded.set(0)
   }
@@ -157,6 +157,9 @@ case class Download(
     if (done) info.path.set(path)
   }
 
+  def acceptRanges: Option[Boolean] = info.acceptRanges.get
+  def acceptRanges(accept: Boolean): Unit = info.acceptRanges.set(Some(accept))
+
   def state: DownloadState.Value = info.state.getValue
   def isStarted: Boolean = info.isSizeDetermined || (info.downloaded.get > 0)
   def isRunning: Boolean = state == DownloadState.Running
@@ -165,11 +168,11 @@ case class Download(
   def canStop: Boolean = isActive
   def canResume(restart: Boolean): Boolean = if (restart) canRestart else canResume
   // We cannot resume if ranges are not supported.
-  def canResume: Boolean = !info.acceptRanges.contains(false) &&
+  def canResume: Boolean = !acceptRanges.contains(false) &&
     ((state == DownloadState.Failure) || (state == DownloadState.Stopped))
   // We can restart upon failure, or if stopped and ranges are not supported.
   def canRestart: Boolean = (state == DownloadState.Failure) ||
-    ((state == DownloadState.Stopped) && info.acceptRanges.contains(false))
+    ((state == DownloadState.Stopped) && acceptRanges.contains(false))
 
   def activeSegments: Int = info.activeSegments.get
   def maxSegments: Int = Main.settings.getSite(info.uri.get).getSegmentsMax
@@ -217,10 +220,10 @@ case class Download(
       path = downloadFile.getPath,
       temporaryPath = downloadFile.getTemporaryPath,
       done = isDone,
-      canResume = (isActive || info.wasActive) && !info.acceptRanges.contains(false),
+      canResume = (isActive || info.wasActive) && !acceptRanges.contains(false),
       size = if (info.isSizeDetermined) Some(info.size.get) else None,
       rangeValidator = info.rangeValidator,
-      acceptRanges = info.acceptRanges,
+      acceptRanges = acceptRanges,
       lastModified = info.lastModified,
       downloadedRanges = downloadFile.getDownloadedRanges(info)
     )

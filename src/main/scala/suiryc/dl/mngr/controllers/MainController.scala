@@ -967,7 +967,7 @@ class MainController extends StagePersistentView with StrictLogging {
           }.add(data.sizeIcon) {
             val warnings =
               (if (!info.isSizeUnknown) Nil else List(Strings.unknownSize)) :::
-                (if (!info.acceptRanges.contains(false)) Nil else List(Strings.resumeUnsupported))
+                (if (!download.acceptRanges.contains(false)) Nil else List(Strings.resumeUnsupported))
 
             if (warnings.nonEmpty) {
               val icon = Icons.exclamationTriangle(styleClass = List("icon-exclamation-triangle-warning")).pane
@@ -975,7 +975,7 @@ class MainController extends StagePersistentView with StrictLogging {
               Tooltip.install(icon, tooltip)
               icon
             } else null
-          }.bind(info.size)
+          }.bind(info.size, info.acceptRanges)
 
           BindingsEx.bind(data.downloadedProgress.progressProperty, 100.millis, JFXSystem.scheduler, info.downloaded, info.state) {
             Option(info.size.get).filter(_ >= 0).map { size ⇒
