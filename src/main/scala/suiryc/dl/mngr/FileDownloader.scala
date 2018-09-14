@@ -195,8 +195,9 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
   }
 
   def stop(state0: State, ex: DownloadException, abort: Boolean): State = {
-    logger.info(s"${state0.download.context} Download stopping")
-    state0.download.info.addLog(LogKind.Info, "Download stopping")
+    val download = state0.download
+    logger.info(s"${download.context} Download stopping")
+    download.info.addLog(LogKind.Info, "Download stopping")
 
     val state = state0.copy(
       stopping = true,
@@ -323,6 +324,13 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
         case (consumerOpt, range, acquired) ⇒
           consumerOpt match {
             case Some(consumer) ⇒
+              // TODO: wait for request 'success' before changing current consumer end ?
+              //  -> useful if request actually fails, so that we
+              //    1. don't waste time/logs changing and resetting the current consumer end
+              //    2. prevent current consumer to end if it reaches the end before the request
+              //       actually fails
+              //  -> at worst, new consumer may overwrite sections already downloaded ?
+              //  Is is worth it ?
               val newRange = range.copy(
                 start = range.start + range.length / 2 + 1
               )
@@ -451,7 +459,7 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
         val redirectLocations = data.context.getRedirectLocations
         if (!redirectLocations.isEmpty) {
           download.info.uri.set(data.context.getRedirectLocations.asScala.last)
-          val message = s"Actual (redirected) uri=<${download.info.uri}>"
+          val message = s"Actual (redirected) uri=<${download.info.uri.get}>"
           logger.info(s"${download.context} $message")
           download.info.addLog(LogKind.Info, message)
         }
@@ -704,9 +712,21 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
   def done(state0: State): State = {
     val download = state0.download
     val lastModified = state0.download.info.lastModified
+    val complete = (download.info.remainingRanges.isEmpty && state0.started && state0.failed.isEmpty) ||
+      download.info.remainingRanges.exists(_.getRanges.isEmpty)
+
+    // If we had a failure, but download actually completed (e.g. only one
+    // segment could be started, and the whole download range was completed)
+    // ignore the failure.
+    val state1 = if (complete && state0.failed.nonEmpty) {
+      state0.copy(failed = None)
+    } else {
+      state0
+    }
+
     // Close the file and handle any issue.
     val closeExOpt = try {
-      state0.download.closeFile(lastModified, done = state0.failed.isEmpty)
+      state1.download.closeFile(lastModified, done = state1.failed.isEmpty)
       None
     } catch {
       case ex: DownloadException ⇒
@@ -716,11 +736,11 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
         Some(DownloadException(
           message = s"I/O error: (${ex.getClass.getSimpleName}) ${ex.getMessage}",
           cause = ex,
-          started = state0.started
+          started = state1.started
         ))
     }
 
-    val state = handleWriteError(state0, closeExOpt)
+    val state = handleWriteError(state1, closeExOpt)
     state.failed.orElse(closeExOpt) match {
       case Some(ex) if closeExOpt.isEmpty ⇒
         // The download did fail on its own
