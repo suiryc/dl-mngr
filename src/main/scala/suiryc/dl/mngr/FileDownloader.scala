@@ -382,7 +382,6 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
       } else {
         new HttpGet(uri)
       }
-      val responseConsumer = new ResponseConsumer(self, download, range)
 
       download.referrer.foreach { referrer ⇒
         request.addHeader(HttpHeaders.REFERER, referrer.toASCIIString)
@@ -428,6 +427,7 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
       //  or
       //   - in a one-shot client, with a specific callback to execute
       val context = HttpClientContext.create()
+      val responseConsumer = new ResponseConsumer(self, download, range, request)
       state.dlMngr.client.execute(requestProducer, responseConsumer, context, null)
 
       val data = SegmentHandlerData(
@@ -785,7 +785,8 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
 class ResponseConsumer(
   downloadHandler: ActorRef,
   download: Download,
-  range: SegmentRange
+  range: SegmentRange,
+  request: HttpRequestBase
 ) extends AbstractAsyncResponseConsumer[Unit] {
 
   private var position: Long = range.start
@@ -831,8 +832,17 @@ class ResponseConsumer(
     // Note: 'failed' will fail this request, which will release its resources
     // and propagate the issue to handler.
     failure match {
-      case Some(ex) ⇒ failed(ex)
-      case None ⇒ downloadHandler ! FileDownloader.SegmentStarted(this, response)
+      case Some(ex) ⇒
+        // First set failure
+        failed(ex)
+        // Then abort the request.
+        // It is sometimes necessary: for some URIs, 'failed' is enough to stop
+        // the request, for others the connection actually keeps on receiving
+        // data (and stays alive in the background ...)
+        request.abort()
+
+      case None ⇒
+        downloadHandler ! FileDownloader.SegmentStarted(this, response)
     }
   }
 
