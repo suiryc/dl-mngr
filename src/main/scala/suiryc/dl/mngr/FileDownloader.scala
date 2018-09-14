@@ -675,15 +675,31 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
     // Too many issues.
     val download = state0.download
     exOpt.map { ex ⇒
-      if (ex.rangeFailed && (ex.rangeValidator != download.info.rangeValidator)) {
-        // The range request failed apparently because the validator changed
-        // (file on server was changed since we started ?).
-        // Notify caller through promise, and let it decide whether to end the
-        // download or restart it (from its current state).
-        val message = s"Too many errors; range validator changed from=<${download.info.rangeValidator}> to=<${ex.rangeValidator}>"
-        logger.warn(s"${download.context} $message")
-        state0.download.info.addLog(LogKind.Warning, message)
-        stop(state0, ex, abort = true)
+      if (ex.rangeFailed) {
+        // If the range validator changed (file on server was changed since we
+        // started ?), notify caller through promise, and let it decide whether
+        // to end the download or restart it (from its current state).
+        // Otherwise, that means the server actually does not support ranges
+        // even though it advertises it.
+        if (ex.rangeValidator != download.info.rangeValidator) {
+          val message = s"Too many errors; range validator changed from=<${download.info.rangeValidator}> to=<${ex.rangeValidator}>"
+          logger.warn(s"${download.context} $message")
+          state0.download.info.addLog(LogKind.Warning, message)
+          stop(state0, ex, abort = true)
+        } else {
+          download.info.acceptRanges = Some(false)
+          // maxSegments will automatically be 1 now
+          state0.updateMaxSegments()
+          val message = "Too many errors; assume server does not accept ranges"
+          logger.warn(s"${download.context} $message")
+          state0.download.info.addLog(LogKind.Warning, message)
+          // Trigger stopping if that was the last consumer
+          if (state0.segmentConsumers.isEmpty) {
+            stop(state0, ex, abort = false)
+          } else {
+            state0
+          }
+        }
       } else {
         val state1 = if (!ex.started) {
           // Request failed.
