@@ -12,6 +12,7 @@ import org.apache.http.nio.protocol.{AbstractAsyncResponseConsumer, BasicAsyncRe
 import org.apache.http.nio.{ContentDecoder, IOControl}
 import org.apache.http.protocol.HttpContext
 import org.apache.http._
+import org.apache.http.client.protocol.HttpClientContext
 import scala.collection.JavaConverters._
 import scala.concurrent.Promise
 import scala.concurrent.duration._
@@ -36,7 +37,9 @@ object FileDownloader {
   case class SegmentHandlerData(
     range: SegmentRange,
     originalRange: SegmentRange,
+    acquired: AcquiredConnection,
     forced: Boolean,
+    context: HttpClientContext,
     request: HttpRequestBase,
     responseConsumer: ResponseConsumer,
     started: Boolean = false,
@@ -308,28 +311,33 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
         }
 
         // Get the best candidate
-        (remainingActive ::: remainingNonActive).sortBy(-_._3).headOption.filter { _ ⇒
-          // Now that we know we really can start a new segment, ensure we can
-          // actually create a new connection.
-          tryAcquireConnection
+        (remainingActive ::: remainingNonActive).sortBy(-_._3).headOption.flatMap {
+          case (consumerOpt, range, _) ⇒
+            // Now that we know we really can start a new segment, ensure we can
+            // actually create a new connection.
+            tryAcquireConnection.map { acquired ⇒
+              (consumerOpt, range, acquired)
+            }
         }
       }.map {
-        case (consumerOpt, range, _) ⇒
+        case (consumerOpt, range, acquired) ⇒
           consumerOpt match {
             case Some(consumer) ⇒
               val newRange = range.copy(
                 start = range.start + range.length / 2 + 1
               )
               val state1 = changeSegmentEnd(state0, consumer, newRange.start - 1)
-              segmentStart(state1, newRange, forced = force)
+              segmentStart(state1, newRange, acquired, forced = force)
 
             case None ⇒
-              segmentStart(state0, range, forced = force)
+              segmentStart(state0, range, acquired, forced = force)
           }
       }.getOrElse(state0)
-    } else if (download.info.remainingRanges.isEmpty && state0.segmentConsumers.isEmpty && !state0.stopping && tryAcquireConnection) {
-      // Special case: initial request failed, so re-try it
-      segmentStart(state0, SegmentRange(0, -1), forced = force)
+    } else if (download.info.remainingRanges.isEmpty && state0.segmentConsumers.isEmpty && !state0.stopping) {
+      // Special case: initial request failed, so re-try it (if possible)
+      tryAcquireConnection.map { acquired ⇒
+        segmentStart(state0, SegmentRange(0, -1), acquired, forced = force)
+      }.getOrElse(state0)
     } else {
       // We cannot try a new segment.
       // We also end up here if first connection request is ongoing (no response
@@ -338,8 +346,9 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
     }
   }
 
-  def segmentStart(state: State, range: SegmentRange, forced: Boolean): State = {
+  def segmentStart(state: State, range: SegmentRange, acquired: AcquiredConnection, forced: Boolean): State = {
     val download = state.download
+    val uri = download.info.uri.get
     download.rateLimiter.addDownload()
     try {
       logger.info(s"${download.context(range)} Starting range=$range")
@@ -353,9 +362,9 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
       // offset).
       val downloaded = download.info.downloaded.get
       val request = if (!state.started && (downloaded > 0)) {
-        new HttpHead(download.uri)
+        new HttpHead(uri)
       } else {
-        new HttpGet(download.uri)
+        new HttpGet(uri)
       }
       val responseConsumer = new ResponseConsumer(self, download, range)
 
@@ -393,14 +402,24 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
         }
       }
       request.setConfig(rcb.build)
-      val requestProducer = new BasicAsyncRequestProducer(URIUtils.extractHost(download.uri), request)
+      val requestProducer = new BasicAsyncRequestProducer(URIUtils.extractHost(uri), request)
 
-      state.dlMngr.client.execute(requestProducer, responseConsumer, null)
+      // Attach a context so that we can retrieve redirection URIs.
+      // It happens that redirection URIs are stored in the HTTP context.
+      // An alternative would be to add an interceptor:
+      //   - in the shared client, and use the context, possibly to execute a
+      //     specific callback
+      //  or
+      //   - in a one-shot client, with a specific callback to execute
+      val context = HttpClientContext.create()
+      state.dlMngr.client.execute(requestProducer, responseConsumer, context, null)
 
       val data = SegmentHandlerData(
         range = range,
         originalRange = range,
+        acquired = acquired,
         forced = forced,
+        context = context,
         request = request,
         responseConsumer = responseConsumer
       )
@@ -410,7 +429,7 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
         val message = s"Failed to start segment range=$range download: ${ex.getMessage}"
         logger.error(s"${download.context(range)} $message", ex)
         state.download.info.addLog(LogKind.Error, message, Some(ex))
-        segmentDone(state, None, range, Some(ex))
+        segmentDone(state, None, range, acquired, Some(ex))
     }
   }
 
@@ -426,6 +445,17 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
       val acceptRanges = Http.handleBytesRange(response, contentLength)
       val validator = if (acceptRanges) Http.getValidator(response) else None
 
+      // Update actual URI when applicable, so that next requests will use it
+      // directly.
+      state0.segmentConsumers.get(consumer).foreach { data ⇒
+        val redirectLocations = data.context.getRedirectLocations
+        if (!redirectLocations.isEmpty) {
+          download.info.uri.set(data.context.getRedirectLocations.asScala.last)
+          val message = s"Actual (redirected) uri=<${download.info.uri}>"
+          logger.info(s"${download.context} $message")
+          download.info.addLog(LogKind.Info, message)
+        }
+      }
       val message = s"Download contentLength=<$contentLength>${
         lastModified.map(v ⇒ s" lastModified=<$v>").getOrElse("")
       } acceptRanges=<$acceptRanges>${
@@ -470,13 +500,13 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
 
   def segmentDone(state: State, consumer: ResponseConsumer, ex: Option[Exception]): State = {
     state.segmentConsumers.get(consumer).map { data ⇒
-      segmentDone(state.removeConsumer(consumer), Some(data), data.range, ex)
+      segmentDone(state.removeConsumer(consumer), Some(data), data.range, data.acquired, ex)
     }.getOrElse(state)
   }
 
-  def segmentDone(state0: State, dataOpt: Option[SegmentHandlerData], range: SegmentRange, ex0: Option[Exception]): State = {
+  def segmentDone(state0: State, dataOpt: Option[SegmentHandlerData], range: SegmentRange, acquired: AcquiredConnection, ex0: Option[Exception]): State = {
     val download = state0.download
-    state0.dlMngr.releaseConnection(download)
+    state0.dlMngr.releaseConnection(acquired)
     download.rateLimiter.removeDownload()
     // Take into account our failure if any.
     val exOpt0: Option[DownloadException] = ex0.map {

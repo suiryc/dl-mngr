@@ -189,7 +189,10 @@ class DownloadManager extends StrictLogging {
   }
 
   def findDownload(uri: URI): Option[Download] = {
-    dlEntries.find(_.download.uri == uri).map(_.download)
+    dlEntries.find { dlEntry ⇒
+      // Check both original and actual URIs
+      (dlEntry.download.uri == uri) || (dlEntry.download.info.uri.get == uri)
+    }.map(_.download)
   }
 
   def stopDownload(id: UUID): Unit = {
@@ -451,11 +454,20 @@ class DownloadManager extends StrictLogging {
     cnxTotal < Main.settings.cnxMax.get
   }
 
-  def tryAcquireConnection(download: Download, force: Boolean): Boolean = this.synchronized {
-    val siteSettings = download.siteSettings
-    val host = download.uri.getHost
-    val perSite = cnxPerSite(siteSettings.site)
-    val perServer = cnxPerServer(host)
+  def tryAcquireConnection(download: Download, force: Boolean): Option[AcquiredConnection] = this.synchronized {
+    // Use the actual URI (since this is the real one we connect to)
+    val uri = download.info.uri.get
+    val siteSettings = Main.settings.getSite(uri)
+    // Remember the acquired connection info to update the appropriate resources
+    // in releaseConnection: the actual URI may change upon the first request
+    // due to redirections.
+    val acquired = AcquiredConnection(
+      site = siteSettings.site,
+      host = uri.getHost
+    )
+
+    val perSite = cnxPerSite(acquired.site)
+    val perServer = cnxPerServer(acquired.host)
 
     val reasonOpt = {
       // The 'running downloads' limit applies to downloads that are not yet running
@@ -475,12 +487,12 @@ class DownloadManager extends StrictLogging {
       if (force || siteSettings.isDefault) None
       else {
         val limit = siteSettings.getCnxMax
-        if (perSite >= limit) Some(s"number of connections for site=<${siteSettings.site}> limit=<$limit>")
+        if (perSite >= limit) Some(s"number of connections for site=<${acquired.site}> limit=<$limit>")
         else None
       }
     }.orElse {
       val limit = Main.settings.cnxServerMax.get
-      if (!force && (perServer >= limit)) Some(s"number of connections for host=<$host> limit=<$limit>")
+      if (!force && (perServer >= limit)) Some(s"number of connections for host=<${acquired.host}> limit=<$limit>")
       else None
     }
 
@@ -490,8 +502,8 @@ class DownloadManager extends StrictLogging {
     }
     if (reasonOpt.isEmpty) {
       cnxTotal += 1
-      cnxPerSite += (siteSettings.site → (perSite + 1))
-      cnxPerServer += (host → (perServer + 1))
+      cnxPerSite += (acquired.site → (perSite + 1))
+      cnxPerServer += (acquired.host → (perServer + 1))
       download.openFile()
       download.info.state.setValue(DownloadState.Running)
       // Note: don't reset last reason. What really matters are 'new' reasons
@@ -500,24 +512,26 @@ class DownloadManager extends StrictLogging {
       // with low usefulness - the same reason: when connection is released, we
       // usually can get a new one and on the next attempt reach the same limit
       // again.
+      Some(acquired)
+    } else {
+      None
     }
-    reasonOpt.isEmpty
   }
 
-  def releaseConnection(download: Download): Unit = this.synchronized {
-    val siteSettings = download.siteSettings
-    val host = download.uri.getHost
-    val perSite = cnxPerSite(siteSettings.site)
-    val perServer = cnxPerServer(host)
+  def releaseConnection(acquired: AcquiredConnection): Unit = this.synchronized {
+    val perSite = cnxPerSite(acquired.site)
+    val perServer = cnxPerServer(acquired.host)
 
     if (cnxTotal > 0) cnxTotal -= 1
-    if (perSite > 1) cnxPerSite += (siteSettings.site → (perSite - 1))
-    else cnxPerSite -= siteSettings.site
-    if (perServer > 1) cnxPerServer += (host → (perServer - 1))
-    else cnxPerServer -= host
+    if (perSite > 1) cnxPerSite += (acquired.site → (perSite - 1))
+    else cnxPerSite -= acquired.site
+    if (perServer > 1) cnxPerServer += (acquired.host → (perServer - 1))
+    else cnxPerServer -= acquired.host
   }
 
 }
+
+case class AcquiredConnection(site: String, host: String)
 
 object DownloadsJanitor {
 

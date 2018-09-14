@@ -1,5 +1,6 @@
 package suiryc.dl.mngr
 
+import java.net.URI
 import java.nio.file.{Path, Paths}
 import scala.collection.JavaConverters._
 import scala.concurrent.duration.FiniteDuration
@@ -148,6 +149,25 @@ class Settings(path: Path) {
     ConfigEntry.from(settings, prefix ++ Seq(KEY_DOWNLOADS, KEY_MAX))
 
   def getSites: Map[String, SiteSettings] = sites
+
+  def getSite(uri: URI): SiteSettings = {
+    @scala.annotation.tailrec
+    def loop(host: String): SiteSettings = {
+      // Site name must not be TLD alone
+      val els = host.split("\\.", 2)
+      if (els.size > 1) {
+        // Check whether this host is known, otherwise go up one level
+        sites.get(host) match {
+          case Some(siteSettings) ⇒ siteSettings
+          case None ⇒ loop(els(1))
+        }
+      } else {
+        // Fallback to default
+        sitesDefault
+      }
+    }
+    loop(uri.getHost.toLowerCase)
+  }
 
   def getSite(site0: String): SiteSettings = {
     val site = site0.toLowerCase

@@ -7,7 +7,7 @@ import java.util.{Date, UUID}
 import javafx.beans.property.{SimpleIntegerProperty, SimpleLongProperty, SimpleObjectProperty}
 import javafx.collections.{FXCollections, ObservableList}
 import scala.concurrent.Promise
-import suiryc.dl.mngr.{DownloadFile, Main, Settings}
+import suiryc.dl.mngr.{DownloadFile, Main}
 
 object DownloadState extends Enumeration {
   val Stopped, Pending, Running, Success, Failure = Value
@@ -37,6 +37,8 @@ case class NewDownloadInfo(
 )
 
 class DownloadInfo {
+  /** Target URI */
+  val uri: SimpleObjectProperty[URI] = new SimpleObjectProperty()
   /** File path */
   val path: SimpleObjectProperty[Path] = new SimpleObjectProperty()
   /** State (initially stopped) */
@@ -140,6 +142,8 @@ case class Download(
 
   private var lastReason = Option.empty[String]
 
+  info.uri.set(uri)
+
   def path: Path = downloadFile.getPath
   info.path.set(path)
 
@@ -162,28 +166,8 @@ case class Download(
   def canResume: Boolean = (state == DownloadState.Failure) || (state == DownloadState.Stopped)
   def canRestart: Boolean = state == DownloadState.Failure
 
-  def siteSettings: Settings#SiteSettings = {
-    val sites = Main.settings.getSites
-    @scala.annotation.tailrec
-    def loop(host: String): Settings#SiteSettings = {
-      // Site name must not be TLD alone
-      val els = host.split("\\.", 2)
-      if (els.size > 1) {
-        // Check whether this host is known, otherwise go up one level
-        sites.get(host) match {
-          case Some(settings) ⇒ settings
-          case None ⇒ loop(els(1))
-        }
-      } else {
-        // Fallback to default
-        Main.settings.sitesDefault
-      }
-    }
-    loop(uri.getHost.toLowerCase)
-  }
-
   def activeSegments: Int = info.activeSegments.get
-  def maxSegments: Int = siteSettings.getSegmentsMax
+  def maxSegments: Int = Main.settings.getSite(info.uri.get).getSegmentsMax
   def minSegmentSize: Long = Main.settings.segmentsMinSize.get
 
   def updateLastReason(opt: Option[String]): Unit = {
