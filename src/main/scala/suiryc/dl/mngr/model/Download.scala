@@ -54,7 +54,7 @@ class DownloadInfo {
   /** Logs */
   val logs: ObservableList[LogEntry] = FXCollections.observableArrayList()
 
-  /** Whether download was active when downloader manager stopping was requested. */
+  /** Whether download was active when download manager stopping was requested. */
   var wasActive: Boolean = false
 
   /** Remaining segment ranges */
@@ -76,6 +76,7 @@ class DownloadInfo {
     rangeValidator = None
     acceptRanges = None
     lastModified = None
+    downloaded.set(0)
   }
 
   def addLog(kind: LogKind.Value, message: String, exOpt: Option[Exception] = None): Unit = {
@@ -163,8 +164,12 @@ case class Download(
   def isDone: Boolean = state == DownloadState.Success
   def canStop: Boolean = isActive
   def canResume(restart: Boolean): Boolean = if (restart) canRestart else canResume
-  def canResume: Boolean = (state == DownloadState.Failure) || (state == DownloadState.Stopped)
-  def canRestart: Boolean = state == DownloadState.Failure
+  // We cannot resume if ranges are not supported.
+  def canResume: Boolean = !info.acceptRanges.contains(false) &&
+    ((state == DownloadState.Failure) || (state == DownloadState.Stopped))
+  // We can restart upon failure, or if stopped and ranges are not supported.
+  def canRestart: Boolean = (state == DownloadState.Failure) ||
+    ((state == DownloadState.Stopped) && info.acceptRanges.contains(false))
 
   def activeSegments: Int = info.activeSegments.get
   def maxSegments: Int = Main.settings.getSite(info.uri.get).getSegmentsMax
@@ -212,7 +217,7 @@ case class Download(
       path = downloadFile.getPath,
       temporaryPath = downloadFile.getTemporaryPath,
       done = isDone,
-      canResume = isActive || info.wasActive,
+      canResume = (isActive || info.wasActive) && !info.acceptRanges.contains(false),
       size = if (info.isSizeDetermined) Some(info.size.get) else None,
       rangeValidator = info.rangeValidator,
       acceptRanges = info.acceptRanges,

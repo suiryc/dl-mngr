@@ -984,9 +984,9 @@ class MainController extends StagePersistentView with StrictLogging {
                 else 0.0
               v
             }.getOrElse {
-              // Note:
-              // Usually we would set progress to -1.0 if isSizeDetermined when
-              // running. But the indeterminate animation consumes too much CPU.
+              // Note: Usually we would set progress to -1.0 if isSizeDetermined
+              // when running. But the "indeterminate state" animation consumes
+              // more CPU (and apparently too much under Linux).
               info.state.get match {
                 case DownloadState.Running ⇒ 0.0
                 case DownloadState.Success ⇒ 1.0

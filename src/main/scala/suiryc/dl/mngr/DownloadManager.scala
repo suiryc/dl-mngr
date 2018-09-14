@@ -414,10 +414,10 @@ class DownloadManager extends StrictLogging {
         // Handle case where downloadRanges is non-empty yet remainingRanges is.
         // e.g. restoring a file that was 'resumed' ('downloaded' known) but
         // actually not started again before closing the app.
-        download.info.downloaded.set(downloadBackupInfo.downloadedRanges.map(_.length).sum)
+        info.downloaded.set(downloadBackupInfo.downloadedRanges.map(_.length).sum)
         // In any case, if remainingRanges is known, rely on it.
-        download.info.remainingRanges.foreach { remainingRanges ⇒
-          download.info.downloaded.set(remainingRanges.getRemovedLength)
+        info.remainingRanges.foreach { remainingRanges ⇒
+          info.downloaded.set(remainingRanges.getRemovedLength)
         }
         addDownload(download, insertFirst = false)
         if (downloadBackupInfo.canResume) resumeDownload(download.id, reusedOpt = None, restart = false)
