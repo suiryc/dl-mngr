@@ -463,10 +463,11 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
 
       // Update actual URI when applicable, so that next requests will use it
       // directly.
-      state0.segmentConsumers.get(consumer).foreach { data ⇒
-        val redirectLocations = data.context.getRedirectLocations
+      state0.segmentConsumers.get(consumer).flatMap { data ⇒
+        Option(data.context.getRedirectLocations)
+      }.foreach { redirectLocations ⇒
         if (!redirectLocations.isEmpty) {
-          download.info.uri.set(data.context.getRedirectLocations.asScala.last)
+          download.info.uri.set(redirectLocations.asScala.last)
           val message = s"Actual (redirected) uri=<${download.info.uri.get}>"
           logger.info(s"${download.context} $message")
           download.info.addLog(LogKind.Info, message)
