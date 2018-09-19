@@ -1,5 +1,9 @@
 package suiryc.dl.mngr.model
 
+import javax.net.ssl.SSLException
+import scala.annotation.tailrec
+
+
 trait ApplicativeException extends Exception
 
 case class DownloadException(
@@ -17,4 +21,16 @@ case class DownloadException(
   rangeValidator: Option[String] = None,
   /** Segment ranges that could not be written. */
   rangesWriteFailed: List[SegmentRange] = Nil
-) extends Exception(message, cause)
+) extends Exception(message, cause) {
+  lazy val isSSLException: Boolean = {
+    @tailrec
+    def loop(ex: Throwable): Boolean = {
+      ex match {
+        case null ⇒ false
+        case _: SSLException ⇒ true
+        case _ ⇒ loop(ex.getCause)
+      }
+    }
+    loop(cause)
+  }
+}

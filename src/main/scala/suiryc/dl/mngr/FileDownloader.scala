@@ -56,6 +56,7 @@ object FileDownloader {
     download: Download,
     started: Boolean,
     stopping: Boolean = false,
+    sslError: Boolean = false,
     cnxErrors: Int = 0,
     dlErrors: Int = 0,
     failed: Option[DownloadException] = None,
@@ -428,7 +429,8 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
       //   - in a one-shot client, with a specific callback to execute
       val context = HttpClientContext.create()
       val responseConsumer = new ResponseConsumer(self, download, range, request)
-      state.dlMngr.client.execute(requestProducer, responseConsumer, context, null)
+      val client = state.dlMngr.getClient(state.sslError)
+      client.execute(requestProducer, responseConsumer, context, null)
 
       val data = SegmentHandlerData(
         range = range,
@@ -548,6 +550,7 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
     val state2 = exOpt match {
       case Some(ex) ⇒
         state1.copy(
+          sslError = state1.sslError || ex.isSSLException,
           cnxErrors = state1.cnxErrors + (if (!ex.started) 1 else 0),
           dlErrors = state1.dlErrors + (if (ex.started) 1 else 0)
         )
@@ -569,6 +572,7 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
       case Some(ex) ⇒
         logger.error(message, ex)
         state2.download.info.addLog(LogKind.Error, s"Segment $status: ${ex.getMessage}", Some(ex))
+        if (ex.isSSLException) state2.download.info.addLog(LogKind.Warning, "Enabling 'trustAll' after SSL issue")
 
       case None ⇒
         logger.info(message)

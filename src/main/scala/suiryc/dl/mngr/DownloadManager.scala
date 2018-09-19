@@ -7,10 +7,15 @@ import java.nio.charset.StandardCharsets
 import java.nio.file.{Files, Path}
 import java.util.UUID
 import monix.execution.Cancelable
+import org.apache.http.config.RegistryBuilder
+import org.apache.http.conn.ssl.{NoopHostnameVerifier, TrustAllStrategy}
 import org.apache.http.impl.nio.client.{CloseableHttpAsyncClient, HttpAsyncClients}
 import org.apache.http.impl.nio.conn.PoolingNHttpClientConnectionManager
 import org.apache.http.impl.nio.reactor.DefaultConnectingIOReactor
 import org.apache.http.impl.nio.reactor.IOReactorConfig
+import org.apache.http.nio.conn.{NoopIOSessionStrategy, SchemeIOSessionStrategy}
+import org.apache.http.nio.conn.ssl.SSLIOSessionStrategy
+import org.apache.http.ssl.SSLContextBuilder
 import scala.concurrent.{Future, Promise}
 import scala.concurrent.duration._
 import scala.util.Try
@@ -19,6 +24,114 @@ import suiryc.scala.io.PathsEx
 
 
 object DownloadManager {
+
+  // Notes:
+  // A connection manager can be explicitly set to a client.
+  // Many parameters (maximum number of connections, SSL strategy etc.) actually
+  // are connection manager ones. When set on the client, they are actually not
+  // applied if a connection manager is also set (if no connection manager is
+  // set, a default one is created with the concerned parameters if any).
+  //
+  // A connection manager can be used by more than one client, in which case
+  // only one of them is supposed to own it, while the others are required to
+  // call 'setConnectionManagerShared(true)'. The manager and/or owning client
+  // is also supposed to only be freed *after* all other clients are done.
+  //
+  // The client, when owning the connection manager, creates a thread for the
+  // manager to work.
+  //
+  // To free resources, there are two possibilities:
+  //  - close the client (owning the connection manager): this shutdowns the
+  //    connection manager, with which the working thread finishes, and the
+  //    client waits for the thread to end
+  // or
+  //  - shutdown the connection manager: the working thread will finish, and
+  //    we are then expected to never use the client again
+
+  class LazyClient(trustAll: Boolean) extends StrictLogging {
+
+    private var started = false
+
+    // TODO: there is no sure way to configure the read buffer (socket + apache)
+    // ConnectionConfig has buffer size, but its the starting value which is
+    // automatically expanded (x2) upon filling when needed ...
+    // By forcing the buffer filling (wait upon writing), it still seems than no
+    // more than ~128KiB (by default) of data are buffered, but how does this happen ?
+    // IOReactorConfig can have rcv buffer size, but
+    //  - it only restrict the socket buffer
+    //  - with small size it seems respected
+    //  - with higher size, forcing buffer filling, usually the amount of data ready is
+    //    x2 or x3 (again, how does this happen ?)
+    // However, setting a 'low' value drastically reduces the download speed.
+    /** HTTP connection manager. */
+    lazy private val connManager = {
+      val bufferReadMax = Main.settings.bufferReadMax.get
+      val bufSize = if (bufferReadMax > 0) {
+        math.max(Main.settings.bufferReadMin.get, bufferReadMax)
+      } else {
+        0
+      }
+      val iorConfig = IOReactorConfig.custom
+        .setRcvBufSize(bufSize.toInt)
+        .build
+      if (trustAll) {
+        val sslStrategy = new SSLIOSessionStrategy(
+          new SSLContextBuilder().loadTrustMaterial(new TrustAllStrategy()).build,
+          null,
+          null,
+          new NoopHostnameVerifier()
+        )
+        val iosessionFactoryRegistry = RegistryBuilder.create[SchemeIOSessionStrategy]
+          .register("http", NoopIOSessionStrategy.INSTANCE)
+          .register("https", sslStrategy)
+          .build
+        new PoolingNHttpClientConnectionManager(new DefaultConnectingIOReactor(iorConfig), iosessionFactoryRegistry)
+      } else {
+        new PoolingNHttpClientConnectionManager(new DefaultConnectingIOReactor(iorConfig))
+      }
+    }
+    // We handle the connection limits ourself
+    // (default maximum connections are 2 for route/host, 20 in total)
+    connManager.setDefaultMaxPerRoute(Int.MaxValue)
+    connManager.setMaxTotal(Int.MaxValue)
+    //val connConfig = ConnectionConfig.custom
+    //    .setBufferSize(1)
+    //    .build
+    //connManager.setDefaultConnectionConfig(connConfig)
+    /** HTTP client. */
+    lazy private val client = HttpAsyncClients.custom
+      .setConnectionManager(connManager)
+      .setConnectionManagerShared(false)
+      .build
+
+    def isStarted: Boolean = started
+
+    def getConnectionManager: PoolingNHttpClientConnectionManager = connManager
+
+    def getClient: CloseableHttpAsyncClient = this.synchronized {
+      started = true
+      client.start()
+      client
+    }
+
+    def close(): Unit = {
+      if (isStarted) {
+        try {
+          connManager.shutdown()
+        } catch {
+          case ex: Exception ⇒
+            logger.error(s"Failed to shutdown HTTP connection manager: ${ex.getMessage}", ex)
+        }
+        try {
+          client.close()
+        } catch {
+          case ex: Exception ⇒
+            logger.error(s"Failed to close HTTP client: ${ex.getMessage}", ex)
+        }
+      }
+    }
+
+  }
 
   /** Download entrey (as handled by manager). */
   case class DownloadEntry(
@@ -48,7 +161,9 @@ class DownloadManager extends StrictLogging {
   private var dlEntries: List[DownloadEntry] = Nil
 
   /** HTTP client. */
-  var client: CloseableHttpAsyncClient = _
+  private var client: LazyClient = _
+  /** HTTP 'trustAll' client. */
+  private var clientTrustAll: LazyClient = _
 
   /** Rate limiter (unlimited by default). */
   private val rateLimiter: RateLimiter = new RateLimiter(0)
@@ -68,45 +183,14 @@ class DownloadManager extends StrictLogging {
   setClient()
 
   def setClient(): Unit = {
-    // TODO: there is no sure way to configure the read buffer (socket + apache)
-    // ConnectionConfig has buffer size, but its the starting value which is
-    // automatically expanded (x2) upon filling when needed ...
-    // By forcing the buffer filling (wait upon writing), it still seems than no
-    // more than ~128KiB (by default) of data are buffered, but how does this happen ?
-    // IOReactorConfig can have rcv buffer size, but
-    //  - it only restrict the socket buffer
-    //  - with small size it seems respected
-    //  - with higher size, forcing buffer filling, usually the amount of data ready is
-    //    x2 or x3 (again, how does this happen ?)
-    // However, setting a 'low' value drastically reduces the download speed.
-    /** HTTP connection manager. */
-    val connManager = {
-      val bufferReadMax = Main.settings.bufferReadMax.get
-      val bufSize = if (bufferReadMax > 0) {
-        math.max(Main.settings.bufferReadMin.get, bufferReadMax)
-      } else {
-        0
-      }
-      val iorConfig = IOReactorConfig.custom
-        .setRcvBufSize(bufSize.toInt)
-        .build
-      new PoolingNHttpClientConnectionManager(new DefaultConnectingIOReactor(iorConfig))
-    }
-    // We handle the connection limits ourself
-    // (default maximum connections are 2 for route/host, 20 in total)
-    connManager.setDefaultMaxPerRoute(Int.MaxValue)
-    connManager.setMaxTotal(Int.MaxValue)
-    //val connConfig = ConnectionConfig.custom
-    //    .setBufferSize(1)
-    //    .build
-    //connManager.setDefaultConnectionConfig(connConfig)
-    /** HTTP client. */
-    client = HttpAsyncClients.custom
-      .setConnectionManager(connManager)
-      .build
-    client.start()
+    client = new LazyClient(trustAll = false)
+    clientTrustAll = new LazyClient(trustAll = true)
 
-    janitor ! DownloadsJanitor.Janitor(connManager)
+    janitor ! DownloadsJanitor.Janitor(List(client, clientTrustAll))
+  }
+
+  def getClient(trustAll: Boolean): CloseableHttpAsyncClient = {
+    if (trustAll) clientTrustAll.getClient else client.getClient
   }
 
   /** Changes rate limit. */
@@ -349,12 +433,10 @@ class DownloadManager extends StrictLogging {
   private def checkDone(): Unit = {
     if (stopping && dlEntries.forall(!_.download.isRunning)) {
       janitor ! DownloadsJanitor.Stop
-      try {
-        client.close()
-      } catch {
-        case ex: Exception ⇒
-          logger.error(s"Failed to close HTTP client: ${ex.getMessage}", ex)
-      }
+      // Note: even though clients will be freed by janitor, we still want to
+      // wait for them to finish.
+      client.close()
+      clientTrustAll.close()
       stopped.trySuccess(())
     }
     ()
@@ -535,7 +617,7 @@ case class AcquiredConnection(site: String, host: String)
 
 object DownloadsJanitor {
 
-  case class Janitor(connManager: PoolingNHttpClientConnectionManager)
+  case class Janitor(clients: List[DownloadManager.LazyClient])
   case object Backup
   case object Cleanup
   case object Start
@@ -547,27 +629,25 @@ class DownloadsJanitor(dlMngr: DownloadManager) extends Actor with StrictLogging
 
   import DownloadsJanitor._
 
-  // 'Old' (previously used) cnx managers
-  private var oldManagers: Set[PoolingNHttpClientConnectionManager] = Set.empty
-  // Current cnx manager
-  private var connManager: Option[PoolingNHttpClientConnectionManager] = None
+  // 'Old' (previously used) clients
+  private var oldClients: Set[DownloadManager.LazyClient] = Set.empty
+  // Current clients
+  private var clients: List[DownloadManager.LazyClient] = Nil
   private var backupCancellable: Option[Cancelable] = None
   private var cleanupCancellable: Option[Cancelable] = None
 
   override def receive: Receive = {
-    case Janitor(mgr) ⇒ janitor(mgr)
+    case Janitor(other) ⇒ janitor(other)
     case Backup ⇒ backup()
     case Cleanup ⇒ cleanup()
     case Start ⇒ start()
     case Stop ⇒ stop()
   }
 
-  def janitor(other: PoolingNHttpClientConnectionManager): Unit = {
-    // Move current manager to 'old' ones
-    connManager.foreach { mgr ⇒
-      oldManagers += mgr
-    }
-    connManager = Some(other)
+  def janitor(other: List[DownloadManager.LazyClient]): Unit = {
+    // Move current clients to 'old' ones
+    oldClients ++= clients.filter(_.isStarted)
+    clients = other
   }
 
   def start(): Unit = {
@@ -616,26 +696,18 @@ class DownloadsJanitor(dlMngr: DownloadManager) extends Actor with StrictLogging
 
   def cleanup(): Unit = {
     // Cleanup all cnx managers
-    oldManagers.foreach { connManager ⇒
+    oldClients.foreach { client ⇒
+      val connManager = client.getConnectionManager
       cleanup(connManager)
       // Check if we are done with this old resource
       if (connManager.getTotalStats.getLeased == 0) {
-        oldManagers -= connManager
-        // Properly shutdown the manager upon forgetting it
-        shutdown(connManager)
+        oldClients -= client
+        // Properly close the client (shutdowns its manager) upon forgetting it
+        client.close()
       }
     }
-    connManager.foreach(cleanup)
+    clients.filter(_.isStarted).map(_.getConnectionManager).foreach(cleanup)
     scheduleCleanup()
-  }
-
-  def shutdown(connManager: PoolingNHttpClientConnectionManager): Unit = {
-    try {
-      connManager.shutdown()
-    } catch {
-      case ex: Exception ⇒
-        logger.error(s"Failed to shutdown HTTP connection manager: ${ex.getMessage}", ex)
-    }
   }
 
   def scheduleCleanup(): Unit = {
@@ -662,8 +734,8 @@ class DownloadsJanitor(dlMngr: DownloadManager) extends Actor with StrictLogging
   def stop(): Unit = {
     backupCancellable.foreach(_.cancel())
     cleanupCancellable.foreach(_.cancel())
-    // Shutdown all remaining managers
-    (oldManagers ++ connManager).foreach(shutdown)
+    // Close all remaining clients (shutdowns managers)
+    (oldClients ++ clients).foreach(_.close())
     context.stop(self)
   }
 
