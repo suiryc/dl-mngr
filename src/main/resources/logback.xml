@@ -1,18 +1,43 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration>
 
+  <!-- Note: any configuration issue will trigger status printing -->
+  <!-- See: https://logback.qos.ch/manual/configuration.html#automaticStatusPrinting -->
+
   <contextListener class="ch.qos.logback.classic.jul.LevelChangePropagator"/>
 
   <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
-    <!-- Encoders are assigned the type ch.qos.logback.classic.PatternLayoutEncoder by default -->
+    <!-- Encoders are assigned the type ch.qos.logback.classic.encoder.PatternLayoutEncoder by default -->
     <encoder>
-      <pattern>%d{HH:mm:ss.SSS} %-5level [%thread] %logger{48} - %msg%n</pattern>
+      <pattern>%d{HH:mm:ss.SSS} %-5level [%thread][%logger{48}] %msg%n</pattern>
     </encoder>
+  </appender>
+
+  <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+    <!-- 'file' property must not be set in prudent mode -->
+    <!-- See: https://logback.qos.ch/manual/appenders.html#prudentWithRolling -->
+    <!-- <file>dl-mngr.log</file> -->
+    <!-- prudent mode does not work with FixedWindowRollingPolicy -->
+    <prudent>true</prudent>
+    <!-- append mode is automatic in prudent mode -->
+    <append>true</append>
+    <immediateFlush>true</immediateFlush>
+    <!-- Encoders are assigned the type ch.qos.logback.classic.encoder.PatternLayoutEncoder by default -->
+    <encoder>
+      <pattern>%d{HH:mm:ss.SSS} %-5level [%thread][%logger{48}] %msg%n</pattern>
+    </encoder>
+
+    <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+      <fileNamePattern>dl-mngr.%d{yyyy-MM-dd}.log</fileNamePattern>
+      <maxHistory>2</maxHistory>
+      <totalSizeCap>50MB</totalSizeCap>
+      <cleanHistoryOnStart>true</cleanHistoryOnStart>
+    </rollingPolicy>
   </appender>
 
   <!-- The level of root is set to DEBUG by default -->
   <root level="INFO">
-    <appender-ref ref="STDOUT" />
+    <appender-ref ref="FILE" />
   </root>
 
   <!-- Hide the "Slf4jLogger started" log -->

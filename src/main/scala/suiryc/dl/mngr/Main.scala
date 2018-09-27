@@ -1,6 +1,7 @@
 package suiryc.dl.mngr
 
 import akka.actor.ActorSystem
+import java.io.Closeable
 import java.nio.file.Path
 import javafx.application.Application
 import javafx.stage.Stage
@@ -10,23 +11,36 @@ import suiryc.dl.mngr.I18N.Strings
 import suiryc.dl.mngr.controllers.MainController
 import suiryc.dl.mngr.model.NewDownloadInfo
 import suiryc.scala.akka.CoreSystem
+import suiryc.scala.io.SystemStreams
 import suiryc.scala.javafx.concurrent.JFXSystem
 import suiryc.scala.misc.Util
 import suiryc.scala.sys.UniqueInstance
+import suiryc.scala.sys.UniqueInstance.CommandResult
 
 object Main {
 
+  // Note: use 'lazy' for fields that indirectly trigger stdout/stderr writing
+  // (e.g. through logger, or scala Console println etc), so that we can
+  // redirect streams before it happens.
+
   val appPath: Path = Util.classLocation[this.type]
 
-  val statePath: Path = appPath.resolve("state.json")
+  def appPathRelative(other: String): Path = appPath.resolve(other)
 
-  val settings = new Settings(appPath.resolve("application.conf"))
+  val statePath: Path = appPathRelative("state.json")
+
+  lazy val settings = new Settings(appPathRelative("application.conf"))
 
   val versionedName: String = s"${suiryc.dl.mngr.Info.name} ${suiryc.dl.mngr.Info.version}" +
     suiryc.dl.mngr.Info.gitHeadCommit.map(v ⇒ s" ($v)").getOrElse("")
 
+  // Streams
+  private val streams = SystemStreams()
+
   // Promise to complete when we are ready to process command arguments
   private val promise = Promise[Unit]()
+
+  // The running controller
   var controller: MainController = _
 
   private val parser: scopt.OptionParser[Params] = new scopt.OptionParser[Params](getClass.getCanonicalName) {
@@ -47,6 +61,9 @@ object Main {
     }
     opt[String]("http-referrer").action { (v, c) ⇒
       c.copy(referrer = nonEmptyOrNone(v))
+    }
+    opt[Boolean]("io-capture").action { (v, c) ⇒
+      c.copy(ioCapture = v)
     }
     opt[String]("unique-instance-id").action { (v, c) ⇒
       c.copy(uniqueInstanceId = v)
@@ -79,7 +96,45 @@ object Main {
     // start the UI) and get unique instance appId.
     parser.parse(args, Params()) match {
       case Some(params) ⇒
-        UniqueInstance.start(params.uniqueInstanceId, cmd, args, promise.future)
+        // Redirect stdout/stderr, so that potential command output result is
+        // not mixed with garbage (logs, etc).
+        // Note: scala 'Console' stores the current 'in/out/err' value. So
+        // better not trigger it before redirecting streams. (methods to change
+        // the values are marked deprecated)
+        val ioCapture = params.ioCapture
+        if (ioCapture) {
+          SystemStreams.replace(
+            SystemStreams.loggerOutput("stdout"),
+            SystemStreams.loggerOutput("stderr", error = true)
+          )
+        }
+        val uniqueInstanceId = params.uniqueInstanceId
+        val processed = UniqueInstance.start(uniqueInstanceId, cmd _, args, promise.future, streams)
+        // We only end up here if we are the (first) unique instance.
+        // Close initial streams when we are done processing the command: this
+        // hints the caller process (e.g. our launcher script) that we are done
+        // and that it can now process whatever we may have printed as result
+        // of CLI processing.
+        // Note: we do it if IO were captured, otherwise we assume caller does
+        // not need it.
+        if (ioCapture) {
+          processed.onComplete { _ ⇒
+            // Notes:
+            // On Windows it may happen that some streams are 'fake' and cannot be
+            // properly closed (invalid file descriptor exception). This is e.g.
+            // the case for stdin when using 'javaw' (at least when spawned from
+            // python without caring about its stdin).
+            streams.out.flush()
+            streams.err.flush()
+            def close(l: String, c: Closeable): Unit = {
+              try { c.close() }
+              catch { case ex: Exception ⇒ println(s"Failed to close $l: $ex") }
+            }
+            close("stdin", streams.in)
+            close("stdout", streams.out)
+            close("stderr", streams.err)
+          }(Akka.dispatcher)
+        }
         // 'launch' does not return until application is closed
         Application.launch(classOf[Main])
 
@@ -88,7 +143,7 @@ object Main {
     }
   }
 
-  protected def cmd(args: Array[String]): Int = {
+  protected def cmd(args: Array[String]): CommandResult = {
     // Second parsing to actually process the arguments through unique instance.
     def process(): Unit = parser.parse(args, Params()).foreach { params ⇒
       // Sanity check: we should not be able to process command arguments if we
@@ -123,7 +178,7 @@ object Main {
         throw ex
     }
 
-    0
+    CommandResult(0, None)
   }
 
   object Akka {
@@ -133,7 +188,7 @@ object Main {
 
   }
 
-  val scheduler: Scheduler = CoreSystem.scheduler
+  lazy val scheduler: Scheduler = CoreSystem.scheduler
 
   def shutdown(stage: Stage): Unit = {
     JFXSystem.runLater(stage.close())
@@ -152,6 +207,7 @@ object Main {
     comment: Option[String] = None,
     cookie: Option[String] = None,
     file: Option[String] = None,
+    ioCapture: Boolean = true,
     referrer: Option[String] = None,
     uniqueInstanceId: String = "suiryc.dl-mngr",
     url: Option[String] = None,
