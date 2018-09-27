@@ -2,20 +2,22 @@ import sbt._
 import Keys._
 
 lazy val versions = Map[String, String](
-  "akka"                  -> "2.5.13",
-  "bouncycastle"          -> "1.59",
-  "config"                -> "1.3.3",
-  "dl-mngr"               -> "0.0.1-SNAPSHOT",
-  "httpclient"            -> "4.5.6",
-  "httpasyncclient"       -> "4.1.4",
-  "logback"               -> "1.2.3",
-  "monix"                 -> "3.0.0-RC1",
-  "scala"                 -> "2.12.6",
-  "scala-logging"         -> "3.9.0",
-  "scalatest"             -> "3.0.5",
-  "scopt"                 -> "3.7.0",
-  "slf4j"                 -> "1.7.25",
-  "suiryc-scala"          -> "0.0.3-SNAPSHOT"
+  "akka"                  → "2.5.13",
+  "bouncycastle"          → "1.59",
+  "config"                → "1.3.3",
+  "dl-mngr"               → "0.0.1-SNAPSHOT",
+  "httpclient"            → "4.5.6",
+  "httpasyncclient"       → "4.1.4",
+  "logback"               → "1.2.3",
+  "monix"                 → "3.0.0-RC1",
+  "netty"                 → "4.1.29.Final",
+  "scala"                 → "2.12.6",
+  "scala-logging"         → "3.9.0",
+  "scalatest"             → "3.0.5",
+  "scopt"                 → "3.7.0",
+  "slf4j"                 → "1.7.25",
+  "spray-json"            → "1.3.4",
+  "suiryc-scala"          → "0.0.3-SNAPSHOT"
 )
 
 
@@ -70,6 +72,8 @@ lazy val dlMngr = project.in(file(".")).
       "com.typesafe.akka"              %% "akka-slf4j"                    % versions("akka"),
       "com.typesafe.scala-logging"     %% "scala-logging"                 % versions("scala-logging"),
       "io.monix"                       %% "monix"                         % versions("monix"),
+      "io.netty"                       %  "netty-all"                     % versions("netty"),
+      "io.spray"                       %% "spray-json"                    % versions("spray-json"),
       "org.apache.httpcomponents"      %  "httpclient"                    % versions("httpclient")
         exclude ("commons-logging", "commons-logging"),
       "org.apache.httpcomponents"      %  "httpasyncclient"               % versions("httpasyncclient")

@@ -6,7 +6,8 @@ import java.nio.file.Path
 import javafx.application.Application
 import javafx.stage.Stage
 import monix.execution.Scheduler
-import scala.concurrent.{ExecutionContextExecutor, Promise}
+import scala.concurrent.{Await, ExecutionContextExecutor, Promise}
+import scala.concurrent.duration.Duration
 import suiryc.dl.mngr.I18N.Strings
 import suiryc.dl.mngr.controllers.MainController
 import suiryc.dl.mngr.model.NewDownloadInfo
@@ -48,7 +49,7 @@ object Main {
     head(versionedName)
     help("help")
     opt[Unit]("auto").action { (_, c) ⇒
-      c.copy(auto = true)
+      c.copy(auto = Some(true))
     }
     opt[String]("comment").action { (v, c) ⇒
       c.copy(comment = nonEmptyOrNone(v))
@@ -63,10 +64,10 @@ object Main {
       c.copy(referrer = nonEmptyOrNone(v))
     }
     opt[Boolean]("io-capture").action { (v, c) ⇒
-      c.copy(ioCapture = v)
+      c.copy(ioCapture = Some(v))
     }
     opt[String]("unique-instance-id").action { (v, c) ⇒
-      c.copy(uniqueInstanceId = v)
+      c.copy(uniqueInstanceId = Some(v))
     }
     opt[String]("url").action { (v, c) ⇒
       c.copy(url = nonEmptyOrNone(v))
@@ -81,6 +82,9 @@ object Main {
            |sbtVersion: ${Info.sbtVersion}
            """.stripMargin)
       sys.exit(0)
+    }
+    opt[Unit]("ws").action { (_, c) ⇒
+      c.copy(ws = Some(true))
     }
   }
 
@@ -101,15 +105,15 @@ object Main {
         // Note: scala 'Console' stores the current 'in/out/err' value. So
         // better not trigger it before redirecting streams. (methods to change
         // the values are marked deprecated)
-        val ioCapture = params.ioCapture
+        val ioCapture = params.ioCapture.contains(true)
         if (ioCapture) {
           SystemStreams.replace(
             SystemStreams.loggerOutput("stdout"),
             SystemStreams.loggerOutput("stderr", error = true)
           )
         }
-        val uniqueInstanceId = params.uniqueInstanceId
-        val processed = UniqueInstance.start(uniqueInstanceId, cmd _, args, promise.future, streams)
+        val uniqueInstanceId = params.uniqueInstanceId.get
+        val processed = UniqueInstance.start(uniqueInstanceId, _cmd _, args, promise.future, streams)
         // We only end up here if we are the (first) unique instance.
         // Close initial streams when we are done processing the command: this
         // hints the caller process (e.g. our launcher script) that we are done
@@ -143,15 +147,27 @@ object Main {
     }
   }
 
-  protected def cmd(args: Array[String]): CommandResult = {
+  protected def _cmd(args: Array[String]): CommandResult = {
     // Second parsing to actually process the arguments through unique instance.
-    def process(): Unit = parser.parse(args, Params()).foreach { params ⇒
+    parser.parse(args, Params()).map(cmd).getOrElse {
+      // Should not happen
+      CommandResult(-1, Some("No parsed arguments"))
+    }
+  }
+
+  def cmd(params: Params): CommandResult = {
+    def process(): CommandResult = {
       // Sanity check: we should not be able to process command arguments if we
       // failed to create the controller.
       if (controller != null) {
+        val wsPort = if (params.needWs) {
+          Await.result(WSServer.start(), Duration.Inf)
+        } else {
+          -1
+        }
         if (params.url.isDefined) {
           val dlInfo = NewDownloadInfo(
-            auto = params.auto,
+            auto = params.isAuto,
             uri = params.url,
             referrer = params.referrer,
             cookie = params.cookie,
@@ -161,6 +177,9 @@ object Main {
           )
           controller.addDownload(dlInfo)
         }
+        CommandResult(0, if (wsPort > 0) Some(wsPort.toString) else None)
+      } else {
+        CommandResult(-1, Some("Controller is not started"))
       }
     }
 
@@ -177,8 +196,6 @@ object Main {
         // At worst caller will log it.
         throw ex
     }
-
-    CommandResult(0, None)
   }
 
   object Akka {
@@ -196,6 +213,7 @@ object Main {
   }
 
   def shutdown(): Unit = {
+    WSServer.stop()
     UniqueInstance.stop()
     // Note: we share the same system
     JFXSystem.terminate(JFXSystem.dispatcher)
@@ -203,16 +221,21 @@ object Main {
   }
 
   case class Params(
-    auto: Boolean = false,
+    auto: Option[Boolean] = None,
     comment: Option[String] = None,
     cookie: Option[String] = None,
+    correlationId: Option[String] = None,
     file: Option[String] = None,
-    ioCapture: Boolean = true,
+    ioCapture: Option[Boolean] = Some(true),
     referrer: Option[String] = None,
-    uniqueInstanceId: String = "suiryc.dl-mngr",
+    uniqueInstanceId: Option[String] = Some("suiryc.dl-mngr"),
     url: Option[String] = None,
-    userAgent: Option[String] = None
-  )
+    userAgent: Option[String] = None,
+    ws: Option[Boolean] = None
+  ) {
+    def isAuto: Boolean = auto.contains(true)
+    def needWs: Boolean = ws.contains(true)
+  }
 
 }
 
