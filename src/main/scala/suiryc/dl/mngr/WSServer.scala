@@ -207,7 +207,7 @@ object WSServer extends StrictLogging {
   )
 
   private object JsonProtocol extends DefaultJsonProtocol {
-    implicit val paramsFormat: RootJsonFormat[Main.Params] = jsonFormat11(Main.Params)
+    implicit val paramsFormat: RootJsonFormat[Main.Params] = jsonFormat12(Main.Params)
     implicit val resultFormat: RootJsonFormat[CommandResult] = jsonFormat3(CommandResult)
   }
 

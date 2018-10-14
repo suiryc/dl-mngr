@@ -21,6 +21,7 @@ import suiryc.scala.javafx.concurrent.JFXSystem
 import suiryc.scala.javafx.scene.control.{Dialogs, TextFieldWithButton}
 import suiryc.scala.javafx.stage.Stages.StageLocation
 import suiryc.scala.javafx.stage.{PathChoosers, StagePersistentView, Stages}
+import suiryc.scala.misc.Units
 import suiryc.scala.settings.ConfigEntry
 
 class NewDownloadController extends StagePersistentView {
@@ -61,11 +62,14 @@ class NewDownloadController extends StagePersistentView {
 
   private var dlMngr: DownloadManager = _
 
+  private var dlInfo: NewDownloadInfo = _
+
   private var result: Option[Result] = None
 
   def initialize(dialog: Dialog[_], dlMngr: DownloadManager, dlInfo: NewDownloadInfo): Unit = {
     this.dialog = dialog
     this.dlMngr = dlMngr
+    this.dlInfo = dlInfo
 
     filenameField.getButtons.head.arrowButton.getStyleClass.add("icon-sync")
 
@@ -98,7 +102,11 @@ class NewDownloadController extends StagePersistentView {
     dlInfo.referrer.foreach(referrerField.setText)
     dlInfo.cookie.foreach(cookieField.setText)
     dlInfo.userAgent.foreach(userAgentField.setText)
-    dlInfo.comment.foreach(commentField.setText)
+    val comment = List(
+      dlInfo.sizeHint.filter(_ >= 0).map(Units.storage.toHumanReadable(_)),
+      dlInfo.comment
+    ).flatten.mkString("\n")
+    if (comment.nonEmpty) commentField.setText(comment)
     // Take into account given file(name)
     dlInfo.file.map(Paths.get(_)) match {
       case Some(path) ⇒
@@ -471,6 +479,7 @@ object NewDownloadController {
           cookie = result.cookie,
           userAgent = result.userAgent,
           save = result.path,
+          sizeHint = controller.dlInfo.sizeHint.filter(_ >= 0),
           reused = result.reused,
           insertFirst = result.insertFirst
         )

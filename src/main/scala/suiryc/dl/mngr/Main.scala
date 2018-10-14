@@ -66,6 +66,9 @@ object Main {
     opt[Boolean]("io-capture").action { (v, c) ⇒
       c.copy(ioCapture = Some(v))
     }
+    opt[Long]("size").action { (v, c) ⇒
+      c.copy(size = Some(v))
+    }
     opt[String]("unique-instance-id").action { (v, c) ⇒
       c.copy(uniqueInstanceId = Some(v))
     }
@@ -173,6 +176,7 @@ object Main {
             cookie = params.cookie,
             userAgent = params.userAgent,
             file = params.file,
+            sizeHint = params.size,
             comment = params.comment
           )
           controller.addDownload(dlInfo)
@@ -228,6 +232,7 @@ object Main {
     file: Option[String] = None,
     ioCapture: Option[Boolean] = Some(true),
     referrer: Option[String] = None,
+    size: Option[Long] = None,
     uniqueInstanceId: Option[String] = Some("suiryc.dl-mngr"),
     url: Option[String] = None,
     userAgent: Option[String] = None,

@@ -228,8 +228,8 @@ class DownloadManager extends StrictLogging {
     dlEntries = reorder(ordered) ::: reorder(rest)
   }
 
-  def addDownload(uri: URI, referrer: Option[URI],
-    cookie: Option[String], userAgent: Option[String], save: Path,
+  def addDownload(uri: URI, referrer: Option[URI], cookie: Option[String],
+    userAgent: Option[String], save: Path, sizeHint: Option[Long],
     reused: Boolean, insertFirst: Boolean): Download =
   {
     // Note: caller still has to 'resume' (start) the download.
@@ -247,6 +247,7 @@ class DownloadManager extends StrictLogging {
       cookie = cookie,
       userAgent = userAgent,
       downloadFile = downloadFile,
+      sizeHint = sizeHint,
       rateLimiter = rateLimiter
     )
     if (reused) {
@@ -479,6 +480,7 @@ class DownloadManager extends StrictLogging {
           cookie = downloadBackupInfo.cookie,
           userAgent = downloadBackupInfo.userAgent,
           downloadFile = downloadFile,
+          sizeHint = downloadBackupInfo.sizeHint,
           rateLimiter = rateLimiter
         )
         val info = download.info

@@ -960,10 +960,17 @@ class MainController extends StagePersistentView with StrictLogging {
             info.path.get
           }
 
-          new BindingsEx.Builder(JFXSystem.scheduler).add(data.size) {
-            Option(info.size.get).filter(_ >= 0).map { size ⇒
+          def displaySize: String = {
+            val size = if (info.isSizeDetermined) Option(info.size.get) else download.sizeHint
+            size.filter(_ >= 0).map { size ⇒
               Units.storage.toHumanReadable(size)
             }.orNull
+          }
+          // Display size right now (if known or hint given)
+          data.size.set(displaySize)
+          // Then refresh when actual size is determined
+          new BindingsEx.Builder(JFXSystem.scheduler).add(data.size) {
+            displaySize
           }.add(data.sizeIcon) {
             val warnings =
               (if (!info.isSizeUnknown) Nil else List(Strings.unknownSize)) :::
@@ -977,7 +984,7 @@ class MainController extends StagePersistentView with StrictLogging {
             } else null
           }.bind(info.size, info.acceptRanges)
 
-          BindingsEx.bind(data.downloadedProgress.progressProperty, 100.millis, JFXSystem.scheduler, info.downloaded, info.state) {
+          BindingsEx.bind(data.downloadedProgress.progressProperty, 500.millis, JFXSystem.scheduler, info.downloaded, info.state) {
             Option(info.size.get).filter(_ >= 0).map { size ⇒
               val v =
                 if (size > 0) info.downloaded.getValue.toDouble / size
@@ -994,7 +1001,7 @@ class MainController extends StagePersistentView with StrictLogging {
               }
             }:Double
           }
-          BindingsEx.bind(data.downloadedProgressText.textProperty, 100.millis, JFXSystem.scheduler, info.downloaded) {
+          BindingsEx.bind(data.downloadedProgressText.textProperty, 500.millis, JFXSystem.scheduler, info.downloaded) {
             val downloaded = info.downloaded.get
             val size = info.size.get
             if (downloaded <= 0) null
@@ -1006,6 +1013,9 @@ class MainController extends StagePersistentView with StrictLogging {
             }
           }
 
+          // Note:
+          // It is sensible to use the same duration for the rate display
+          // throttling and the rate handler step.
           new BindingsEx.Builder(JFXSystem.scheduler).add(data.rate) {
             if (download.state == DownloadState.Running) {
               val rate = data.rateHandler.update(info.downloaded.get)
@@ -1026,7 +1036,7 @@ class MainController extends StagePersistentView with StrictLogging {
             } else {
               null
             }
-          }.bind(400.millis, info.downloaded, info.state, data.rateUpdate)
+          }.bind(data.rateHandler.step, info.downloaded, info.state, data.rateUpdate)
 
           new BindingsEx.Builder(JFXSystem.scheduler).add(data.stateIcon) {
             download.state match {
@@ -1195,7 +1205,7 @@ object MainController {
     download.info.state.listen(refreshRateUpdate _)
     refreshRateUpdate(download.state)
 
-    val rateHandler = new RateHandler(download.info.downloaded.get, 2.seconds, 400.millis)
+    val rateHandler = new RateHandler(download.info.downloaded.get, 4.seconds, 800.millis)
 
     val downloadedProgress: ProgressBar = new ProgressBar()
     downloadedProgress.setProgress(0.0)

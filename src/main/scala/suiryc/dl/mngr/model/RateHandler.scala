@@ -9,7 +9,7 @@ object RateHandler {
 
 }
 
-class RateHandler(startValue: Long, duration: FiniteDuration, step: FiniteDuration) {
+class RateHandler(startValue: Long, duration: FiniteDuration, val step: FiniteDuration) {
 
   import RateHandler._
 

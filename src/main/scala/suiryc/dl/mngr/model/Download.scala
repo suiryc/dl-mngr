@@ -32,6 +32,8 @@ case class NewDownloadInfo(
   userAgent: Option[String] = None,
   /** Filename. */
   file: Option[String] = None,
+  /** Size hint (informational). */
+  sizeHint: Option[Long] = None,
   /** Comment. */
   comment: Option[String] = None
 )
@@ -109,6 +111,8 @@ case class DownloadBackupInfo(
   canResume: Boolean,
   /** Download size. */
   size: Option[Long],
+  /** Download size hint (informational). */
+  sizeHint: Option[Long],
   /** Range validator (if applicable) */
   rangeValidator: Option[String],
   /** Whether server accept ranges */
@@ -133,6 +137,8 @@ case class Download(
   userAgent: Option[String],
   /** Download file handler (I/O). */
   downloadFile: DownloadFile,
+  /** Download size hint (informational). */
+  sizeHint: Option[Long],
   /** Rate limiter. */
   rateLimiter: RateLimiter,
   /** Promise completed once the download is 'finished' (success or failure). */
@@ -222,6 +228,7 @@ case class Download(
       done = isDone,
       canResume = (isActive || info.wasActive) && !acceptRanges.contains(false),
       size = if (info.isSizeDetermined) Some(info.size.get) else None,
+      sizeHint = sizeHint,
       rangeValidator = info.rangeValidator,
       acceptRanges = acceptRanges,
       lastModified = info.lastModified,
