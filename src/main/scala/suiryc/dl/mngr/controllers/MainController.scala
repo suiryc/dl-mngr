@@ -931,8 +931,9 @@ class MainController extends StagePersistentView with StrictLogging {
             removeDownload(state, download.id)
             // Remove from disk when requested
             if (removeFromDisk) {
-              download.downloadFile.getTemporaryPath.foreach(_.toFile.delete())
-              download.downloadFile.getPath.toFile.delete()
+              // Since the download is unfinished, we only need to delete the
+              // temporary file if any (or the real file otherwise).
+              download.downloadFile.getTemporaryPath.getOrElse(download.downloadFile.getPath).toFile.delete()
             }
           }
         }

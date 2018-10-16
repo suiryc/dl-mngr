@@ -262,10 +262,10 @@ class DownloadFile(private var path: Path) extends LazyLogging {
 
   def close(lastModified: Option[Date], done: Boolean): Unit = {
     if (channel != null) {
-      if (channel.isOpen) {
-        flush(force = true)
-        channel.close()
-      }
+      flush(force = true)
+      // If not done, and file is empty, delete it.
+      val delete = !done && (channel.size == 0)
+      channel.close()
       channel = null
       lastModified.foreach { date ⇒
         // Change "last modified" time according to the server one.
@@ -287,6 +287,9 @@ class DownloadFile(private var path: Path) extends LazyLogging {
           path = probed
           Files.move(tempPath, path)
         }
+      } else if (delete) {
+        temporary.getOrElse(path).toFile.delete()
+        ()
       }
     }
   }
