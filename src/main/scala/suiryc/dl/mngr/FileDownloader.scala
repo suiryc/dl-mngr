@@ -458,7 +458,7 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
         val message = s"Failed to start segment range=$range download: ${ex.getMessage}"
         logger.error(s"${download.context(range)} $message", ex)
         state.download.info.addLog(LogKind.Error, message, Some(ex))
-        segmentDone(state, None, range, acquired, Some(ex))
+        segmentDone(state, None, range, acquired, downloaded = false, Some(ex))
     }
   }
 
@@ -536,11 +536,12 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
 
   def segmentDone(state: State, consumer: ResponseConsumer, ex: Option[Exception]): State = {
     state.segmentConsumers.get(consumer).map { data ⇒
-      segmentDone(state.removeConsumer(consumer), Some(data), data.range, data.acquired, ex)
+      val downloaded = consumer.position > data.range.start
+      segmentDone(state.removeConsumer(consumer), Some(data), data.range, data.acquired, downloaded, ex)
     }.getOrElse(state)
   }
 
-  def segmentDone(state0: State, dataOpt: Option[SegmentHandlerData], range: SegmentRange, acquired: AcquiredConnection, ex0: Option[Exception]): State = {
+  def segmentDone(state0: State, dataOpt: Option[SegmentHandlerData], range: SegmentRange, acquired: AcquiredConnection, downloaded: Boolean, ex0: Option[Exception]): State = {
     val download = state0.download
     state0.dlMngr.releaseConnection(acquired)
     download.rateLimiter.removeDownload()
@@ -563,7 +564,7 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
         state1.copy(
           sslError = state1.sslError || ex.isSSLException,
           cnxErrors = state1.cnxErrors + (if (!ex.started) 1 else 0),
-          dlErrors = state1.dlErrors + (if (ex.started) 1 else 0)
+          dlErrors = state1.dlErrors + (if (ex.started && !downloaded) 1 else 0)
         )
 
       case None ⇒
@@ -826,7 +827,7 @@ class ResponseConsumer(
   request: HttpRequestBase
 ) extends AbstractAsyncResponseConsumer[Unit] {
 
-  private var position: Long = range.start
+  private[mngr] var position: Long = range.start
   @volatile private[mngr] var end: Long = range.end
 
   // IOControl will be accessed by concurrent threads.
