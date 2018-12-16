@@ -15,7 +15,7 @@ object Http extends StrictLogging {
    * String is cleaned when necessary.
    */
   def getURI(s: String): URI = {
-    // "[]" are not allowed inside path components
+    // Some characters (e.g. "[]") are not allowed inside path components and must be escaped
     val cleaned = {
       // Format: http://server:port/path?query
       // First separate path (and query) from start of URI
@@ -28,6 +28,8 @@ object Http extends StrictLogging {
         val parts = v.split("""\?""", 2)
         // Replace characters in path
         val path = parts.head.replaceAll("""\[""", "%5B").replaceAll("""\]""", "%5D")
+        // If we need to escape all characters (*WARNING*: we need to be sure the URL was not already escaped ...)
+        //val path = parts.head.split('/').map(URLEncoder.encode(_, StandardCharsets.UTF_8)).mkString("/")
         // Leave query untouched
         val query = parts.tail.headOption
         // Re-build path and query

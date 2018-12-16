@@ -9,6 +9,7 @@ import java.util.UUID
 import monix.execution.Cancelable
 import org.apache.http.config.RegistryBuilder
 import org.apache.http.conn.ssl.{NoopHostnameVerifier, TrustAllStrategy}
+import org.apache.http.impl.client.DefaultRedirectStrategy
 import org.apache.http.impl.nio.client.{CloseableHttpAsyncClient, HttpAsyncClients}
 import org.apache.http.impl.nio.conn.PoolingNHttpClientConnectionManager
 import org.apache.http.impl.nio.reactor.DefaultConnectingIOReactor
@@ -20,6 +21,7 @@ import scala.concurrent.{Future, Promise}
 import scala.concurrent.duration._
 import scala.util.Try
 import suiryc.dl.mngr.model._
+import suiryc.dl.mngr.util.Http
 import suiryc.scala.io.PathsEx
 
 
@@ -102,6 +104,7 @@ object DownloadManager {
     lazy private val client = HttpAsyncClients.custom
       .setConnectionManager(connManager)
       .setConnectionManagerShared(false)
+      .setRedirectStrategy(new RelaxedRedirectStrategy)
       .build
 
     def isStarted: Boolean = started
@@ -133,7 +136,28 @@ object DownloadManager {
 
   }
 
-  /** Download entrey (as handled by manager). */
+  class RelaxedRedirectStrategy extends DefaultRedirectStrategy {
+
+    override protected def createLocationURI(location: String): URI = {
+      try {
+        super.createLocationURI(location)
+      } catch {
+        case ex: Exception ⇒
+          // Sometimes the location may have invalid characters.
+          // Use out own method in this case.
+          try {
+            Http.getURI(location)
+          } catch {
+            case _: Exception ⇒
+              // Throw the original error if we also fail.
+              throw ex
+          }
+      }
+    }
+
+  }
+
+  /** Download entry (as handled by manager). */
   case class DownloadEntry(
     /** Download. */
     download: Download,
