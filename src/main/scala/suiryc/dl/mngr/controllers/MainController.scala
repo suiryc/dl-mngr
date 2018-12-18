@@ -79,6 +79,36 @@ class MainController extends StagePersistentView with StrictLogging {
   @FXML
   protected var logsTable: TableView[LogEntry] = _
 
+  @FXML
+  protected var dlPropertiesTab: Tab = _
+
+  @FXML
+  protected var dlURILabel: Label = _
+
+  @FXML
+  protected var dlServerLabel: Label = _
+
+  @FXML
+  protected var dlSiteLabel: Label = _
+
+  @FXML
+  protected var dlReferrerLabel: Label = _
+
+  @FXML
+  protected var dlCookieLabel: Label = _
+
+  @FXML
+  protected var dlUserAgentLabel: Label = _
+
+  @FXML
+  protected var dlFolderLabel: Label = _
+
+  @FXML
+  protected var dlFileLabel: Label = _
+
+  @FXML
+  protected var dlSizeLabel: Label = _
+
   private val columnDownloadIndex = new TableColumn[UUID, String]("#")
 
   private val columnDownloadFile = new TableColumn[UUID, UUID](Strings.file)
@@ -370,19 +400,44 @@ class MainController extends StagePersistentView with StrictLogging {
     downloadsTable.setContextMenu(downloadsContextMenu)
     downloadsTable.getSelectionModel.setSelectionMode(SelectionMode.MULTIPLE)
     downloadsTable.getSelectionModel.selectedItemProperty.listen { id ⇒
-      // Cancel previous subscription if any
-      Option(logsTable.getUserData) match {
-        case Some(cancellable: Cancellable) ⇒
-          cancellable.cancel()
-
-        case _ ⇒
+      // Cancel previous subscriptions if any
+      def cancelSubscription(v: Option[Any]): Unit = {
+        v match {
+          case Some(cancellable: Cancellable) ⇒ cancellable.cancel()
+          case _ ⇒
+        }
       }
+      cancelSubscription(Option(dlPropertiesTab.getUserData))
+      cancelSubscription(Option(logsTable.getUserData))
 
       // Fix minimum width; will be updated when setting cells content
       columnLogMessage.setMinWidth(computeTextWidth("MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM"))
 
       getDownloadData(id) match {
         case Some(data) ⇒
+          val download = data.download
+          val info = download.info
+
+          dlSiteLabel.setText(download.siteSettings.site)
+          dlReferrerLabel.setText(download.referrer.map(_.toString).orNull)
+          dlCookieLabel.setText(download.cookie.orNull)
+          dlUserAgentLabel.setText(download.userAgent.orNull)
+          def updateProperties(): Unit = {
+            dlURILabel.setText(info.uri.get.toString)
+            dlServerLabel.setText(info.uri.get.getHost)
+            dlFolderLabel.setText(info.path.get.getParent.toString)
+            dlFileLabel.setText(info.path.get.getFileName.toString)
+            dlSizeLabel.setText(if (info.isSizeDetermined && !info.isSizeUnknown) info.size.get.toString else "")
+          }
+          val propertiesCancellable = RichObservableValue.listen(info.uri, info.path, info.size) {
+            JFXSystem.runLater {
+              updateProperties()
+            }
+          }
+          updateProperties()
+          // Remember this subscription
+          dlPropertiesTab.setUserData(propertiesCancellable)
+
           def getLogs(l: java.util.List[_ <: LogEntry]): List[LogEntry] = {
             val logs0 = l.asScala.toList
             if (!Main.settings.debug.get) {
@@ -392,7 +447,7 @@ class MainController extends StagePersistentView with StrictLogging {
             }
           }
           def setLogs(): Unit = {
-            val logs = getLogs(data.download.info.logs)
+            val logs = getLogs(info.logs)
             logsTable.getItems.setAll(logs:_*)
             updateLogMessageMinWidth(logs)
             ()
@@ -426,7 +481,7 @@ class MainController extends StagePersistentView with StrictLogging {
           // We only expect entries to be added, which can be propagated easily in
           // the table. For any other change, re-set all the items.
           // In either case, update the column minimum width accordingly.
-          val cancellable = data.download.info.logs.listen { change ⇒
+          val logsCancellable = info.logs.listen { change ⇒
             def loop(): Unit = {
               if (change.next()) {
                 if (change.wasPermutated() || change.wasUpdated() || change.wasRemoved() || !change.wasAdded()) {
@@ -444,16 +499,24 @@ class MainController extends StagePersistentView with StrictLogging {
               }
             }
 
-            loop()
+            JFXSystem.runLater {
+              loop()
+            }
           }
           // Set initial value (only changes are listened)
           setLogs()
 
           // Remember this subscription
-          logsTable.setUserData(cancellable)
+          logsTable.setUserData(logsCancellable)
 
         case None ⇒
           logsTable.getItems.clear()
+          List(
+            dlURILabel, dlServerLabel, dlSiteLabel, dlReferrerLabel, dlCookieLabel, dlUserAgentLabel,
+            dlFolderLabel, dlFileLabel, dlSizeLabel
+          ).foreach { label ⇒
+            label.setText(null)
+          }
       }
     }
 

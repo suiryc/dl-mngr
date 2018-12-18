@@ -180,8 +180,9 @@ case class Download(
   def canRestart: Boolean = (state == DownloadState.Failure) ||
     ((state == DownloadState.Stopped) && acceptRanges.contains(false))
 
+  def siteSettings: Main.settings.SiteSettings = Main.settings.getSite(info.uri.get)
   def activeSegments: Int = info.activeSegments.get
-  def maxSegments: Int = Main.settings.getSite(info.uri.get).getSegmentsMax
+  def maxSegments: Int = siteSettings.getSegmentsMax
   def minSegmentSize: Long = Main.settings.segmentsMinSize.get
 
   def updateLastReason(opt: Option[String]): Unit = {

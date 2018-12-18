@@ -1,17 +1,25 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
+<?import javafx.geometry.Insets?>
 <?import javafx.scene.control.ChoiceBox?>
 <?import javafx.scene.control.CustomMenuItem?>
+<?import javafx.scene.control.Label?>
 <?import javafx.scene.control.Menu?>
 <?import javafx.scene.control.MenuBar?>
 <?import javafx.scene.control.MenuItem?>
+<?import javafx.scene.control.ScrollPane?>
 <?import javafx.scene.control.SeparatorMenuItem?>
 <?import javafx.scene.control.SplitPane?>
+<?import javafx.scene.control.Tab?>
+<?import javafx.scene.control.TabPane?>
 <?import javafx.scene.control.TableView?>
 <?import javafx.scene.control.TextField?>
 <?import javafx.scene.input.KeyCodeCombination?>
 <?import javafx.scene.layout.AnchorPane?>
+<?import javafx.scene.layout.ColumnConstraints?>
+<?import javafx.scene.layout.GridPane?>
 <?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.RowConstraints?>
 <?import javafx.scene.layout.VBox?>
 
 <AnchorPane maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" minHeight="360.0" minWidth="600.0" xmlns="http://javafx.com/javafx/10.0.1" xmlns:fx="http://javafx.com/fxml/1" fx:controller="suiryc.dl.mngr.controllers.MainController">
@@ -57,7 +65,63 @@
             <SplitPane fx:id="splitPane" dividerPositions="0.5" orientation="VERTICAL" VBox.vgrow="ALWAYS">
               <items>
                   <TableView fx:id="downloadsTable" prefHeight="200.0" prefWidth="200.0" />
-                  <TableView fx:id="logsTable" prefHeight="200.0" prefWidth="200.0" />
+                  <TabPane>
+                     <tabs>
+                        <Tab closable="false" text="%Logs">
+                           <content>
+                              <TableView fx:id="logsTable" prefHeight="200.0" prefWidth="200.0" />
+                           </content>
+                        </Tab>
+                        <Tab fx:id="dlPropertiesTab" closable="false" text="%Properties">
+                           <content>
+                              <ScrollPane>
+                                 <content>
+                                    <GridPane hgap="5.0" vgap="5.0">
+                                      <columnConstraints>
+                                        <ColumnConstraints hgrow="NEVER" />
+                                        <ColumnConstraints hgrow="SOMETIMES" minWidth="50.0" />
+                                      </columnConstraints>
+                                      <rowConstraints>
+                                        <RowConstraints minHeight="25.0" vgrow="NEVER" />
+                                          <RowConstraints minHeight="25.0" vgrow="NEVER" />
+                                          <RowConstraints minHeight="25.0" vgrow="NEVER" />
+                                        <RowConstraints minHeight="25.0" vgrow="NEVER" />
+                                        <RowConstraints minHeight="25.0" vgrow="NEVER" />
+                                          <RowConstraints minHeight="25.0" vgrow="NEVER" />
+                                          <RowConstraints minHeight="25.0" vgrow="NEVER" />
+                                          <RowConstraints minHeight="25.0" vgrow="NEVER" />
+                                          <RowConstraints minHeight="25.0" vgrow="NEVER" />
+                                      </rowConstraints>
+                                       <children>
+                                          <Label text="URI:" />
+                                          <Label fx:id="dlURILabel" GridPane.columnIndex="1" />
+                                          <Label text="%Server:" GridPane.rowIndex="1" />
+                                          <Label fx:id="dlServerLabel" GridPane.columnIndex="1" GridPane.rowIndex="1" />
+                                          <Label text="%Site:" GridPane.rowIndex="2" />
+                                          <Label fx:id="dlSiteLabel" GridPane.columnIndex="1" GridPane.rowIndex="2" />
+                                          <Label text="Referrer:" GridPane.rowIndex="3" />
+                                          <Label fx:id="dlReferrerLabel" GridPane.columnIndex="1" GridPane.rowIndex="3" />
+                                          <Label text="Cookie:" GridPane.rowIndex="4" />
+                                          <Label fx:id="dlCookieLabel" GridPane.columnIndex="1" GridPane.rowIndex="4" />
+                                          <Label text="User agent:" GridPane.rowIndex="5" />
+                                          <Label fx:id="dlUserAgentLabel" GridPane.columnIndex="1" GridPane.rowIndex="5" />
+                                          <Label text="%Folder:" GridPane.rowIndex="6" />
+                                          <Label fx:id="dlFolderLabel" GridPane.columnIndex="1" GridPane.rowIndex="6" />
+                                          <Label text="%File:" GridPane.rowIndex="7" />
+                                          <Label fx:id="dlFileLabel" GridPane.columnIndex="1" GridPane.rowIndex="7" />
+                                          <Label text="%Size:" GridPane.rowIndex="8" />
+                                          <Label fx:id="dlSizeLabel" GridPane.columnIndex="1" GridPane.rowIndex="8" />
+                                       </children>
+                                       <padding>
+                                          <Insets bottom="10.0" left="10.0" right="10.0" top="10.0" />
+                                       </padding>
+                                    </GridPane>
+                                 </content>
+                              </ScrollPane>
+                           </content>
+                        </Tab>
+                     </tabs>
+                  </TabPane>
               </items>
             </SplitPane>
          </children>
