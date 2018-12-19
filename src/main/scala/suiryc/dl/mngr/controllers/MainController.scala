@@ -776,9 +776,9 @@ class MainController extends StagePersistentView with StrictLogging {
       enableMenuRemove(remove, _data)
       val items = downloadsTable.getItems
       // If all items are in first positions, we cannot move them up
-      val cannotMoveUp = items.isEmpty || (_selectedIndices.max + 1 == _selectedIndices.size)
+      val cannotMoveUp = _selectedIndices.isEmpty || (_selectedIndices.max + 1 == _selectedIndices.size)
       // If all items are in last positions, we cannot move them down
-      val cannotMoveDown = items.isEmpty || (items.size - _selectedIndices.min == _selectedIndices.size)
+      val cannotMoveDown = _selectedIndices.isEmpty || (items.size - _selectedIndices.min == _selectedIndices.size)
       moveFirst.setDisable(cannotMoveUp)
       moveUp.setDisable(cannotMoveUp)
       moveDown.setDisable(cannotMoveDown)

@@ -306,7 +306,7 @@ class OptionsController extends StagePersistentView {
     // its children are managed, which gives a computed minimum size of 0 ...
     // Unlike in 'initialize', here is the first time the skin is present, so
     // make all children managed.
-    val tabPane = stage.getScene.lookup(".content.tab-pane").asInstanceOf[TabPane]
+    val tabPane = sitesTab.getTabPane
     tabPane.getSkin.asInstanceOf[SkinBase[_]].getChildren.asScala.foreach { child ⇒
       child.setManaged(true)
     }
