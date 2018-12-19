@@ -3,6 +3,7 @@
 <?import javafx.geometry.Insets?>
 <?import javafx.scene.control.ChoiceBox?>
 <?import javafx.scene.control.CustomMenuItem?>
+<?import javafx.scene.control.Hyperlink?>
 <?import javafx.scene.control.Label?>
 <?import javafx.scene.control.Menu?>
 <?import javafx.scene.control.MenuBar?>
@@ -21,6 +22,7 @@
 <?import javafx.scene.layout.HBox?>
 <?import javafx.scene.layout.RowConstraints?>
 <?import javafx.scene.layout.VBox?>
+<?import javafx.scene.text.Font?>
 
 <AnchorPane maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" minHeight="360.0" minWidth="600.0" xmlns="http://javafx.com/javafx/10.0.1" xmlns:fx="http://javafx.com/fxml/1" fx:controller="suiryc.dl.mngr.controllers.MainController">
    <children>
@@ -74,9 +76,9 @@
                         </Tab>
                         <Tab fx:id="dlPropertiesTab" closable="false" text="%Properties">
                            <content>
-                              <ScrollPane>
+                              <ScrollPane fx:id="dlPropertiesScrollPane" fitToWidth="true">
                                  <content>
-                                    <GridPane hgap="5.0" vgap="5.0">
+                                    <GridPane hgap="10.0" vgap="5.0">
                                       <columnConstraints>
                                         <ColumnConstraints hgrow="NEVER" />
                                         <ColumnConstraints hgrow="SOMETIMES" minWidth="50.0" />
@@ -93,23 +95,59 @@
                                           <RowConstraints minHeight="25.0" vgrow="NEVER" />
                                       </rowConstraints>
                                        <children>
-                                          <Label text="URI:" />
-                                          <Label fx:id="dlURILabel" GridPane.columnIndex="1" />
-                                          <Label text="%Server:" GridPane.rowIndex="1" />
-                                          <Label fx:id="dlServerLabel" GridPane.columnIndex="1" GridPane.rowIndex="1" />
-                                          <Label text="%Site:" GridPane.rowIndex="2" />
-                                          <Label fx:id="dlSiteLabel" GridPane.columnIndex="1" GridPane.rowIndex="2" />
-                                          <Label text="Referrer:" GridPane.rowIndex="3" />
-                                          <Label fx:id="dlReferrerLabel" GridPane.columnIndex="1" GridPane.rowIndex="3" />
-                                          <Label text="Cookie:" GridPane.rowIndex="4" />
-                                          <Label fx:id="dlCookieLabel" GridPane.columnIndex="1" GridPane.rowIndex="4" />
-                                          <Label text="User agent:" GridPane.rowIndex="5" />
-                                          <Label fx:id="dlUserAgentLabel" GridPane.columnIndex="1" GridPane.rowIndex="5" />
-                                          <Label text="%Folder:" GridPane.rowIndex="6" />
-                                          <Label fx:id="dlFolderLabel" GridPane.columnIndex="1" GridPane.rowIndex="6" />
-                                          <Label text="%File:" GridPane.rowIndex="7" />
-                                          <Label fx:id="dlFileLabel" GridPane.columnIndex="1" GridPane.rowIndex="7" />
-                                          <Label text="%Size:" GridPane.rowIndex="8" />
+                                          <Label text="URI:">
+                                             <font>
+                                                <Font name="System Bold" size="12.0" />
+                                             </font>
+                                          </Label>
+                                          <TextField fx:id="dlURIField" editable="false" GridPane.columnIndex="1" />
+                                          <Label text="%Server:" GridPane.rowIndex="1">
+                                             <font>
+                                                <Font name="System Bold" size="12.0" />
+                                             </font>
+                                          </Label>
+                                          <Hyperlink fx:id="dlServerLink" disable="true" onAction="#onDlServerSettings" GridPane.columnIndex="1" GridPane.rowIndex="1" />
+                                          <Label text="%Site:" GridPane.rowIndex="2">
+                                             <font>
+                                                <Font name="System Bold" size="12.0" />
+                                             </font>
+                                          </Label>
+                                          <Hyperlink fx:id="dlSiteLink" disable="true" onAction="#onDlSiteSettings" GridPane.columnIndex="1" GridPane.rowIndex="2" />
+                                          <Label text="Referrer:" GridPane.rowIndex="3">
+                                             <font>
+                                                <Font name="System Bold" size="12.0" />
+                                             </font>
+                                          </Label>
+                                          <TextField fx:id="dlReferrerField" editable="false" GridPane.columnIndex="1" GridPane.rowIndex="3" />
+                                          <Label text="Cookie:" GridPane.rowIndex="4">
+                                             <font>
+                                                <Font name="System Bold" size="12.0" />
+                                             </font>
+                                          </Label>
+                                          <TextField fx:id="dlCookieField" editable="false" GridPane.columnIndex="1" GridPane.rowIndex="4" />
+                                          <Label text="User agent:" GridPane.rowIndex="5">
+                                             <font>
+                                                <Font name="System Bold" size="12.0" />
+                                             </font>
+                                          </Label>
+                                          <TextField fx:id="dlUserAgentField" editable="false" GridPane.columnIndex="1" GridPane.rowIndex="5" />
+                                          <Label text="%Folder:" GridPane.rowIndex="6">
+                                             <font>
+                                                <Font name="System Bold" size="12.0" />
+                                             </font>
+                                          </Label>
+                                          <TextField fx:id="dlFolderField" editable="false" GridPane.columnIndex="1" GridPane.rowIndex="6" />
+                                          <Label text="%File:" GridPane.rowIndex="7">
+                                             <font>
+                                                <Font name="System Bold" size="12.0" />
+                                             </font>
+                                          </Label>
+                                          <TextField fx:id="dlFileField" editable="false" GridPane.columnIndex="1" GridPane.rowIndex="7" />
+                                          <Label text="%Size:" GridPane.rowIndex="8">
+                                             <font>
+                                                <Font name="System Bold" size="12.0" />
+                                             </font>
+                                          </Label>
                                           <Label fx:id="dlSizeLabel" GridPane.columnIndex="1" GridPane.rowIndex="8" />
                                        </children>
                                        <padding>

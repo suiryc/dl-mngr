@@ -10,7 +10,7 @@ import javafx.stage.{DirectoryChooser, Stage, Window}
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 import suiryc.dl.mngr.util.Icons
-import suiryc.dl.mngr.{DownloadManager, I18N, Main, Settings}
+import suiryc.dl.mngr.{I18N, Main, Settings}
 import suiryc.scala.javafx.beans.binding.BindingsEx
 import suiryc.scala.javafx.beans.value.RichObservableValue._
 import suiryc.scala.javafx.concurrent.JFXSystem
@@ -110,6 +110,8 @@ class OptionsController extends StagePersistentView {
   protected var siteMaxSegmentsField: TextField = _
 
   private var stage: Stage = _
+
+  private var sitesChanged = false
 
   private var cnxLimitChanged = false
 
@@ -298,6 +300,37 @@ class OptionsController extends StagePersistentView {
     ()
   }
 
+  def display(display: Display): Unit = {
+    def findSiteEntry(site: String): Option[Option[SiteSettingsSnapshot]] = {
+      sitesField.getItems.asScala.find { item ⇒
+        item.exists(_.settings.site == site)
+      }
+    }
+
+    display.serverSettings.foreach { server ⇒
+      sitesTab.getTabPane.getSelectionModel.select(sitesTab)
+      findSiteEntry(server) match {
+        case Some(found) ⇒
+          // A site already exists for this server
+          sitesField.getSelectionModel.select(found)
+
+        case None ⇒
+          // Prepare a new site entry for this server
+          sitesSnapshots.addSite(Some(server))
+      }
+    }
+    display.siteSettings.foreach { siteSettings ⇒
+      // 'default' site uses default settings (from the Main tab)
+      if (!siteSettings.isDefault) {
+        // Select 'Sites' tab and target site if found.
+        findSiteEntry(siteSettings.site).foreach { found ⇒
+          sitesTab.getTabPane.getSelectionModel.select(sitesTab)
+          sitesField.getSelectionModel.select(found)
+        }
+      }
+    }
+  }
+
   /** Restores (persisted) view. */
   override protected def restoreView(): Unit = {
     // We will need to compute the minimum size of the dialog. It takes into
@@ -336,7 +369,7 @@ class OptionsController extends StagePersistentView {
   }
 
   def onSiteAdd(@unused event: ActionEvent): Unit = {
-    sitesSnapshots.addSite()
+    sitesSnapshots.addSite(None)
   }
 
   def onSiteRemove(@unused event: ActionEvent): Unit = {
@@ -647,6 +680,7 @@ class OptionsController extends StagePersistentView {
         newSettings.cnxMax.withDefault(OPT_INT_DEFAULT).set(cnxMax.getDraftValue())
         newSettings.segmentsMax.withDefault(OPT_INT_DEFAULT).set(segmentsMax.getDraftValue())
 
+        sitesChanged = true
         // Since this is a 'new' site configuration, connection limits may have changed
         cnxLimitChanged = true
 
@@ -665,7 +699,7 @@ class OptionsController extends StagePersistentView {
 
     private var removed: Set[SiteSettingsSnapshot] = Set.empty
 
-    def addSite(): Unit = {
+    def addSite(siteOpt: Option[String]): Unit = {
       // Create a new snapshot for this site
       @scala.annotation.tailrec
       def getName(idx: Long): String = {
@@ -679,7 +713,9 @@ class OptionsController extends StagePersistentView {
       val siteSettings = new Main.settings.SiteSettings("")
       val snap = SiteSettingsSnapshot(siteSettings)
       // Build a unique site name to apply.
-      snap.site = getName(0)
+      snap.site = siteOpt.getOrElse(getName(0))
+      snap.cnxMax.draft.set(Main.settings.sitesDefault.cnxMax.get)
+      snap.segmentsMax.draft.set(Main.settings.sitesDefault.segmentsMax.get)
       // Add to our known list of settings
       add(snap)
       // Refresh sites (re-ordering may be needed)
@@ -717,6 +753,7 @@ class OptionsController extends StagePersistentView {
       // entries being 'swapped' (renamed to each other).
       removed.foreach { snap ⇒
         Main.settings.removeSite(snap.settings)
+        sitesChanged = true
         // Since this site was removed, connection limits may have changed
         cnxLimitChanged = true
       }
@@ -782,8 +819,21 @@ object OptionsController {
   // Default value (invalid otherwise) used for optional config entries
   private val OPT_INT_DEFAULT: Int = -1
 
-  def buildDialog(dlMngr: DownloadManager, owner: Window): Dialog[Boolean] = {
-    val dialog = new Dialog[Boolean]()
+  // What to specifically display in the options
+  case class Display(
+    serverSettings: Option[String] = None,
+    siteSettings: Option[Main.settings.SiteSettings] = None
+  )
+
+  case class Result(
+    sitesChanged: Boolean = false,
+    cnxLimitChanged: Boolean = false,
+    cnxBufferChanged: Boolean = false,
+    reload: Boolean = false
+  )
+
+  def buildDialog(owner: Window, display: Display): Dialog[Result] = {
+    val dialog = new Dialog[Result]()
     Stages.initOwner(dialog, owner)
     Stages.getStage(dialog).getIcons.clear()
     List(256.0, 128.0, 64.0, 32.0, 16.0).foreach { size ⇒
@@ -807,18 +857,19 @@ object OptionsController {
     dialog.getDialogPane.setContent(loader.load[Node]())
     val controller = loader.getController[OptionsController]
     controller.initialize(dialog, snapshot1, snapshot2)
+    controller.display(display)
 
     Dialogs.addPersistence(dialog, controller)
 
-    dialog.setResultConverter(resultConverter(controller, dlMngr, snapshot1, snapshot2) _)
+    dialog.setResultConverter(resultConverter(controller, snapshot1, snapshot2) _)
 
     dialog
   }
 
-  def resultConverter(controller: OptionsController, dlMngr: DownloadManager,
-    snapshot1: SettingsSnapshot, snapshot2: SettingsSnapshot)(buttonType: ButtonType): Boolean =
+  def resultConverter(controller: OptionsController,
+    snapshot1: SettingsSnapshot, snapshot2: SettingsSnapshot)(buttonType: ButtonType): Result =
   {
-    if (buttonType != ButtonType.OK) false
+    if (buttonType != ButtonType.OK) Result()
     else {
       // Apply changes
       val r = Main.settings.settings.delayedSave {
@@ -826,19 +877,12 @@ object OptionsController {
         snapshot1.applyDraft()
       }
 
-      // If cnx limits were (or may have) changed, ping downloads.
-      // We only need to do it once: all downloads will be pinged (in order)
-      // and will acquire new connection(s) when possible.
-      if (controller.cnxLimitChanged) {
-        dlMngr.refreshDownloads()
-        dlMngr.tryConnection()
-      }
-      // If cnx buffer was changed, re-create the HTTP client.
-      if (controller.cnxBufferChanged) {
-        dlMngr.setClient()
-      }
-
-      r
+      Result(
+        sitesChanged = controller.sitesChanged,
+        cnxLimitChanged = controller.cnxLimitChanged,
+        cnxBufferChanged = controller.cnxBufferChanged,
+        reload = r
+      )
     }
   }
 

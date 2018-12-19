@@ -84,28 +84,31 @@ class MainController extends StagePersistentView with StrictLogging {
   protected var dlPropertiesTab: Tab = _
 
   @FXML
-  protected var dlURILabel: Label = _
+  protected var dlPropertiesScrollPane: ScrollPane = _
 
   @FXML
-  protected var dlServerLabel: Label = _
+  protected var dlURIField: TextField = _
 
   @FXML
-  protected var dlSiteLabel: Label = _
+  protected var dlServerLink: Hyperlink = _
 
   @FXML
-  protected var dlReferrerLabel: Label = _
+  protected var dlSiteLink: Hyperlink = _
 
   @FXML
-  protected var dlCookieLabel: Label = _
+  protected var dlReferrerField: TextField = _
 
   @FXML
-  protected var dlUserAgentLabel: Label = _
+  protected var dlCookieField: TextField = _
 
   @FXML
-  protected var dlFolderLabel: Label = _
+  protected var dlUserAgentField: TextField = _
 
   @FXML
-  protected var dlFileLabel: Label = _
+  protected var dlFolderField: TextField = _
+
+  @FXML
+  protected var dlFileField: TextField = _
 
   @FXML
   protected var dlSizeLabel: Label = _
@@ -402,42 +405,16 @@ class MainController extends StagePersistentView with StrictLogging {
     downloadsTable.getSelectionModel.setSelectionMode(SelectionMode.MULTIPLE)
     downloadsTable.getSelectionModel.selectedItemProperty.listen { id ⇒
       // Cancel previous subscriptions if any
-      def cancelSubscription(v: Option[Any]): Unit = {
-        v match {
-          case Some(cancellable: Cancellable) ⇒ cancellable.cancel()
-          case _ ⇒
-        }
-      }
-      cancelSubscription(Option(dlPropertiesTab.getUserData))
       cancelSubscription(Option(logsTable.getUserData))
+
+      refreshDlProperties()
 
       // Fix minimum width; will be updated when setting cells content
       columnLogMessage.setMinWidth(computeTextWidth("MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM"))
 
       getDownloadData(id) match {
         case Some(data) ⇒
-          val download = data.download
-          val info = download.info
-
-          dlSiteLabel.setText(download.siteSettings.site)
-          dlReferrerLabel.setText(download.referrer.map(_.toString).orNull)
-          dlCookieLabel.setText(download.cookie.orNull)
-          dlUserAgentLabel.setText(download.userAgent.orNull)
-          def updateProperties(): Unit = {
-            dlURILabel.setText(info.uri.get.toString)
-            dlServerLabel.setText(info.uri.get.getHost)
-            dlFolderLabel.setText(info.path.get.getParent.toString)
-            dlFileLabel.setText(info.path.get.getFileName.toString)
-            dlSizeLabel.setText(if (info.isSizeDetermined && !info.isSizeUnknown) info.size.get.toString else "")
-          }
-          val propertiesCancellable = RichObservableValue.listen(info.uri, info.path, info.size) {
-            JFXSystem.runLater {
-              updateProperties()
-            }
-          }
-          updateProperties()
-          // Remember this subscription
-          dlPropertiesTab.setUserData(propertiesCancellable)
+          val info = data.download.info
 
           def getLogs(l: java.util.List[_ <: LogEntry]): List[LogEntry] = {
             val logs0 = l.asScala.toList
@@ -512,12 +489,6 @@ class MainController extends StagePersistentView with StrictLogging {
 
         case None ⇒
           logsTable.getItems.clear()
-          List(
-            dlURILabel, dlServerLabel, dlSiteLabel, dlReferrerLabel, dlCookieLabel, dlUserAgentLabel,
-            dlFolderLabel, dlFileLabel, dlSizeLabel
-          ).foreach { label ⇒
-            label.setText(null)
-          }
       }
     }
 
@@ -562,6 +533,61 @@ class MainController extends StagePersistentView with StrictLogging {
         onDownloadsRemove(null)
       }
     })
+  }
+
+  private def cancelSubscription(v: Option[Any]): Unit = {
+    v match {
+      case Some(cancellable: Cancellable) ⇒ cancellable.cancel()
+      case _ ⇒
+    }
+  }
+
+  private def refreshDlProperties(): Unit = {
+    cancelSubscription(Option(dlPropertiesTab.getUserData))
+
+    selectedDownloadData match {
+      case Some(data) ⇒
+        val download = data.download
+        val info = download.info
+
+        List(dlServerLink, dlSiteLink).foreach { field ⇒
+          field.setDisable(false)
+        }
+        dlSiteLink.setText(download.siteSettings.site)
+        dlReferrerField.setText(download.referrer.map(_.toString).orNull)
+        dlCookieField.setText(download.cookie.orNull)
+        dlUserAgentField.setText(download.userAgent.orNull)
+        def updateProperties(): Unit = {
+          dlURIField.setText(info.uri.get.toString)
+          dlServerLink.setText(info.uri.get.getHost)
+          dlFolderField.setText(info.path.get.getParent.toString)
+          dlFileField.setText(info.path.get.getFileName.toString)
+          dlSizeLabel.setText(if (info.isSizeDetermined && !info.isSizeUnknown) info.size.get.toString else "")
+          // Somehow changed text (e.g. dlSiteLink) is not always updated until
+          // layout is triggered again (e.g. resizing). Try manual trigger.
+          dlPropertiesScrollPane.layout()
+        }
+        val propertiesCancellable = RichObservableValue.listen(info.uri, info.path, info.size) {
+          JFXSystem.runLater {
+            updateProperties()
+          }
+        }
+        updateProperties()
+        // Remember this subscription
+        dlPropertiesTab.setUserData(propertiesCancellable)
+
+      case None ⇒
+        List(dlServerLink, dlSiteLink).foreach { field ⇒
+          field.setDisable(true)
+        }
+        List(dlServerLink, dlSiteLink, dlSizeLabel).foreach { field ⇒
+          field.setText(null)
+        }
+        List(dlURIField, dlReferrerField, dlCookieField, dlUserAgentField,
+          dlFolderField, dlFileField).foreach { field ⇒
+          field.setText(null)
+        }
+    }
   }
 
   /** Restores (persisted) view. */
@@ -662,6 +688,9 @@ class MainController extends StagePersistentView with StrictLogging {
   private def getState: State = {
     stage.getUserData.asInstanceOf[State]
   }
+
+  private def selectedDownload: Option[UUID] = Some(downloadsTable.getSelectionModel.getSelectedItem)
+  private def selectedDownloadData: Option[DownloadData] = selectedDownload.flatMap(getDownloadData)
 
   private def selectedDownloadsIdx: List[Int] = downloadsTable.getSelectionModel.getSelectedIndices.asScala.toList.map(Int.unbox)
   private def selectedDownloads: List[UUID] = downloadsTable.getSelectionModel.getSelectedItems.asScala.toList
@@ -816,7 +845,7 @@ class MainController extends StagePersistentView with StrictLogging {
   }
 
   def onOptions(@unused event: ActionEvent): Unit = {
-    actor ! OnOptions
+    actor ! OnOptions()
   }
 
   def onExit(@unused event: ActionEvent): Unit = {
@@ -845,6 +874,20 @@ class MainController extends StagePersistentView with StrictLogging {
 
   def onDownloadsRemove(@unused event: ActionEvent): Unit = {
     actor ! OnDownloadsRemove
+  }
+
+  def onDlServerSettings(@unused event: ActionEvent): Unit = {
+    selectedDownloadData.foreach { data ⇒
+      val host = data.download.info.uri.get.getHost
+      actor ! OnOptions(OptionsController.Display(serverSettings = Some(host)))
+    }
+  }
+
+  def onDlSiteSettings(@unused event: ActionEvent): Unit = {
+    selectedDownloadData.foreach { data ⇒
+      val siteSettings = data.download.siteSettings
+      actor ! OnOptions(OptionsController.Display(siteSettings = Some(siteSettings)))
+    }
   }
 
   def addDownload(id: UUID, first: Boolean, select: Boolean): Unit = {
@@ -879,7 +922,7 @@ class MainController extends StagePersistentView with StrictLogging {
       }
 
     def receive0(state: State): Receive = {
-      case OnOptions                      ⇒ onOptions(state)
+      case OnOptions(display)             ⇒ onOptions(state, display)
       case OnExit                         ⇒ onExit(state)
       case OnDownloadsAdd(dlInfo)         ⇒ onDownloadsAdd(state, dlInfo)
       case OnDownloadsRemoveCompleted     ⇒ onDownloadsRemoveCompleted(state)
@@ -912,12 +955,33 @@ class MainController extends StagePersistentView with StrictLogging {
       }(Main.Akka.dispatcher)
     }
 
-    def onOptions(state: State): Unit = {
-      val dialog = OptionsController.buildDialog(state.dlMngr, state.stage)
+    def onOptions(state: State, display: OptionsController.Display): Unit = {
+      val dlMngr = state.dlMngr
+      val dialog = OptionsController.buildDialog(state.stage, display)
       dialog.initModality(Modality.WINDOW_MODAL)
       dialog.setResizable(true)
-      val reload = dialog.showAndWait().orElse(false)
-      if (reload) {
+      val result = dialog.showAndWait().orElse(OptionsController.Result())
+
+      // If sites were changed, refresh properties (selected download site may
+      // have changed).
+      if (result.sitesChanged) {
+        refreshDlProperties()
+      }
+
+      // If cnx limits were (or may have) changed, ping downloads.
+      // We only need to do it once: all downloads will be pinged (in order)
+      // and will acquire new connection(s) when possible.
+      if (result.cnxLimitChanged) {
+        dlMngr.refreshDownloads()
+        dlMngr.tryConnection()
+      }
+      // If cnx buffer was changed, re-create the HTTP client.
+      if (result.cnxBufferChanged) {
+        dlMngr.setClient()
+      }
+
+      // Reload controller if needed (language change).
+      if (result.reload) {
         // Reset I18N cache to apply any language change
         I18N.reset()
         // Persist now to restore it when rebuilding the stage
@@ -1286,7 +1350,7 @@ object MainController {
     downloadedProgressPane.getChildren.setAll(downloadedProgress, downloadedProgressText)
   }
 
-  case object OnOptions
+  case class OnOptions(display: OptionsController.Display = OptionsController.Display())
   case object OnExit
   case class OnDownloadsAdd(dlInfo: NewDownloadInfo)
   case object OnDownloadsRemoveCompleted
