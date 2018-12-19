@@ -40,6 +40,7 @@ import suiryc.scala.javafx.scene.control.skin.SplitPaneSkinEx
 import suiryc.scala.javafx.stage.{StagePersistentView, Stages}
 import suiryc.scala.javafx.stage.Stages.StageLocation
 import suiryc.scala.settings.ConfigEntry
+import suiryc.scala.unused
 
 // TODO: status bar ? (display current speed / limit, number of running downloads + pending + finished / total, number of connections)
 class MainController extends StagePersistentView with StrictLogging {
@@ -814,35 +815,35 @@ class MainController extends StagePersistentView with StrictLogging {
     event.consume()
   }
 
-  def onOptions(@deprecated("unused","") event: ActionEvent): Unit = {
+  def onOptions(@unused event: ActionEvent): Unit = {
     actor ! OnOptions
   }
 
-  def onExit(@deprecated("unused","") event: ActionEvent): Unit = {
+  def onExit(@unused event: ActionEvent): Unit = {
     actor ! OnExit
   }
 
-  def onDownloadsAdd(@deprecated("unused","") event: ActionEvent): Unit = {
+  def onDownloadsAdd(@unused event: ActionEvent): Unit = {
     addDownload(NewDownloadInfo())
   }
 
-  def onDownloadsStopAll(@deprecated("unused","") event: ActionEvent): Unit = {
+  def onDownloadsStopAll(@unused event: ActionEvent): Unit = {
     getDownloadsData.filter(_.download.canStop).foreach { data ⇒
       getState.dlMngr.stopDownload(data.download.id)
     }
   }
 
-  def onDownloadsResumeAll(@deprecated("unused","") event: ActionEvent): Unit = {
+  def onDownloadsResumeAll(@unused event: ActionEvent): Unit = {
     getDownloadsData.filter(_.download.canResume(restart = false)).foreach { data ⇒
       getState.dlMngr.resumeDownload(data.download.id, reusedOpt = None, restart = false)
     }
   }
 
-  def onDownloadsRemoveCompleted(@deprecated("unused","") event: ActionEvent): Unit = {
+  def onDownloadsRemoveCompleted(@unused event: ActionEvent): Unit = {
     actor ! OnDownloadsRemoveCompleted
   }
 
-  def onDownloadsRemove(@deprecated("unused","") event: ActionEvent): Unit = {
+  def onDownloadsRemove(@unused event: ActionEvent): Unit = {
     actor ! OnDownloadsRemove
   }
 

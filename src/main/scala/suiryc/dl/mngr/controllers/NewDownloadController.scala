@@ -23,6 +23,7 @@ import suiryc.scala.javafx.stage.Stages.StageLocation
 import suiryc.scala.javafx.stage.{PathChoosers, StagePersistentView, Stages}
 import suiryc.scala.misc.Units
 import suiryc.scala.settings.ConfigEntry
+import suiryc.scala.unused
 
 class NewDownloadController extends StagePersistentView {
 
@@ -273,7 +274,7 @@ class NewDownloadController extends StagePersistentView {
     updateFilename(None)
   }
 
-  def onFileSelect(@deprecated("unused","") event: ActionEvent): Unit = {
+  def onFileSelect(@unused event: ActionEvent): Unit = {
     val fileChooser = new FileChooser()
     fileChooser.setTitle(dialog.getTitle)
     fileChooser.getExtensionFilters.addAll(
@@ -468,7 +469,7 @@ object NewDownloadController {
     }
   }
 
-  def resultConverter(mainController: MainController, controller: NewDownloadController)(@deprecated("unused","") buttonType: ButtonType): Option[Download] = {
+  def resultConverter(mainController: MainController, controller: NewDownloadController)(@unused buttonType: ButtonType): Option[Download] = {
     // Note: controller result is only set upon "OK"
     controller.result.map { result ⇒
       val dlMngr = controller.dlMngr

@@ -20,6 +20,7 @@ import suiryc.scala.javafx.stage.Stages.StageLocation
 import suiryc.scala.javafx.stage.{PathChoosers, StagePersistentView, Stages}
 import suiryc.scala.misc.{Units, Util}
 import suiryc.scala.settings._
+import suiryc.scala.unused
 import suiryc.scala.util.I18NLocale
 
 class OptionsController extends StagePersistentView {
@@ -326,7 +327,7 @@ class OptionsController extends StagePersistentView {
     stageLocation.set(Stages.getLocation(stage).orNull)
   }
 
-  def onDownloadFolderSelect(@deprecated("unused","") event: ActionEvent): Unit = {
+  def onDownloadFolderSelect(@unused event: ActionEvent): Unit = {
     val directoryChooser = new DirectoryChooser()
     PathChoosers.setInitialPath(directoryChooser, Option(downloadFolderField.getText).map(Paths.get(_).toFile).orNull)
     Option(directoryChooser.showDialog(stage)).foreach { selectedFolder ⇒
@@ -334,11 +335,11 @@ class OptionsController extends StagePersistentView {
     }
   }
 
-  def onSiteAdd(@deprecated("unused","") event: ActionEvent): Unit = {
+  def onSiteAdd(@unused event: ActionEvent): Unit = {
     sitesSnapshots.addSite()
   }
 
-  def onSiteRemove(@deprecated("unused","") event: ActionEvent): Unit = {
+  def onSiteRemove(@unused event: ActionEvent): Unit = {
     getSelectedSite.filterNot(_.isDefault).foreach { snap ⇒
       sitesSnapshots.removeSite(snap)
     }
