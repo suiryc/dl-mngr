@@ -386,6 +386,9 @@ class DownloadManager extends StrictLogging {
           // get another connection.
           tryConnection(Some(id))
           checkDone()
+          // When a download is done, it is also a good time to (force) save
+          // our state.
+          if (!stopping) saveState()
         }
 
       case None ⇒
