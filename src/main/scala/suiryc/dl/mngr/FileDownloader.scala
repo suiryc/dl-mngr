@@ -188,16 +188,23 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
       downloaded(state, range)
 
     case Refresh ⇒
-      refresh(state)
+      applyState(refresh(state))
   }
 
   def applyState(state: State): Unit = {
     context.become(receive(state))
   }
 
-  def refresh(state: State): Unit = {
+  def refresh(state: State): State = {
     state.updateMaxSegments()
-    ()
+
+    val segmentConsumers = state.segmentConsumers.map {
+      case (consumer, data) ⇒
+        val acquired = state.dlMngr.tryAcquireConnection(state.download, force = true).getOrElse(data.acquired)
+        state.dlMngr.releaseConnection(data.acquired)
+        consumer → data.copy(acquired = acquired)
+    }
+    state.copy(segmentConsumers = segmentConsumers)
   }
 
   def resume(state: State, action: String, force: Boolean): State = {

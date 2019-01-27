@@ -962,6 +962,13 @@ class MainController extends StagePersistentView with StrictLogging {
       dialog.setResizable(true)
       val result = dialog.showAndWait().orElse(OptionsController.Result())
 
+      // If sites or limits were changed, refresh downloads: in particular the
+      // maximum number of segments will be recomputed, and the current
+      // connections associated to the correct site.
+      if (result.sitesChanged || result.cnxLimitChanged) {
+        dlMngr.refreshDownloads()
+      }
+
       // If sites were changed, refresh properties (selected download site may
       // have changed).
       if (result.sitesChanged) {
@@ -972,7 +979,6 @@ class MainController extends StagePersistentView with StrictLogging {
       // We only need to do it once: all downloads will be pinged (in order)
       // and will acquire new connection(s) when possible.
       if (result.cnxLimitChanged) {
-        dlMngr.refreshDownloads()
         dlMngr.tryConnection()
       }
       // If cnx buffer was changed, re-create the HTTP client.
