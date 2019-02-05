@@ -1251,16 +1251,17 @@ class MainController extends StagePersistentView with StrictLogging {
 
       if (up) {
         // When moving up, use the first item as base.
-        val dst = if (most) 0 else items.indexOf(ids.head) - 1
+        val dst = if (most) 0 else math.max(0, items.indexOf(ids.head) - 1)
         ids.zipWithIndex.foreach {
           case (id, offset) ⇒ moveDownload(id, dst + offset)
         }
       } else {
         // When moving down, use the last item as base.
-        val dst = if (most) items.size - 1 else items.indexOf(ids.last) + 1
+        val idxMax = items.size - 1
+        val dst = if (most) idxMax else math.min(idxMax, items.indexOf(ids.last) + 1)
         // Since we are moving each item downward - from first to last -, they
         // individually all go to the same position so that at the end the last
-        // one is really moved to the tar get position while others are right
+        // one is really moved to the target position while others are right
         // before it (and remain in original order).
         ids.foreach { id ⇒
           moveDownload(id, dst)
