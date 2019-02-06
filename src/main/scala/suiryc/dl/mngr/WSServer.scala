@@ -156,46 +156,56 @@ object WSServer extends StrictLogging {
     override protected def channelRead0(ctx: ChannelHandlerContext, frame: WebSocketFrame): Unit = {
       frame match {
         case frame: TextWebSocketFrame ⇒
-          ctx.channel.writeAndFlush(new TextWebSocketFrame(processMessage(frame.text)))
-          ()
+          processMessage(frame.text).foreach { s ⇒
+            ctx.channel.writeAndFlush(new TextWebSocketFrame(s))
+          }
 
         case _ ⇒
           throw new UnsupportedOperationException(s"Unsupported frame type: ${frame.getClass.getName}")
       }
     }
 
-    private def processMessage(msg: String): String = {
+    private def processMessage(msg: String): Future[String] = {
       import JsonProtocol._
       val paramsOpt = try {
-        Some(msg.parseJson.convertTo[Main.Params])
+        Right(msg.parseJson.convertTo[Main.Params])
       } catch {
+        case ex: Exception ⇒ Left(ex)
+      }
+      val fExec = paramsOpt match {
+        case Left(ex) ⇒
+          Main.controller.displayError(
+            title = None,
+            contentText = Some(Strings.cliIssue),
+            ex = ex
+          )
+          Future.successful(UniqueInstance.CommandResult(
+            UniqueInstance.CODE_CMD_ERROR,
+            Some(s"Failed to parse message: ${ex.getMessage}"))
+          )
+
+        case Right(params) ⇒
+          Main.cmd(params)
+      }
+      fExec.recover {
         case ex: Exception ⇒
           Main.controller.displayError(
             title = None,
             contentText = Some(Strings.cliIssue),
             ex = ex
           )
-          None
-      }
-      val result0 = try {
-        paramsOpt.map(Main.cmd).getOrElse {
-          UniqueInstance.CommandResult(-1, Some("Failed to parse message"))
-        }
-      } catch {
-        case ex: Exception ⇒
-          Main.controller.displayError(
-            title = None,
-            contentText = Some(Strings.cliIssue),
-            ex = ex
+          UniqueInstance.CommandResult(
+            UniqueInstance.CODE_CMD_ERROR,
+            Some(s"Failed to process arguments: ${ex.getMessage}")
           )
-          UniqueInstance.CommandResult(-1, Some(s"Failed to process arguments: ${ex.getMessage}"))
+      }.map { r ⇒
+        val result = CommandResult(
+          correlationId = paramsOpt.toOption.flatMap(_.correlationId),
+          code = r.code,
+          output = r.output
+        )
+        result.toJson.compactPrint
       }
-      val result = CommandResult(
-        correlationId = paramsOpt.flatMap(_.correlationId),
-        code = result0.code,
-        output = result0.output
-      )
-      result.toJson.compactPrint
     }
 
   }

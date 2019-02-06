@@ -6,8 +6,8 @@ import java.nio.file.Path
 import javafx.application.Application
 import javafx.stage.Stage
 import monix.execution.Scheduler
-import scala.concurrent.{Await, ExecutionContextExecutor, Promise}
-import scala.concurrent.duration.Duration
+import scala.concurrent.{ExecutionContextExecutor, Future, Promise}
+import scala.util.Failure
 import suiryc.dl.mngr.I18N.Strings
 import suiryc.dl.mngr.controllers.MainController
 import suiryc.dl.mngr.model.NewDownloadInfo
@@ -23,6 +23,8 @@ object Main {
   // Note: use 'lazy' for fields that indirectly trigger stdout/stderr writing
   // (e.g. through logger, or scala Console println etc), so that we can
   // redirect streams before it happens.
+
+  import Akka.dispatcher
 
   val appPath: Path = Util.classLocation[this.type]
 
@@ -140,65 +142,66 @@ object Main {
             close("stdin", streams.in)
             close("stdout", streams.out)
             close("stderr", streams.err)
-          }(Akka.dispatcher)
+          }
         }
         // 'launch' does not return until application is closed
         Application.launch(classOf[Main])
 
       case None ⇒
-        sys.exit(-1)
+        sys.exit(UniqueInstance.CODE_CMD_ERROR)
     }
   }
 
-  protected def _cmd(args: Array[String]): CommandResult = {
+  protected def _cmd(args: Array[String]): Future[CommandResult] = {
     // Second parsing to actually process the arguments through unique instance.
     parser.parse(args, Params()).map(cmd).getOrElse {
       // Should not happen
-      CommandResult(-1, Some("No parsed arguments"))
+      Future.successful(CommandResult(UniqueInstance.CODE_CMD_ERROR, Some("Invalid arguments")))
     }
   }
 
-  def cmd(params: Params): CommandResult = {
-    def process(): CommandResult = {
-      // Sanity check: we should not be able to process command arguments if we
-      // failed to create the controller.
-      if (controller != null) {
-        val wsPort = if (params.needWs) {
-          Await.result(WSServer.start(), Duration.Inf)
-        } else {
-          -1
-        }
-        if (params.url.isDefined) {
-          val dlInfo = NewDownloadInfo(
-            auto = params.isAuto,
-            uri = params.url,
-            referrer = params.referrer,
-            cookie = params.cookie,
-            userAgent = params.userAgent,
-            file = params.file,
-            sizeHint = params.size,
-            comment = params.comment
-          )
-          controller.addDownload(dlInfo)
-        }
-        CommandResult(0, if (wsPort > 0) Some(wsPort.toString) else None)
+  def cmd(params: Params): Future[CommandResult] = {
+    // Sanity check: we should not be able to process command arguments if we
+    // failed to create the controller.
+    if (controller != null) {
+      val fWS = if (params.needWs) {
+        WSServer.start()
       } else {
-        CommandResult(-1, Some("Controller is not started"))
+        Future.successful(-1)
       }
-    }
-
-    try {
-      process()
-    } catch {
-      case ex: Exception ⇒
-        // Display the issue in the GUI when possible.
-        Option(controller).foreach(_.displayError(
-          title = None,
-          contentText = Some(Strings.cliIssue),
-          ex = ex
-        ))
+      val fExec = if (params.url.isDefined) {
+        val dlInfo = NewDownloadInfo(
+          auto = params.isAuto,
+          uri = params.url,
+          referrer = params.referrer,
+          cookie = params.cookie,
+          userAgent = params.userAgent,
+          file = params.file,
+          sizeHint = params.size,
+          comment = params.comment
+        )
+        controller.addDownload(dlInfo)
+      } else {
+        Future.successful(())
+      }
+      val f = for {
+        wsPort ← fWS
+        _ ← fExec
+      } yield {
+        CommandResult(UniqueInstance.CODE_SUCCESS, if (wsPort > 0) Some(wsPort.toString) else None)
+      }
+      f.andThen {
+        case Failure(ex) ⇒
+          // Display the issue in the GUI when possible.
+          Option(controller).foreach(_.displayError(
+            title = None,
+            contentText = Some(Strings.cliIssue),
+            ex = ex
+          ))
         // At worst caller will log it.
-        throw ex
+      }
+    } else {
+      Future.successful(CommandResult(UniqueInstance.CODE_ERROR, Some("Controller is not started")))
     }
   }
 

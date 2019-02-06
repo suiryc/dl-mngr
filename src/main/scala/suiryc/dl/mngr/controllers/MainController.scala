@@ -20,6 +20,7 @@ import javafx.stage.{Modality, Stage, WindowEvent}
 import javafx.util.StringConverter
 import monix.execution.Cancelable
 import scala.collection.JavaConverters._
+import scala.concurrent.{Future, Promise}
 import scala.concurrent.duration._
 import suiryc.dl.mngr.model._
 import suiryc.scala.misc.Units
@@ -834,8 +835,10 @@ class MainController extends StagePersistentView with StrictLogging {
     ()
   }
 
-  def addDownload(dlInfo: NewDownloadInfo): Unit = {
-    actor ! OnDownloadsAdd(dlInfo)
+  def addDownload(dlInfo: NewDownloadInfo): Future[Unit] = {
+    val promise = Promise[Unit]()
+    actor ! OnDownloadsAdd(dlInfo, promise)
+    promise.future
   }
 
   def onCloseRequest(event: WindowEvent): Unit = {
@@ -854,6 +857,7 @@ class MainController extends StagePersistentView with StrictLogging {
 
   def onDownloadsAdd(@unused event: ActionEvent): Unit = {
     addDownload(NewDownloadInfo())
+    ()
   }
 
   def onDownloadsStopAll(@unused event: ActionEvent): Unit = {
@@ -922,13 +926,13 @@ class MainController extends StagePersistentView with StrictLogging {
       }
 
     def receive0(state: State): Receive = {
-      case OnOptions(display)             ⇒ onOptions(state, display)
-      case OnExit                         ⇒ onExit(state)
-      case OnDownloadsAdd(dlInfo)         ⇒ onDownloadsAdd(state, dlInfo)
-      case OnDownloadsRemoveCompleted     ⇒ onDownloadsRemoveCompleted(state)
-      case OnDownloadsRemove              ⇒ onDownloadsRemove(state)
-      case AddDownload(id, first, select) ⇒ addDownload(state, id, first, select)
-      case MoveDownloads(ids, up, most)   ⇒ moveDownloads(state, ids, up, most)
+      case OnOptions(display)              ⇒ onOptions(state, display)
+      case OnExit                          ⇒ onExit(state)
+      case OnDownloadsAdd(dlInfo, promise) ⇒ onDownloadsAdd(state, dlInfo, promise)
+      case OnDownloadsRemoveCompleted      ⇒ onDownloadsRemoveCompleted(state)
+      case OnDownloadsRemove               ⇒ onDownloadsRemove(state)
+      case AddDownload(id, first, select)  ⇒ addDownload(state, id, first, select)
+      case MoveDownloads(ids, up, most)    ⇒ moveDownloads(state, ids, up, most)
     }
 
     def onExit(state: State): Unit = {
@@ -998,7 +1002,7 @@ class MainController extends StagePersistentView with StrictLogging {
       }
     }
 
-    def onDownloadsAdd(state: State, dlInfo: NewDownloadInfo): Unit = {
+    def onDownloadsAdd(state: State, dlInfo: NewDownloadInfo, promise: Promise[Unit]): Unit = {
       val dialogOpt = NewDownloadController.buildDialog(MainController.this, state.stage, state.dlMngr, dlInfo)
       // In automatic mode, there is no dialog and download has been added.
       dialogOpt.foreach { dialog ⇒
@@ -1006,6 +1010,8 @@ class MainController extends StagePersistentView with StrictLogging {
         dialog.setResizable(true)
         dialog.show()
       }
+      promise.trySuccess(())
+      ()
     }
 
     def onDownloadsRemoveCompleted(state: State): Unit = {
@@ -1359,7 +1365,7 @@ object MainController {
 
   case class OnOptions(display: OptionsController.Display = OptionsController.Display())
   case object OnExit
-  case class OnDownloadsAdd(dlInfo: NewDownloadInfo)
+  case class OnDownloadsAdd(dlInfo: NewDownloadInfo, promise: Promise[Unit])
   case object OnDownloadsRemoveCompleted
   case object OnDownloadsRemove
   case class AddDownload(id: UUID, first: Boolean, select: Boolean)
