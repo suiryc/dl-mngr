@@ -13,7 +13,7 @@ import javafx.event.ActionEvent
 import javafx.fxml.{FXML, FXMLLoader}
 import javafx.scene.{Node, Parent, Scene}
 import javafx.scene.control._
-import javafx.scene.input.{KeyCode, KeyEvent, MouseEvent}
+import javafx.scene.input._
 import javafx.scene.layout.{Pane, Region, StackPane}
 import javafx.scene.text.{Font, Text}
 import javafx.stage.{Modality, Stage, WindowEvent}
@@ -114,6 +114,10 @@ class MainController extends StagePersistentView with StrictLogging {
   @FXML
   protected var dlSizeLabel: Label = _
 
+  private val clipboard = Clipboard.getSystemClipboard
+
+  private val CTRL_C = new KeyCodeCombination(KeyCode.C, KeyCombination.CONTROL_DOWN)
+
   private val columnDownloadIndex = new TableColumn[UUID, String]("#")
 
   private val columnDownloadFile = new TableColumn[UUID, UUID](Strings.file)
@@ -134,6 +138,7 @@ class MainController extends StagePersistentView with StrictLogging {
   )
 
   private val columnLogTime = new TableColumn[LogEntry, String](Strings.time)
+  private val timeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS")
   private val columnLogMessage = new TableColumn[LogEntry, LogEntry](Strings.message)
 
   private val logsColumns = List(
@@ -358,7 +363,6 @@ class MainController extends StagePersistentView with StrictLogging {
     columnDownloadSegments.setMinWidth(computeTextWidth("_99/99_"))
 
     logsColumns.foreach(_._2.setSortable(false))
-    val timeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS")
     columnLogTime.setCellValueFactory { data ⇒
       Option(data.getValue).map{ v ⇒
         new SimpleStringProperty(v.time.format(timeFormatter))
@@ -444,6 +448,12 @@ class MainController extends StagePersistentView with StrictLogging {
         onDownloadsRemove(null)
       }
     })
+
+    logsTable.getSelectionModel.setSelectionMode(SelectionMode.MULTIPLE)
+    // Handle 'Ctrl-c' to copy log(s).
+    logsTable.addEventHandler(KeyEvent.KEY_PRESSED, (event: KeyEvent) => {
+      if (CTRL_C.`match`(event)) Option(logsTable.getSelectionModel.getSelectedItems.asScala.toList).foreach(copyDownloadLogsToClipboard)
+    })
   }
 
   private def computeTextWidth(s: String): Double = {
@@ -457,6 +467,26 @@ class MainController extends StagePersistentView with StrictLogging {
       case Some(cancellable: Cancellable) ⇒ cancellable.cancel()
       case _ ⇒
     }
+  }
+
+  private def copyDownloadLogsToClipboard(entries: List[LogEntry]): Unit = {
+    val text = entries.map { entry ⇒
+      val lines = List(
+        s"${Strings.time}: ${entry.time.format(timeFormatter)}",
+        s"${Strings.kind}: ${entry.kind}",
+        s"${Strings.message}: ${entry.message}"
+      ) ::: entry.exOpt.map { ex ⇒
+        val sw = new StringWriter()
+        val pw = new PrintWriter(sw)
+        ex.printStackTrace(pw)
+        s"${Strings.error}: $sw"
+      }.toList
+      lines.mkString("", "\n", "\n")
+    }.mkString("", "\n", "")
+    val content = new ClipboardContent()
+    content.putString(text)
+    clipboard.setContent(content)
+    ()
   }
 
   private def refreshDlLogs(): Unit = {
