@@ -175,12 +175,6 @@ class MainController extends StagePersistentView with StrictLogging {
     //  enableMenuRemove(downloadsRemove, _data)
     //}
 
-    def computeTextWidth(s: String): Double = {
-      s.map { c ⇒
-        Toolkit.getToolkit.getFontLoader.getFontMetrics(Font.getDefault).getCharWidth(c).toDouble
-      }.sum
-    }
-
     // We wish to disable mouse events in the custom menu item (but not the
     // nodes within). rateLimitField and rateLimitUnitField are children of an
     // HBox, and its parent will be set upon first displaying the menu.
@@ -404,93 +398,9 @@ class MainController extends StagePersistentView with StrictLogging {
 
     downloadsTable.setContextMenu(downloadsContextMenu)
     downloadsTable.getSelectionModel.setSelectionMode(SelectionMode.MULTIPLE)
-    downloadsTable.getSelectionModel.selectedItemProperty.listen { id ⇒
-      // Cancel previous subscriptions if any
-      cancelSubscription(Option(logsTable.getUserData))
-
+    downloadsTable.getSelectionModel.selectedItemProperty.listen {
+      refreshDlLogs()
       refreshDlProperties()
-
-      // Fix minimum width; will be updated when setting cells content
-      columnLogMessage.setMinWidth(computeTextWidth("MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM"))
-
-      getDownloadData(id) match {
-        case Some(data) ⇒
-          val info = data.download.info
-
-          def getLogs(l: java.util.List[_ <: LogEntry]): List[LogEntry] = {
-            val logs0 = l.asScala.toList
-            if (!Main.settings.debug.get) {
-              logs0.filter(_.kind != LogKind.Debug)
-            } else {
-              logs0
-            }
-          }
-          def setLogs(): Unit = {
-            val logs = getLogs(info.logs)
-            logsTable.getItems.setAll(logs:_*)
-            updateLogMessageMinWidth(logs)
-            ()
-          }
-
-          def updateLogMessageMinWidth(els: List[LogEntry]): Unit = {
-            if (els.nonEmpty) {
-              val textWidth = els.map(entry ⇒ computeTextWidth(entry.message)).max
-              // To compute the minimum width, we need the maximum text width and
-              // any 'extra' (padding/insets) applied on the TableCell.
-              // The commented code below can be used to compute those.
-              //def insetsWidth(insets: Insets): Double = insets.getLeft + insets.getRight
-              //val extraWidth = insetsWidth(cell.getPadding) + insetsWidth(cell.getInsets) + insetsWidth(cell.getLabelPadding)
-              // But the very first built cells (that can be accessed in the
-              // CellFactory above for example) do not have any padding/insets
-              // yet ... (and 'runLater' does not help).
-              // Keep it simple and use a hard-coded value: 10 on Windows and ~12
-              // on Linux.
-              val extraWidth = 12.0
-              val minWidth = math.max(Graphics.iconSize + textWidth + extraWidth, columnLogMessage.getMinWidth)
-              // Note: if only setting minimum width, often the actual width does
-              // not change (when it was bigger before re-setting log entries)
-              // until interaction is done (e.g. resizing window).
-              // Setting max width (along with preferred width) helps applying the
-              // target width right now, as is done below (in restoreView).
-              columnLogMessage.setMinWidth(minWidth)
-            }
-          }
-
-          // Listen to this download logs.
-          // We only expect entries to be added, which can be propagated easily in
-          // the table. For any other change, re-set all the items.
-          // In either case, update the column minimum width accordingly.
-          val logsCancellable = info.logs.listen { change ⇒
-            def loop(): Unit = {
-              if (change.next()) {
-                if (change.wasPermutated() || change.wasUpdated() || change.wasRemoved() || !change.wasAdded()) {
-                  setLogs()
-                } else {
-                  val logs = getLogs(change.getAddedSubList)
-                  if (logs.nonEmpty) {
-                    // We only expect adding at the end. Adding at position
-                    // 'change.getFrom' fails when filtering debug messages.
-                    logsTable.getItems.addAll(logs.asJava)
-                    updateLogMessageMinWidth(logs)
-                  }
-                  loop()
-                }
-              }
-            }
-
-            JFXSystem.runLater {
-              loop()
-            }
-          }
-          // Set initial value (only changes are listened)
-          setLogs()
-
-          // Remember this subscription
-          logsTable.setUserData(logsCancellable)
-
-        case None ⇒
-          logsTable.getItems.clear()
-      }
     }
 
     // Note: 'KEY_PRESSED' and 'KEY_TYPED' are continuously triggered while key
@@ -536,10 +446,103 @@ class MainController extends StagePersistentView with StrictLogging {
     })
   }
 
+  private def computeTextWidth(s: String): Double = {
+    s.map { c ⇒
+      Toolkit.getToolkit.getFontLoader.getFontMetrics(Font.getDefault).getCharWidth(c).toDouble
+    }.sum
+  }
+
   private def cancelSubscription(v: Option[Any]): Unit = {
     v match {
       case Some(cancellable: Cancellable) ⇒ cancellable.cancel()
       case _ ⇒
+    }
+  }
+
+  private def refreshDlLogs(): Unit = {
+    // Cancel previous subscriptions if any
+    cancelSubscription(Option(logsTable.getUserData))
+
+    // Fix minimum width; will be updated when setting cells content
+    columnLogMessage.setMinWidth(computeTextWidth("MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM"))
+
+    selectedDownloadData match {
+      case Some(data) ⇒
+        val info = data.download.info
+
+        def getLogs(l: java.util.List[_ <: LogEntry]): List[LogEntry] = {
+          val logs0 = l.asScala.toList
+          if (!Main.settings.debug.get) {
+            logs0.filter(_.kind != LogKind.Debug)
+          } else {
+            logs0
+          }
+        }
+        def setLogs(): Unit = {
+          val logs = getLogs(info.logs)
+          logsTable.getItems.setAll(logs:_*)
+          updateLogMessageMinWidth(logs)
+          ()
+        }
+
+        def updateLogMessageMinWidth(els: List[LogEntry]): Unit = {
+          if (els.nonEmpty) {
+            val textWidth = els.map(entry ⇒ computeTextWidth(entry.message)).max
+            // To compute the minimum width, we need the maximum text width and
+            // any 'extra' (padding/insets) applied on the TableCell.
+            // The commented code below can be used to compute those.
+            //def insetsWidth(insets: Insets): Double = insets.getLeft + insets.getRight
+            //val extraWidth = insetsWidth(cell.getPadding) + insetsWidth(cell.getInsets) + insetsWidth(cell.getLabelPadding)
+            // But the very first built cells (that can be accessed in the
+            // CellFactory above for example) do not have any padding/insets
+            // yet ... (and 'runLater' does not help).
+            // Keep it simple and use a hard-coded value: 10 on Windows and ~12
+            // on Linux.
+            val extraWidth = 12.0
+            val minWidth = math.max(Graphics.iconSize + textWidth + extraWidth, columnLogMessage.getMinWidth)
+            // Note: if only setting minimum width, often the actual width does
+            // not change (when it was bigger before re-setting log entries)
+            // until interaction is done (e.g. resizing window).
+            // Setting max width (along with preferred width) helps applying the
+            // target width right now, as is done below (in restoreView).
+            columnLogMessage.setMinWidth(minWidth)
+          }
+        }
+
+        // Listen to this download logs.
+        // We only expect entries to be added, which can be propagated easily in
+        // the table. For any other change, re-set all the items.
+        // In either case, update the column minimum width accordingly.
+        val logsCancellable = info.logs.listen { change ⇒
+          def loop(): Unit = {
+            if (change.next()) {
+              if (change.wasPermutated() || change.wasUpdated() || change.wasRemoved() || !change.wasAdded()) {
+                setLogs()
+              } else {
+                val logs = getLogs(change.getAddedSubList)
+                if (logs.nonEmpty) {
+                  // We only expect adding at the end. Adding at position
+                  // 'change.getFrom' fails when filtering debug messages.
+                  logsTable.getItems.addAll(logs.asJava)
+                  updateLogMessageMinWidth(logs)
+                }
+                loop()
+              }
+            }
+          }
+
+          JFXSystem.runLater {
+            loop()
+          }
+        }
+        // Set initial value (only changes are listened)
+        setLogs()
+
+        // Remember this subscription
+        logsTable.setUserData(logsCancellable)
+
+      case None ⇒
+        logsTable.getItems.clear()
     }
   }
 
@@ -961,10 +964,16 @@ class MainController extends StagePersistentView with StrictLogging {
 
     def onOptions(state: State, display: OptionsController.Display): Unit = {
       val dlMngr = state.dlMngr
+      val debug0 = Main.settings.debug.get
       val dialog = OptionsController.buildDialog(state.stage, display)
       dialog.initModality(Modality.WINDOW_MODAL)
       dialog.setResizable(true)
       val result = dialog.showAndWait().orElse(OptionsController.Result())
+
+      // Refresh selected DL logs to show/hide debug events.
+      if (Main.settings.debug.get != debug0) {
+        refreshDlLogs()
+      }
 
       // If sites or limits were changed, refresh downloads: in particular the
       // maximum number of segments will be recomputed, and the current
