@@ -174,6 +174,8 @@ class DownloadManager extends StrictLogging {
   import Main.Akka._
   import DownloadManager._
 
+  /** Whether we already started. */
+  private var started: Boolean = false
   /** Whether we are currently stopping (and waiting for downloads to properly stop). */
   @volatile
   private var stopping: Boolean = false
@@ -493,7 +495,7 @@ class DownloadManager extends StrictLogging {
     ()
   }
 
-  def start(): Unit = {
+  def start(): Unit = this.synchronized {
     import spray.json._
     import JsonImplicits._
 
@@ -556,9 +558,11 @@ class DownloadManager extends StrictLogging {
       }
     }
 
-    readFile(Main.statePath) || readFile(PathsEx.backupPath(Main.statePath))
-
-    janitor ! DownloadsJanitor.Start
+    if (!started) {
+      readFile(Main.statePath) || readFile(PathsEx.backupPath(Main.statePath))
+      janitor ! DownloadsJanitor.Start
+      started = true
+    }
   }
 
   private def canTryAcquireConnection: Boolean = this.synchronized {
@@ -647,8 +651,8 @@ case class AcquiredConnection(site: String, host: String)
 object DownloadsJanitor {
 
   case class Janitor(clients: List[DownloadManager.LazyClient])
-  case object Backup
-  case object Cleanup
+  private case object Backup
+  private case object Cleanup
   case object Start
   case object Stop
 
@@ -686,6 +690,7 @@ class DownloadsJanitor(dlMngr: DownloadManager) extends Actor with StrictLogging
   }
 
   def backup(): Unit = {
+    backupCancellable = None
     try {
       dlMngr.saveState()
     } catch {
@@ -701,7 +706,7 @@ class DownloadsJanitor(dlMngr: DownloadManager) extends Actor with StrictLogging
   }
 
   def scheduleBackup(): Unit = {
-    backupCancellable = Some(Main.scheduler.scheduleOnce(Main.settings.autosaveDelay.get)(self ! Backup))
+    if (backupCancellable.isEmpty) backupCancellable = Some(Main.scheduler.scheduleOnce(Main.settings.autosaveDelay.get)(self ! Backup))
   }
 
   def cleanup(connManager: PoolingNHttpClientConnectionManager): Unit = {
@@ -724,6 +729,7 @@ class DownloadsJanitor(dlMngr: DownloadManager) extends Actor with StrictLogging
   }
 
   def cleanup(): Unit = {
+    cleanupCancellable = None
     // Cleanup all cnx managers
     oldClients.foreach { client ⇒
       val connManager = client.getConnectionManager
@@ -757,7 +763,7 @@ class DownloadsJanitor(dlMngr: DownloadManager) extends Actor with StrictLogging
       1.seconds
     ).max
     // Note: we may also simply schedule every second ...
-    cleanupCancellable = Some(Main.scheduler.scheduleOnce(next)(self ! Cleanup))
+    if (cleanupCancellable.isEmpty) cleanupCancellable = Some(Main.scheduler.scheduleOnce(next)(self ! Cleanup))
   }
 
   def stop(): Unit = {
