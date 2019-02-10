@@ -103,29 +103,33 @@
                   <RowConstraints minHeight="-Infinity" vgrow="NEVER" />
                   <RowConstraints minHeight="-Infinity" vgrow="NEVER" />
                   <RowConstraints minHeight="-Infinity" vgrow="NEVER" />
+                  <RowConstraints minHeight="-Infinity" vgrow="NEVER" />
+                  <RowConstraints minHeight="-Infinity" vgrow="NEVER" />
                </rowConstraints>
                <children>
                   <Label text="%Proxy:" />
                   <TextField fx:id="proxyField" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" GridPane.columnIndex="1" />
-                  <Separator prefWidth="200.0" GridPane.columnSpan="2" GridPane.rowIndex="1" />
-                  <Label text="%Max errors:" GridPane.rowIndex="2" />
-                  <TextField fx:id="maxErrorsField" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" GridPane.columnIndex="1" GridPane.rowIndex="2" />
-                  <Label text="%Attempt delay:" GridPane.rowIndex="3" />
-                  <TextField fx:id="attemptDelayField" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" GridPane.columnIndex="1" GridPane.rowIndex="3" />
-                  <Separator prefWidth="200.0" GridPane.columnSpan="2" GridPane.rowIndex="4" />
-                  <Label text="%Connection request timeout:" GridPane.rowIndex="5" />
-                  <TextField fx:id="cnxRequestTimeoutField" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" GridPane.columnIndex="1" GridPane.rowIndex="5" />
-                  <Label text="%Connection timeout:" GridPane.rowIndex="6" />
-                  <TextField fx:id="cnxTimeoutField" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" GridPane.columnIndex="1" GridPane.rowIndex="6" />
-                  <Label text="%Socket timeout:" GridPane.rowIndex="7" />
-                  <TextField fx:id="socketTimeoutField" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" GridPane.columnIndex="1" GridPane.rowIndex="7" />
-                  <Label text="%Idle timeout:" GridPane.rowIndex="8" />
-                  <TextField fx:id="idleTimeoutField" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" GridPane.columnIndex="1" GridPane.rowIndex="8" />
-                  <Separator prefWidth="200.0" GridPane.columnSpan="2" GridPane.rowIndex="9" />
-                  <Label text="%Buffer min size:" GridPane.rowIndex="10" />
-                  <TextField fx:id="bufferMinSizeField" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" GridPane.columnIndex="1" GridPane.rowIndex="10" />
-                  <Label text="%Buffer max size:" GridPane.rowIndex="11" />
-                  <TextField fx:id="bufferMaxSizeField" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" GridPane.columnIndex="1" GridPane.rowIndex="11" />
+                  <CheckBox fx:id="sslTrustField" mnemonicParsing="false" text="%confirmation.ssl-trust" GridPane.columnSpan="2" GridPane.rowIndex="1" />
+                  <CheckBox fx:id="sslErrorAskField" allowIndeterminate="true" mnemonicParsing="false" text="%Ask on SSL error" GridPane.columnSpan="2" GridPane.rowIndex="2" />
+                  <Separator prefWidth="200.0" GridPane.columnSpan="2" GridPane.rowIndex="3" />
+                  <Label text="%Max errors:" GridPane.rowIndex="4" />
+                  <TextField fx:id="maxErrorsField" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" GridPane.columnIndex="1" GridPane.rowIndex="4" />
+                  <Label text="%Attempt delay:" GridPane.rowIndex="5" />
+                  <TextField fx:id="attemptDelayField" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" GridPane.columnIndex="1" GridPane.rowIndex="5" />
+                  <Separator prefWidth="200.0" GridPane.columnSpan="2" GridPane.rowIndex="6" />
+                  <Label text="%Connection request timeout:" GridPane.rowIndex="7" />
+                  <TextField fx:id="cnxRequestTimeoutField" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" GridPane.columnIndex="1" GridPane.rowIndex="7" />
+                  <Label text="%Connection timeout:" GridPane.rowIndex="8" />
+                  <TextField fx:id="cnxTimeoutField" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" GridPane.columnIndex="1" GridPane.rowIndex="8" />
+                  <Label text="%Socket timeout:" GridPane.rowIndex="9" />
+                  <TextField fx:id="socketTimeoutField" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" GridPane.columnIndex="1" GridPane.rowIndex="9" />
+                  <Label text="%Idle timeout:" GridPane.rowIndex="10" />
+                  <TextField fx:id="idleTimeoutField" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" GridPane.columnIndex="1" GridPane.rowIndex="10" />
+                  <Separator prefWidth="200.0" GridPane.columnSpan="2" GridPane.rowIndex="11" />
+                  <Label text="%Buffer min size:" GridPane.rowIndex="12" />
+                  <TextField fx:id="bufferMinSizeField" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" GridPane.columnIndex="1" GridPane.rowIndex="12" />
+                  <Label text="%Buffer max size:" GridPane.rowIndex="13" />
+                  <TextField fx:id="bufferMaxSizeField" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" GridPane.columnIndex="1" GridPane.rowIndex="13" />
                </children>
                <padding>
                   <Insets bottom="15.0" left="15.0" right="15.0" top="15.0" />
@@ -159,6 +163,8 @@
                      <children>
                         <Label text="%Site" />
                         <TextField fx:id="siteNameField" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" />
+                        <CheckBox fx:id="siteSslTrustField" mnemonicParsing="false" text="%confirmation.ssl-trust" />
+                        <CheckBox fx:id="siteSslErrorAskField" allowIndeterminate="true" mnemonicParsing="false" text="%Ask on SSL error" />
                         <Label text="%Max connections:" />
                         <TextField fx:id="siteMaxCnxField" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" />
                         <Label text="%Max segments:" />

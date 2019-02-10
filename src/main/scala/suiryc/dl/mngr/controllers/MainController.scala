@@ -28,7 +28,7 @@ import suiryc.dl.mngr.{DownloadManager, I18N, Main, Settings}
 import suiryc.dl.mngr.I18N.Strings
 import suiryc.dl.mngr.util.Icons
 import suiryc.scala.RichOption._
-import suiryc.scala.concurrent.Cancellable
+import suiryc.scala.concurrent.{Cancellable, RichFuture}
 import suiryc.scala.javafx.beans.binding.BindingsEx
 import suiryc.scala.javafx.beans.property.ConfigEntryProperty
 import suiryc.scala.javafx.beans.value.RichObservableValue
@@ -868,6 +868,70 @@ class MainController extends StagePersistentView with StrictLogging {
     ()
   }
 
+  /**
+   * Asks confirmation to allow by-passing SSL trusting error.
+   *
+   * @param site concerned site
+   * @param host concerned host
+   * @return whether a new attempt can be made (SSL will be trusted)
+   */
+  def askOnSslError(site: String, host: String, ex: Exception): Future[Boolean] = {
+    val siteSettings = Main.settings.getSite(site, allowDefault = true)
+    val canTrustSite = !siteSettings.isDefault
+    val buttonSite = new ButtonType(Strings.site)
+    val buttonServer = new ButtonType(Strings.server)
+    val buttonNo = ButtonType.NO
+
+    val b1 = if (canTrustSite) Some(buttonSite) else None
+    val buttons = b1.toList ::: List(buttonServer, buttonNo)
+    val defaultButton = b1.orElse(Some(buttonServer))
+    // Don't block the current thread.
+    RichFuture.blockingAsync {
+      // Prevent more than one dialog at a time for a given site. Useful if we
+      // have more than one download for the concerned site/host, in which case
+      // we can re-check settings before asking user (in case trusting was set
+      // in a previous confirmation).
+      siteSettings.synchronized {
+        val dlMngr = getState.dlMngr
+        val serverConnections = dlMngr.getServerConnections(site, host)
+        if (serverConnections.sslErrorAsk.contains(true)) {
+          // We need to ask confirmation.
+          val text =
+            s"""${Strings.sslIssue}
+               |${Strings.site}: $site
+               |${Strings.server}: $host""".stripMargin
+          Dialogs.confirmation(
+            owner = Option(stage),
+            title = None,
+            headerText = Some(text),
+            contentText = Some(Strings.sslTrust),
+            ex = Some(ex),
+            buttons = buttons,
+            defaultButton = defaultButton
+          ).getOrElse(ButtonType.CANCEL) match {
+            case `buttonSite` ⇒
+              dlMngr.trustSslSiteConnection(site, trust = true)
+              siteSettings.sslTrust.set(true)
+              true
+
+            case `buttonServer` ⇒
+              dlMngr.trustSslServerConnection(host, trust = true)
+              true
+
+            case `buttonNo` ⇒
+              dlMngr.trustSslServerConnection(host, trust = false)
+              false
+
+            case _ ⇒
+              false
+          }
+        } else {
+          serverConnections.sslTrust || serverConnections.sslErrorAsk.isEmpty
+        }
+      }
+    }
+  }
+
   def addDownload(dlInfo: NewDownloadInfo): Future[Unit] = {
     val promise = Promise[Unit]()
     actor ! OnDownloadsAdd(dlInfo, promise)
@@ -1003,6 +1067,11 @@ class MainController extends StagePersistentView with StrictLogging {
       // Refresh selected DL logs to show/hide debug events.
       if (Main.settings.debug.get != debug0) {
         refreshDlLogs()
+      }
+
+      // If SSL trusting changed, refresh download manager connections.
+      if (result.sslTrustChanged) {
+        dlMngr.refreshServerConnections()
       }
 
       // If sites or limits were changed, refresh downloads: in particular the

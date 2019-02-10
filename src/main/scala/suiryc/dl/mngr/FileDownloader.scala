@@ -16,6 +16,7 @@ import org.apache.http.client.protocol.HttpClientContext
 import scala.collection.JavaConverters._
 import scala.concurrent.Promise
 import scala.concurrent.duration._
+import scala.util.Success
 import suiryc.dl.mngr.model._
 import suiryc.dl.mngr.util.Http
 
@@ -33,6 +34,7 @@ object FileDownloader {
   case object AddConnection extends FileDownloaderMsg
   case object RemoveConnection extends FileDownloaderMsg
   case class TryConnection(promise: Promise[Unit]) extends FileDownloaderMsg
+  case object TryResume
 
   case class SegmentHandlerData(
     range: SegmentRange,
@@ -56,7 +58,6 @@ object FileDownloader {
     download: Download,
     started: Boolean,
     stopping: Boolean = false,
-    sslError: Boolean = false,
     cnxErrors: Int = 0,
     dlErrors: Int = 0,
     failed: Option[DownloadException] = None,
@@ -146,6 +147,7 @@ object FileDownloader {
 class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with StrictLogging {
 
   import FileDownloader._
+  import context.dispatcher
 
   // See RFC 7233 for range requests
 
@@ -162,6 +164,9 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
         "starting"
       }
       applyState(resume(state.resume(restart).withDownload(download), action, force))
+
+    case TryResume ⇒
+      applyState(tryResume(state))
 
     case DownloadStop ⇒
       applyState(stop(state, DownloadException(message = "Download stopped", stopped = true), abort = true))
@@ -212,6 +217,15 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
     logger.info(s"${state.download.context} $message")
     state.download.info.addLog(LogKind.Info, message)
     trySegment(state, force = force)
+  }
+
+  def tryResume(state: State): State = {
+    if (state.download.canResume) {
+      // The download manager does follow the downloads. So we need to go
+      // through it to resume the download.
+      dlMngr.resumeDownload(state.download.id, reusedOpt = None, restart = false)
+      state
+    } else trySegment(state)
   }
 
   def stop(state0: State, ex: DownloadException, abort: Boolean): State = {
@@ -383,8 +397,9 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
     val uri = download.info.uri.get
     download.rateLimiter.addDownload()
     try {
-      logger.info(s"${download.context(range)} Starting range=$range")
-      state.download.info.addLog(LogKind.Debug, "Starting new segment")
+      val message = s"Starting range=$range sslTrust=${acquired.sslTrust}"
+      logger.info(s"${download.context(range)} $message")
+      state.download.info.addLog(LogKind.Debug, message)
 
       // Upon 'resuming' (!started and downloaded already set), only do a HEAD
       // request to determine size, accept ranges, etc. The way requests are
@@ -444,7 +459,7 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
       //   - in a one-shot client, with a specific callback to execute
       val context = HttpClientContext.create()
       val responseConsumer = new ResponseConsumer(self, download, range, request)
-      val client = state.dlMngr.getClient(state.sslError)
+      val client = state.dlMngr.getClient(acquired.sslTrust)
       client.execute(requestProducer, responseConsumer, context, null)
 
       val data = SegmentHandlerData(
@@ -549,8 +564,9 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
   }
 
   def segmentDone(state0: State, dataOpt: Option[SegmentHandlerData], range: SegmentRange, acquired: AcquiredConnection, downloaded: Boolean, ex0: Option[Exception]): State = {
-    val download = state0.download
-    state0.dlMngr.releaseConnection(acquired)
+    var state = state0
+    val download = state.download
+    state.dlMngr.releaseConnection(acquired)
     download.rateLimiter.removeDownload()
     // Take into account our failure if any.
     val exOpt0: Option[DownloadException] = ex0.map {
@@ -565,17 +581,12 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
       None
     }
 
-    val state1 = handleWriteError(state0, exOpt0)
-    val state2 = exOpt match {
-      case Some(ex) ⇒
-        state1.copy(
-          sslError = state1.sslError || ex.isSSLException,
-          cnxErrors = state1.cnxErrors + (if (!ex.started) 1 else 0),
-          dlErrors = state1.dlErrors + (if (ex.started && !downloaded) 1 else 0)
-        )
-
-      case None ⇒
-        state1
+    state = handleWriteError(state, exOpt0)
+    exOpt.foreach { ex ⇒
+      state = state.copy(
+        cnxErrors = state.cnxErrors + (if (!ex.started) 1 else 0),
+        dlErrors = state.dlErrors + (if (ex.started && !downloaded) 1 else 0)
+      )
     }
     val status = if (aborted) {
       "aborted"
@@ -584,58 +595,87 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
     } else {
       "finished"
     }
-    val message = s"${download.context(range)} Segment $status${
+    val message0 = s"Segment $status"
+    val message = s"${download.context(range)} $message0${
       exOpt.map(v ⇒ s" ex=<$v>").getOrElse("")
     }; remaining segments=${download.info.activeSegments.getValue}"
     exOpt match {
       case Some(ex) ⇒
         logger.error(message, ex)
-        state2.download.info.addLog(LogKind.Error, s"Segment $status: ${ex.getMessage}", Some(ex))
-        if (ex.isSSLException) state2.download.info.addLog(LogKind.Warning, "Enabling 'trustAll' after SSL issue")
+        state.download.info.addLog(LogKind.Error, s"$message0: ${ex.getMessage}", Some(ex))
 
       case None ⇒
         logger.info(message)
-        state2.download.info.addLog(LogKind.Debug, s"Segment $status")
+        state.download.info.addLog(LogKind.Debug, s"$message0 range=$range")
     }
 
     // Upon issue, and if range was not started, try to give it back to its
     // original owner.
-    val state3 = if (exOpt.isDefined && download.info.remainingRanges.exists(_.contains(range.start))) {
-      state2.segmentConsumers.find {
-        case (_, handerData) ⇒
+    if (exOpt.isDefined && download.info.remainingRanges.exists(_.contains(range.start))) {
+      state.segmentConsumers.find {
+        case (_, handlerData) ⇒
           // The range to give back must follow an handler end, and belong to
           // its original range.
-          (range.start == handerData.range.end + 1) && (range.end <= handerData.originalRange.end)
-      }.map {
+          (range.start == handlerData.range.end + 1) && (range.end <= handlerData.originalRange.end)
+      }.foreach {
         case (consumer, _) ⇒
-          changeSegmentEnd(state2, consumer, range.end)
-      }.getOrElse(state2)
-    } else {
-      state2
+          state = changeSegmentEnd(state, consumer, range.end)
+      }
+    }
+
+    // Handle any SSL error.
+    var stopped = false
+    var askPending = false
+    if (exOpt.exists(_.isSSLException)) {
+      val ex = exOpt.get
+      acquired.sslErrorAsk match {
+        case Some(ask) ⇒
+          if (ask) {
+            // Ask user. If SSL is to be trusted, re-try.
+            askPending = true
+            Main.controller.askOnSslError(acquired.site, acquired.host, ex).onComplete {
+              case Success(true) ⇒ self ! TryResume
+              case _ ⇒
+            }
+            // Trigger stopping if that was the last consumer
+            if (state.segmentConsumers.isEmpty) {
+              state = stop(state, ex, abort = false)
+              stopped = true
+            }
+          }
+
+        case None ⇒
+          // Automatically trust SSL, but not for site if it is the default
+          state.download.info.addLog(LogKind.Warning, "Enabling 'trustAll' after SSL issue")
+          if (!acquired.isDefaultSite) state.dlMngr.trustSslSiteConnection(acquired.site, trust = true)
+          else state.dlMngr.trustSslServerConnection(acquired.host, trust = true)
+      }
     }
 
     // Note:
     // Download is not fully finished if segments are still running or
     // remaining. If content length was unknown, we are done if the segment
     // finished without issue.
-    val finished = state3.segmentConsumers.isEmpty && (
-      state3.stopping ||
+    val finished = state.segmentConsumers.isEmpty && (
+      state.stopping ||
         (download.info.remainingRanges.isEmpty && exOpt.isEmpty) ||
         download.info.remainingRanges.exists(_.getRanges.isEmpty)
       )
-    val state = if (finished) {
-      done(state3)
-    } else if (!state3.hasTooManyErrors) {
-      segmentFinished(state3, aborted, exOpt)
+    state = if (stopped) {
+      state
+    } else if (finished) {
+      done(state)
+    } else if (!state.hasTooManyErrors) {
+      segmentFinished(state, aborted, exOpt)
     } else {
-      tooManyErrors(state3, exOpt)
+      tooManyErrors(state, exOpt)
     }
 
     // Now that we may have tried a new connection, give a chance to other
     // downloads to also try a new connection (if applicable).
     // If we were done, let the download manager (which asynchronously handles
     // the 'final' state) do it (especially after changing the state).
-    if (!finished) state.dlMngr.tryConnection(Some(download.id))
+    if (!askPending && !finished) state.dlMngr.tryConnection(Some(download.id))
 
     state
   }

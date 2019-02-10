@@ -117,7 +117,7 @@ object DownloadManager {
       client
     }
 
-    def close(): Unit = {
+    def close(): Unit = this.synchronized {
       if (isStarted) {
         try {
           connManager.shutdown()
@@ -144,7 +144,7 @@ object DownloadManager {
       } catch {
         case ex: Exception ⇒
           // Sometimes the location may have invalid characters.
-          // Use out own method in this case.
+          // Use our own method in this case.
           try {
             Http.getURI(location)
           } catch {
@@ -165,6 +165,42 @@ object DownloadManager {
     dler: ActorRef
   ) {
     def withDownload(download: Download): DownloadEntry = copy(download = download)
+  }
+
+  /** Connections information per server. */
+  case class ServerConnections(
+    /** Last activity. */
+    lastActive: Long,
+    /** Active connections count. */
+    cnxCount: Long,
+    /** Whether SSL settings changed. */
+    sslChanged: Boolean,
+    /** Whether to trust SSL. */
+    sslTrust: Boolean,
+    /** Whether to asl upon SSL error. */
+    sslErrorAsk: Option[Boolean]
+  ) {
+    def active: ServerConnections = copy(lastActive = System.currentTimeMillis)
+    def acquireConnection: ServerConnections = active.copy(cnxCount = cnxCount + 1)
+    def releaseConnection: ServerConnections = active.copy(cnxCount = math.max(0L, cnxCount - 1))
+    def updateSsl(trust: Boolean, ask: Option[Boolean]): ServerConnections =
+      active.copy(sslTrust = trust, sslErrorAsk = ask)
+    def updateSsl(siteSettings: Main.settings.SiteSettings): ServerConnections =
+      updateSsl(siteSettings.sslTrust.get, siteSettings.sslErrorAsk.opt)
+    def trustSsl(trust: Boolean): ServerConnections =
+      updateSsl(trust = trust, ask = Some(false)).copy(sslChanged = true)
+  }
+
+  object ServerConnections {
+    def apply(siteSettings: Main.settings.SiteSettings): ServerConnections = {
+      ServerConnections(
+        lastActive = System.currentTimeMillis,
+        cnxCount = 0,
+        sslChanged = false,
+        sslTrust = siteSettings.sslTrust.get,
+        sslErrorAsk = siteSettings.sslErrorAsk.opt
+      )
+    }
   }
 
 }
@@ -197,11 +233,11 @@ class DownloadManager extends StrictLogging {
   /** Total number of connection. */
   private var cnxTotal = 0L
 
-  /** Number of connections per site. */
+  /** Connections per site. */
   private var cnxPerSite: Map[String, Long] = Map.empty.withDefaultValue(0L)
 
-  /** Number of connections per server. */
-  private var cnxPerServer: Map[String, Long] = Map.empty.withDefaultValue(0L)
+  /** Connections per server. */
+  private var cnxPerServer: Map[String, ServerConnections] = Map.empty
 
   // Janitoring is done in a dedicated actor.
   private val janitor = system.actorOf(Props(new DownloadsJanitor(this)))
@@ -573,16 +609,22 @@ class DownloadManager extends StrictLogging {
     // Use the actual URI (since this is the real one we connect to)
     val uri = download.info.uri.get
     val siteSettings = Main.settings.getSite(uri)
+    val site = siteSettings.site
+    val host = uri.getHost
+
+    val perSite = cnxPerSite(site)
+    val perServer = cnxPerServer.getOrElse(host, ServerConnections(siteSettings))
+
     // Remember the acquired connection info to update the appropriate resources
     // in releaseConnection: the actual URI may change upon the first request
     // due to redirections.
     val acquired = AcquiredConnection(
-      site = siteSettings.site,
-      host = uri.getHost
+      site = site,
+      isDefaultSite = siteSettings.isDefault,
+      host = host,
+      sslTrust = perServer.sslTrust,
+      sslErrorAsk = perServer.sslErrorAsk
     )
-
-    val perSite = cnxPerSite(acquired.site)
-    val perServer = cnxPerServer(acquired.host)
 
     val reasonOpt = {
       // The 'running downloads' limit applies to downloads that are not yet running
@@ -607,7 +649,7 @@ class DownloadManager extends StrictLogging {
       }
     }.orElse {
       val limit = Main.settings.cnxServerMax.get
-      if (!force && (perServer >= limit)) Some(s"number of connections for host=<${acquired.host}> limit=<$limit>")
+      if (!force && (perServer.cnxCount >= limit)) Some(s"number of connections for host=<${acquired.host}> limit=<$limit>")
       else None
     }
 
@@ -618,7 +660,7 @@ class DownloadManager extends StrictLogging {
     if (reasonOpt.isEmpty) {
       cnxTotal += 1
       cnxPerSite += (acquired.site → (perSite + 1))
-      cnxPerServer += (acquired.host → (perServer + 1))
+      cnxPerServer += (acquired.host → perServer.acquireConnection)
       download.openFile()
       download.info.state.setValue(DownloadState.Running)
       // Note: don't reset last reason. What really matters are 'new' reasons
@@ -635,24 +677,67 @@ class DownloadManager extends StrictLogging {
 
   def releaseConnection(acquired: AcquiredConnection): Unit = this.synchronized {
     val perSite = cnxPerSite(acquired.site)
-    val perServer = cnxPerServer(acquired.host)
 
     if (cnxTotal > 0) cnxTotal -= 1
     if (perSite > 1) cnxPerSite += (acquired.site → (perSite - 1))
     else cnxPerSite -= acquired.site
-    if (perServer > 1) cnxPerServer += (acquired.host → (perServer - 1))
-    else cnxPerServer -= acquired.host
+    cnxPerServer.get(acquired.host).foreach { perServer ⇒
+      cnxPerServer += (acquired.host → perServer.releaseConnection)
+    }
+  }
+
+  def trustSslSiteConnection(site: String, trust: Boolean): Unit = this.synchronized {
+    // Apply trusting to known concerned servers.
+    cnxPerServer = cnxPerServer.map {
+      case (host, group) ⇒
+        val updated =
+          if (Main.settings.getServerSite(host).site != site) group
+          else group.trustSsl(trust)
+        host → updated
+    }
+  }
+
+  def trustSslServerConnection(host: String, trust: Boolean): Unit = this.synchronized {
+    cnxPerServer += (host → cnxPerServer.getOrElse(host, ServerConnections(Main.settings.getServerSite(host))).trustSsl(trust))
+  }
+
+  def getServerConnections(site: String, host: String): ServerConnections = this.synchronized {
+    cnxPerServer.getOrElse(host, ServerConnections(Main.settings.getSite(site, allowDefault = true)))
+  }
+
+  def refreshServerConnections(): Unit = this.synchronized {
+    cnxPerServer = cnxPerServer.map {
+      case (host, group) ⇒ host → group.updateSsl(Main.settings.getServerSite(host))
+    }
+  }
+
+  def cleanupServerConnections(): Unit = this.synchronized {
+    // Keep if either:
+    //  - there are active connections
+    //  - ssl settings changed and last activity was less than 6 hours ago
+    // When ssl settings did not change (and there is no active connection)
+    // there is no need to keep anything.
+    cnxPerServer = cnxPerServer.filter {
+      case (_, group) ⇒
+        (group.cnxCount > 0) ||
+          (group.sslChanged && (group.lastActive >= System.currentTimeMillis - 6.hours.toMillis))
+    }
   }
 
 }
 
-case class AcquiredConnection(site: String, host: String)
+case class AcquiredConnection(
+  site: String,
+  isDefaultSite: Boolean,
+  host: String,
+  sslTrust: Boolean,
+  sslErrorAsk: Option[Boolean]
+)
 
 object DownloadsJanitor {
 
   case class Janitor(clients: List[DownloadManager.LazyClient])
-  private case object Backup
-  private case object Cleanup
+  private case class Trigger(f: () ⇒ Unit)
   case object Start
   case object Stop
 
@@ -667,12 +752,12 @@ class DownloadsJanitor(dlMngr: DownloadManager) extends Actor with StrictLogging
   // Current clients
   private var clients: List[DownloadManager.LazyClient] = Nil
   private var backupCancellable: Option[Cancelable] = None
-  private var cleanupCancellable: Option[Cancelable] = None
+  private var cleanupClientCancellable: Option[Cancelable] = None
+  private var cleanupMngrCancellable: Option[Cancelable] = None
 
   override def receive: Receive = {
     case Janitor(other) ⇒ janitor(other)
-    case Backup ⇒ backup()
-    case Cleanup ⇒ cleanup()
+    case Trigger(f) ⇒ trigger(f)
     case Start ⇒ start()
     case Stop ⇒ stop()
   }
@@ -686,7 +771,16 @@ class DownloadsJanitor(dlMngr: DownloadManager) extends Actor with StrictLogging
   def start(): Unit = {
     // Prime the pump
     scheduleBackup()
-    scheduleCleanup()
+    scheduleCleanupClient()
+    scheduleCleanupMngr()
+  }
+
+  def trigger(f: () ⇒ Unit): Unit = {
+    try {
+      f()
+    } catch {
+      case _: Exception ⇒
+    }
   }
 
   def backup(): Unit = {
@@ -706,10 +800,12 @@ class DownloadsJanitor(dlMngr: DownloadManager) extends Actor with StrictLogging
   }
 
   def scheduleBackup(): Unit = {
-    if (backupCancellable.isEmpty) backupCancellable = Some(Main.scheduler.scheduleOnce(Main.settings.autosaveDelay.get)(self ! Backup))
+    if (backupCancellable.isEmpty) {
+      backupCancellable = Some(Main.scheduler.scheduleOnce(Main.settings.autosaveDelay.get)(self ! Trigger(() ⇒ backup())))
+    }
   }
 
-  def cleanup(connManager: PoolingNHttpClientConnectionManager): Unit = {
+  def cleanupClient(connManager: PoolingNHttpClientConnectionManager): Unit = {
     // See: https://hc.apache.org/httpcomponents-client-ga/tutorial/html/connmgmt.html
     // When executing a new request on the client, pending requests past
     // timeout are failed and cached connections past keep-alive (assumed
@@ -728,12 +824,12 @@ class DownloadsJanitor(dlMngr: DownloadManager) extends Actor with StrictLogging
     connManager.closeIdleConnections(idleTimeout.length, idleTimeout.unit)
   }
 
-  def cleanup(): Unit = {
-    cleanupCancellable = None
+  def cleanupClient(): Unit = {
+    cleanupClientCancellable = None
     // Cleanup all cnx managers
     oldClients.foreach { client ⇒
       val connManager = client.getConnectionManager
-      cleanup(connManager)
+      cleanupClient(connManager)
       // Check if we are done with this old resource
       if (connManager.getTotalStats.getLeased == 0) {
         oldClients -= client
@@ -741,11 +837,11 @@ class DownloadsJanitor(dlMngr: DownloadManager) extends Actor with StrictLogging
         client.close()
       }
     }
-    clients.filter(_.isStarted).map(_.getConnectionManager).foreach(cleanup)
-    scheduleCleanup()
+    clients.filter(_.isStarted).map(_.getConnectionManager).foreach(cleanupClient)
+    scheduleCleanupClient()
   }
 
-  def scheduleCleanup(): Unit = {
+  def scheduleCleanupClient(): Unit = {
     // We want to check again later according to
     //  - connection request timeout
     //  - idle timeout
@@ -763,12 +859,27 @@ class DownloadsJanitor(dlMngr: DownloadManager) extends Actor with StrictLogging
       1.seconds
     ).max
     // Note: we may also simply schedule every second ...
-    if (cleanupCancellable.isEmpty) cleanupCancellable = Some(Main.scheduler.scheduleOnce(next)(self ! Cleanup))
+    if (cleanupClientCancellable.isEmpty) {
+      cleanupClientCancellable = Some(Main.scheduler.scheduleOnce(next)(self ! Trigger(() ⇒ cleanupClient())))
+    }
+  }
+
+  def cleanupMngr(): Unit = {
+    cleanupMngrCancellable = None
+    dlMngr.cleanupServerConnections()
+    scheduleCleanupMngr()
+  }
+
+  def scheduleCleanupMngr(): Unit = {
+    if (cleanupMngrCancellable.isEmpty) {
+      cleanupMngrCancellable = Some(Main.scheduler.scheduleOnce(1.hour)(self ! Trigger(() ⇒ cleanupMngr())))
+    }
   }
 
   def stop(): Unit = {
     backupCancellable.foreach(_.cancel())
-    cleanupCancellable.foreach(_.cancel())
+    cleanupClientCancellable.foreach(_.cancel())
+    cleanupMngrCancellable.foreach(_.cancel())
     // Close all remaining clients (shutdowns managers)
     (oldClients ++ clients).foreach(_.close())
     context.stop(self)

@@ -68,6 +68,12 @@ class OptionsController extends StagePersistentView {
   protected var proxyField: TextField = _
 
   @FXML
+  protected var sslTrustField: CheckBox = _
+
+  @FXML
+  protected var sslErrorAskField: CheckBox = _
+
+  @FXML
   protected var maxErrorsField: TextField = _
 
   @FXML
@@ -104,6 +110,12 @@ class OptionsController extends StagePersistentView {
   protected var siteNameField: TextField = _
 
   @FXML
+  protected var siteSslTrustField: CheckBox = _
+
+  @FXML
+  protected var siteSslErrorAskField: CheckBox = _
+
+  @FXML
   protected var siteMaxCnxField: TextField = _
 
   @FXML
@@ -112,6 +124,11 @@ class OptionsController extends StagePersistentView {
   private var stage: Stage = _
 
   private var sitesChanged = false
+
+  // Note: sites specific settings (e.g. sslTrust) will be considered as
+  // (possibly) changed if sites were changed. So no need to explicitly
+  // set them to true along 'sitesChanged'.
+  private var sslTrustChanged = false
 
   private var cnxLimitChanged = false
 
@@ -151,19 +168,21 @@ class OptionsController extends StagePersistentView {
       booleanSettingSnapshot(debugField, Main.settings.debug)
       , {
         val setting = Main.settings.downloadsPath
-        val snap = SettingSnapshot(setting).setOnRefreshDraft {
-          Option(downloadFolderField.getText).map(Paths.get(_)).orNull
+        val snap = SettingSnapshot.opt(setting).setOnRefreshDraft {
+          Option(downloadFolderField.getText).filter(_.trim.nonEmpty).map(Paths.get(_))
         }
-        def draftToField(): Unit = downloadFolderField.setText(Option(snap.draft.get).map(_.toString).orNull)
+        def draftToField(): Unit = downloadFolderField.setText(snap.draft.get.map(_.toString).orNull)
         snap.draft.listen(draftToField())
         draftToField()
         snap
       }, {
         val setting = Main.settings.downloadsExtension
-        val snap = SettingSnapshot(setting).setOnRefreshDraft {
-          Option(fileExtensionField.getText).orNull
+        val snap = SettingSnapshot.opt(setting).setOnRefreshDraft {
+          // Note: empty extension is allowed (disables it), so don't filter out
+          // empty string value.
+          Option(fileExtensionField.getText)
         }
-        def draftToField(): Unit = fileExtensionField.setText(snap.draft.get)
+        def draftToField(): Unit = fileExtensionField.setText(snap.draft.get.orNull)
         snap.draft.listen(draftToField())
         draftToField()
         snap
@@ -176,16 +195,18 @@ class OptionsController extends StagePersistentView {
       , bytesSettingSnapshot(writeBufferSizeField, Main.settings.bufferWriteFlushSize)
       , {
         val setting = Main.settings.proxy
-        val snap = SettingSnapshot(setting).withDefault {
-          setting.refOpt.orNull
+        val snap = SettingSnapshot.opt(setting).withDefault {
+          setting.refOpt
         }.setOnRefreshDraft {
-          Option(proxyField.getText).filter(_.trim.nonEmpty).orNull
+          Option(proxyField.getText).filter(_.trim.nonEmpty)
         }
-        def draftToField(): Unit = proxyField.setText(Option(snap.draft.get).orNull)
+        def draftToField(): Unit = proxyField.setText(snap.draft.get.orNull)
         snap.draft.listen(draftToField())
         draftToField()
         snap
-      }, intSettingSnapshot(maxErrorsField, Main.settings.errorMax)
+      }, sslTrustOnChange(booleanSettingSnapshot(sslTrustField, Main.settings.sitesDefault.sslTrust))
+      , sslTrustOnChange(booleanSettingSnapshot(sslErrorAskField, Main.settings.sitesDefault.sslErrorAsk))
+      , intSettingSnapshot(maxErrorsField, Main.settings.errorMax)
       , durationSettingSnapshot(attemptDelayField, Main.settings.errorDelay)
       , durationSettingSnapshot(cnxRequestTimeoutField, Main.settings.connectionRequestTimeout)
       , durationSettingSnapshot(cnxTimeoutField, Main.settings.connectTimeout)
@@ -282,11 +303,14 @@ class OptionsController extends StagePersistentView {
       downloadFolderField.textProperty, fileExtensionField.textProperty, removeCompletedField.selectedProperty,
       maxDownloadsField.textProperty, maxCnxField.textProperty, maxServerCnxField.textProperty, maxSegmentsField.textProperty, minSegmentSizeField.textProperty,
       writeBufferSizeField.textProperty,
-      proxyField.textProperty,
+      proxyField.textProperty, sslTrustField.selectedProperty, sslTrustField.indeterminateProperty,
+      sslErrorAskField.selectedProperty, sslErrorAskField.indeterminateProperty,
       maxErrorsField.textProperty, attemptDelayField.textProperty,
       cnxRequestTimeoutField.textProperty, cnxTimeoutField.textProperty, socketTimeoutField.textProperty, idleTimeoutField.textProperty,
       bufferMinSizeField.textProperty, bufferMaxSizeField.textProperty,
-      siteNameField.textProperty, siteMaxCnxField.textProperty, siteMaxSegmentsField.textProperty,
+      siteNameField.textProperty, siteSslTrustField.selectedProperty, siteSslTrustField.indeterminateProperty,
+      siteSslErrorAskField.selectedProperty, siteSslErrorAskField.indeterminateProperty,
+      siteMaxCnxField.textProperty, siteMaxSegmentsField.textProperty,
       sitesField.getSelectionModel.selectedItemProperty
     )
     new BindingsEx.Builder().add(buttonOk.disableProperty) {
@@ -379,11 +403,21 @@ class OptionsController extends StagePersistentView {
   }
 
   private def updateSite(): Unit = {
-    // The 'default' site 'max segments' property is also accessible in the
-    // 'Main' tab. We wish both fields to remain synced, so when applicable
-    // we create a bidirectional binding (which first applies the second
-    // property value to the first one).
+    // Some 'default' site properties are also accessible in the other tabs.
+    // We wish both fields to remain synced, so when applicable we create a
+    // bidirectional binding (which first applies the second property value
+    // to the first one).
     // Before any change, unbind the fields (noop if not bound).
+    def unbind(dst: CheckBox, src: CheckBox): Unit = {
+      dst.selectedProperty.unbindBidirectional(src.selectedProperty())
+      dst.indeterminateProperty.unbindBidirectional(src.indeterminateProperty())
+    }
+    def bind(dst: CheckBox, src: CheckBox): Unit = {
+      dst.selectedProperty.bindBidirectional(src.selectedProperty())
+      dst.indeterminateProperty.bindBidirectional(src.indeterminateProperty())
+    }
+    unbind(siteSslTrustField, sslTrustField)
+    unbind(siteSslErrorAskField, sslErrorAskField)
     siteMaxSegmentsField.textProperty.unbindBidirectional(maxSegmentsField.textProperty())
     Option(sitesField.getSelectionModel.getSelectedItem).flatten match {
       case Some(item) ⇒
@@ -391,18 +425,15 @@ class OptionsController extends StagePersistentView {
         // We need to get the current draft value (which may have been changed
         // - refreshed - previously) instead of the setting value (draft not
         // yet applied).
-        // In all cases, a non-positive value is invalid. In the case of
-        // non-default sites we use a special negative value as default (which
-        // means non-existing value).
-        // So we actually only need to check for non-positive values and empty
-        // the field in this case.
-        def positiveOrNone(v: Int): Option[String] =
-          if (v > 0) Some(v.toString) else None
-        siteMaxCnxField.setText(positiveOrNone(item.cnxMax.getDraftValue(refreshed = false)).orNull)
+        siteMaxCnxField.setText(item.cnxMax.getDraftValue(refreshed = false).map(_.toString).orNull)
         if (item.isDefault) {
+          bind(siteSslTrustField, sslTrustField)
+          bind(siteSslErrorAskField, sslErrorAskField)
           siteMaxSegmentsField.textProperty.bindBidirectional(maxSegmentsField.textProperty())
         } else {
-          siteMaxSegmentsField.setText(positiveOrNone(item.segmentsMax.getDraftValue(refreshed = false)).orNull)
+          optToField(item.sslTrust.getDraftValue(refreshed = false), siteSslTrustField)
+          optToField(item.sslErrorAsk.getDraftValue(refreshed = false), siteSslErrorAskField)
+          siteMaxSegmentsField.setText(item.segmentsMax.getDraftValue(refreshed = false).map(_.toString).orNull)
         }
         siteNameField.setText(item.site)
         siteNameField.setDisable(item.isDefault)
@@ -417,41 +448,27 @@ class OptionsController extends StagePersistentView {
     }
   }
 
+  private def sslTrustOnChange(snap: ConfigOptEntrySnapshot[Boolean]): ConfigOptEntrySnapshot[Boolean] = {
+    snap.setOnChange { _ ⇒
+      sslTrustChanged = true
+    }
+  }
+
   private def tryConnectionOnChange(snap: SettingSnapshot[_]): Unit = {
     snap.setOnChange { _ ⇒
       cnxLimitChanged = true
     }
   }
 
-  private def booleanSettingSnapshot(field: CheckBox, setting: ConfigEntry[Boolean]): ConfigEntrySnapshot[Boolean] = {
-    val snap = SettingSnapshot(setting).setOnRefreshDraft {
-      field.isSelected
-    }
-    def draftToField(): Unit = field.setSelected(snap.draft.get)
-    snap.draft.listen(draftToField())
-    draftToField()
-    snap
-  }
-
-  private def intSettingSnapshot(field: TextField, setting0: ConfigEntry[Int],
-    siteSettings: Option[Settings#SiteSettings] = None, isDefault: Boolean = true,
-    isCnxLimit: Boolean = false): ConfigEntrySnapshot[Int] =
+  private def booleanSettingSnapshot(field: CheckBox, setting: ConfigEntry[Boolean],
+    siteSettings: Option[Settings#SiteSettings] = None): ConfigOptEntrySnapshot[Boolean] =
   {
     // We have to handle standard settings and site settings.
     // For the later, there is a need to determine (in callbacks) whether the
     // target site is selected.
     @inline
     def isSelected: Boolean = siteSettings.forall(isSiteSelected)
-    // The 'default' site settings have default values. Other sites do not
-    // (values are optional there). To have everything work as expected, we
-    // dynamically add a default value to the setting we use here. This way the
-    // 'snapshot' will properly take care of 'reset'ting the underlying config
-    // entry when applicable, and also not crash (since the current value is
-    // retrieved first, and null cannot be used here).
-    // We use a negative default value since non-positive values are invalid in
-    // our case (and thus cannot not be used - checkForm).
-    val setting = if (isDefault) setting0 else setting0.withDefault(OPT_INT_DEFAULT)
-    val snap = SettingSnapshot(setting)
+    val snap = SettingSnapshot.opt(setting)
     snap.setOnRefreshDraft {
       // Notes:
       // We are called in two cases:
@@ -462,19 +479,35 @@ class OptionsController extends StagePersistentView {
       // We make sure 2. is only actually called upon saving changes in
       // configuration, which should only be possible if at least one value was
       // changed and all values are valid (checkForm also matters for 'Ok').
-      // So we wish to use OPT_INT_DEFAULT when either:
+      // If our site is not selected we keep the current draft value.
+      if (isSelected) fieldToOpt(field)
+      else snap.getDraftValue(refreshed = false)
+    }
+    def draftToField(): Unit = if (isSelected) optToField(snap.draft.get, field)
+    snap.draft.listen(draftToField())
+    draftToField()
+    snap
+  }
+
+  private def intSettingSnapshot(field: TextField, setting: ConfigEntry[Int],
+    siteSettings: Option[Settings#SiteSettings] = None,
+    isCnxLimit: Boolean = false): ConfigOptEntrySnapshot[Int] =
+  {
+    @inline
+    def isSelected: Boolean = siteSettings.forall(isSiteSelected)
+    val snap = SettingSnapshot.opt(setting)
+    snap.setOnRefreshDraft {
+      // Here we wish to use None when either:
       //  - value is not an integer: invalid value
       //  - value is empty:
-      //   -> for non-default sites this is allowed, and being the default -
-      //      see above - the config entry will be removed as wanted
+      //   -> for non-default sites this is allowed (to remove the config entry)
       //   -> for default site, this is an invalid value
       //   -> for other settings, this is also an invalid value
-      // If our site is not selected we keep the current draft value.
-      if (isSelected) getInt(field.getText).getOrElse(OPT_INT_DEFAULT)
+      if (isSelected) getInt(field.getText)
       else snap.getDraftValue(refreshed = false)
     }
     if (isCnxLimit) tryConnectionOnChange(snap)
-    def draftToField(): Unit = if (isSelected) field.setText(snap.draft.get.toString)
+    def draftToField(): Unit = if (isSelected) field.setText(snap.draft.get.map(_.toString).orNull)
     snap.draft.listen(draftToField())
     draftToField()
     snap
@@ -563,6 +596,28 @@ class OptionsController extends StagePersistentView {
       siteNameOk && siteMaxCnxOk && siteMaxSegmentsOk
   }
 
+  private def optToField(v: Option[Boolean], field: CheckBox): Unit = {
+    if (field.isAllowIndeterminate) {
+      v match {
+        case Some(b) ⇒
+          field.setIndeterminate(false)
+          field.setSelected(b)
+
+        case None ⇒
+          field.setIndeterminate(true)
+      }
+    } else {
+      // Since 'indeterminate' state is not allowed, we use 'false' as default
+      // value.
+      field.setSelected(v.getOrElse(false))
+    }
+  }
+
+  private def fieldToOpt(field: CheckBox): Option[Boolean] = {
+    if (field.isAllowIndeterminate && field.isIndeterminate) None
+    else Some(field.isSelected)
+  }
+
   private def isEmpty(s: String): Boolean = Option(s).forall(_.trim.isEmpty)
 
   private def getSelectedSite: Option[SiteSettingsSnapshot] =
@@ -607,27 +662,35 @@ class OptionsController extends StagePersistentView {
 
     val isDefault: Boolean = settings.isDefault
 
-    val cnxMax: ConfigEntrySnapshot[Int] =
-      intSettingSnapshot(siteMaxCnxField, settings.cnxMax, Some(settings), isDefault, isCnxLimit = true)
-    val segmentsMax: ConfigEntrySnapshot[Int] =
-      intSettingSnapshot(siteMaxSegmentsField, settings.segmentsMax, Some(settings), isDefault, isCnxLimit = true)
+    val sslTrust: ConfigOptEntrySnapshot[Boolean] =
+      sslTrustOnChange(booleanSettingSnapshot(siteSslTrustField, settings.sslTrust, Some(settings)))
+    val sslErrorAsk: ConfigOptEntrySnapshot[Boolean] =
+      sslTrustOnChange(booleanSettingSnapshot(siteSslErrorAskField, settings.sslErrorAsk, Some(settings)))
+    val cnxMax: ConfigOptEntrySnapshot[Int] =
+      intSettingSnapshot(siteMaxCnxField, settings.cnxMax, Some(settings), isCnxLimit = true)
+    val segmentsMax: ConfigOptEntrySnapshot[Int] =
+      intSettingSnapshot(siteMaxSegmentsField, settings.segmentsMax, Some(settings), isCnxLimit = true)
 
     // Add the managed snapshots
-    add(cnxMax, segmentsMax)
+    add(sslTrust, sslErrorAsk, cnxMax, segmentsMax)
 
     def isSiteChanged: Boolean = refreshedSiteName(checkSelected = true) != settings.site
 
-    def refreshDraftInt(field: TextField, snap: ConfigEntrySnapshot[Int]): Unit = {
+    def refreshDraftBoolean(field: CheckBox, snap: ConfigOptEntrySnapshot[Boolean]): Unit = {
+      snap.draft.set(fieldToOpt(field))
+    }
+
+    def refreshDraftInt(field: TextField, snap: ConfigOptEntrySnapshot[Int]): Unit = {
       // We are called to refresh the draft value because the selection moved
       // from our site to another.
       // We only allow positive values.
       // If value is invalid, we keep the current draft value. The only
       // exception being non-default site value that can be emptied, in which
-      // case we use the default value (used to 'reset' entry).
+      // case we can use None (to 'reset' entry).
       val text = field.getText
       snap.draft.set {
-        getInt(text).filter(_ > 0).getOrElse {
-          if (!isDefault && isEmpty(text)) OPT_INT_DEFAULT
+        getInt(text).filter(_ > 0).orElse {
+          if (!isDefault && isEmpty(text)) None
           else snap.getDraftValue(refreshed = false)
         }
       }
@@ -638,6 +701,8 @@ class OptionsController extends StagePersistentView {
       val name = refreshedSiteName(checkSelected = false)
       val siteNameChanged = site != name
       site = name
+      refreshDraftBoolean(siteSslTrustField, sslTrust)
+      refreshDraftBoolean(siteSslErrorAskField, sslErrorAsk)
       refreshDraftInt(siteMaxCnxField, cnxMax)
       refreshDraftInt(siteMaxSegmentsField, segmentsMax)
       if (siteNameChanged) {
@@ -667,6 +732,12 @@ class OptionsController extends StagePersistentView {
     }
 
     override def applyDraft(): Boolean = {
+      def optToValue[A](snap: SettingSnapshot[Option[A]], configEntry: ConfigEntry[A]): Unit = {
+        snap.getDraftValue() match {
+          case Some(v) ⇒ configEntry.set(v)
+          case None ⇒ configEntry.reset()
+        }
+      }
       // Refresh site name if applicable
       site = refreshedSiteName(checkSelected = true)
       // If site was renamed, we need to make sure the 'new' entry is created.
@@ -674,15 +745,15 @@ class OptionsController extends StagePersistentView {
       // If site was not renamed, simply apply draft changes.
       if (isSiteChanged) {
         // Create a brand new site settings entry
-        val newSettings = Main.settings.getSite(site)
+        val newSettings = Main.settings.getSite(site, allowDefault = false)
         // And set our values. Make sure to get the refreshed draft value and
-        // filter out defaults.
-        newSettings.cnxMax.withDefault(OPT_INT_DEFAULT).set(cnxMax.getDraftValue())
-        newSettings.segmentsMax.withDefault(OPT_INT_DEFAULT).set(segmentsMax.getDraftValue())
+        // remove entry when applicable.
+        optToValue(sslTrust, newSettings.sslTrust)
+        optToValue(sslErrorAsk, newSettings.sslErrorAsk)
+        optToValue(cnxMax, newSettings.cnxMax)
+        optToValue(segmentsMax, newSettings.segmentsMax)
 
         sitesChanged = true
-        // Since this is a 'new' site configuration, connection limits may have changed
-        cnxLimitChanged = true
 
         true
       } else super.applyDraft()
@@ -714,8 +785,10 @@ class OptionsController extends StagePersistentView {
       val snap = SiteSettingsSnapshot(siteSettings)
       // Build a unique site name to apply.
       snap.site = siteOpt.getOrElse(getName(0))
-      snap.cnxMax.draft.set(Main.settings.sitesDefault.cnxMax.get)
-      snap.segmentsMax.draft.set(Main.settings.sitesDefault.segmentsMax.get)
+      snap.sslTrust.draft.set(Main.settings.sitesDefault.sslTrust.opt)
+      snap.sslErrorAsk.draft.set(Main.settings.sitesDefault.sslErrorAsk.opt)
+      snap.cnxMax.draft.set(Main.settings.sitesDefault.cnxMax.opt)
+      snap.segmentsMax.draft.set(Main.settings.sitesDefault.segmentsMax.opt)
       // Add to our known list of settings
       add(snap)
       // Refresh sites (re-ordering may be needed)
@@ -754,8 +827,6 @@ class OptionsController extends StagePersistentView {
       removed.foreach { snap ⇒
         Main.settings.removeSite(snap.settings)
         sitesChanged = true
-        // Since this site was removed, connection limits may have changed
-        cnxLimitChanged = true
       }
       removed = Set.empty
       snapshots.filter { snap ⇒
@@ -816,9 +887,6 @@ object OptionsController {
   private val stageLocation = ConfigEntry.from[StageLocation](Main.settings.settings,
     Settings.KEY_SUIRYC, Settings.KEY_DL_MNGR, Settings.KEY_STAGE, settingsKeyPrefix, "location")
 
-  // Default value (invalid otherwise) used for optional config entries
-  private val OPT_INT_DEFAULT: Int = -1
-
   // What to specifically display in the options
   case class Display(
     serverSettings: Option[String] = None,
@@ -827,6 +895,7 @@ object OptionsController {
 
   case class Result(
     sitesChanged: Boolean = false,
+    sslTrustChanged: Boolean = false,
     cnxLimitChanged: Boolean = false,
     cnxBufferChanged: Boolean = false,
     reload: Boolean = false
@@ -877,9 +946,12 @@ object OptionsController {
         snapshot1.applyDraft()
       }
 
+      // If sites changed (added/removed), sites settings may also have changed
+      // (an existing download may now be associated to another site).
       Result(
         sitesChanged = controller.sitesChanged,
-        cnxLimitChanged = controller.cnxLimitChanged,
+        sslTrustChanged = controller.sslTrustChanged || controller.sitesChanged,
+        cnxLimitChanged = controller.cnxLimitChanged || controller.sitesChanged,
         cnxBufferChanged = controller.cnxBufferChanged,
         reload = r
       )

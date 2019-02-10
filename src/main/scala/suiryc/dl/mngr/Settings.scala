@@ -15,6 +15,7 @@ object Settings {
 
   private[mngr] val KEY_STAGE = "stage"
 
+  private val KEY_ASK = "ask"
   private val KEY_AUTO_SAVE = "auto-save"
   private val KEY_BUFFER = "buffer"
   private val KEY_CODE = "code"
@@ -44,7 +45,9 @@ object Settings {
   private val KEY_SITES = "sites"
   private val KEY_SIZE = "size"
   private val KEY_SOCKET = "socket"
+  private val KEY_SSL = "ssl"
   private val KEY_TIMEOUT = "timeout"
+  private val KEY_TRUST = "trust"
   private val KEY_VALUE = "value"
   private val KEY_UNIT = "unit"
   private val KEY_WRITE = "write"
@@ -169,14 +172,26 @@ class Settings(path: Path) {
     loop(uri.getHost.toLowerCase)
   }
 
-  def getSite(site0: String): SiteSettings = {
+  def getServerSite(host: String): SiteSettings = {
+    try {
+      getSite(new URI("http", host, null, null))
+    } catch {
+      case _: Exception ⇒ sitesDefault
+    }
+  }
+
+  def getSite(site0: String, allowDefault: Boolean): SiteSettings = {
     val site = site0.toLowerCase
-    if (site == KEY_DEFAULT) throw new Exception("Cannot access default site settings this way")
-    sites.getOrElse(site, {
-      val s = new SiteSettings(site)
-      sites += (site → s)
-      s
-    })
+    if (site == KEY_DEFAULT) {
+      if (!allowDefault) throw new Exception("Cannot access default site settings this way")
+      sitesDefault
+    } else {
+      sites.getOrElse(site, {
+        val s = new SiteSettings(site)
+        sites += (site → s)
+        s
+      })
+    }
   }
 
   def removeSite(s: SiteSettings): Unit = {
@@ -206,6 +221,10 @@ class Settings(path: Path) {
 
     private val settingsPrefix = sitesPrefix :+ site
 
+    val sslTrust: ConfigEntry[Boolean] =
+      ConfigEntry.from(settings, settingsPrefix ++ Seq(KEY_SSL, KEY_TRUST))
+    val sslErrorAsk: ConfigEntry[Boolean] =
+      ConfigEntry.from(settings, settingsPrefix ++ Seq(KEY_SSL, KEY_ERROR, KEY_ASK))
     val cnxMax: ConfigEntry[Int] =
       ConfigEntry.from(settings, settingsPrefix ++ Seq(KEY_CONNECTION, KEY_MAX))
     val segmentsMax: ConfigEntry[Int] =
