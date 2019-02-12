@@ -48,6 +48,7 @@ object I18N extends suiryc.scala.util.I18N("i18n.dl-mngr") with I18NWithConfigEn
     def sslTrust: String = getString("confirmation.ssl-trust")
     def stop: String = getString("Stop")
     def stopAll: String = getString("Stop all")
+    def stopDlsOnExit: String = getString("confirmation.exit-running-downloads")
     def time: String = getString("Time")
     def unexpectedIssue: String = getString("error.unexpected-issue")
     def unknownSize: String = getString("warning.size-unknown")

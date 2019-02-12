@@ -1033,27 +1033,41 @@ class MainController extends StagePersistentView with StrictLogging {
     }
 
     def onExit(state: State): Unit = {
-      // TODO: check there is no running download, or ask for confirmation to stop them
-      persistView()
+      val canExit = !getDownloadsData.exists(_.download.canStop) || {
+        Dialogs.confirmation(
+          owner = Option(stage),
+          title = None,
+          headerText = Some(Strings.stopDlsOnExit),
+          contentText = None,
+          buttons = List(ButtonType.OK, ButtonType.CANCEL),
+          defaultButton = Some(ButtonType.OK)
+        ).getOrElse(ButtonType.CANCEL) match {
+          case ButtonType.OK ⇒ true
+          case _ ⇒ false
+        }
+      }
+      if (canExit) {
+        persistView()
 
-      state.dlMngr.stop().onComplete { _ ⇒
-        val ok = try {
-          state.dlMngr.saveState()
-          true
-        } catch {
-          case ex: Exception ⇒
-            displayError(
-              title = Some(state.stage.getTitle),
-              contentText = Some(s"${Strings.writeIssue}\n${Main.statePath}"),
-              ex = ex
-            )
-            false
-        }
-        if (ok) {
-          context.stop(self)
-          Main.shutdown(state.stage)
-        }
-      }(Main.Akka.dispatcher)
+        state.dlMngr.stop().onComplete { _ ⇒
+          val ok = try {
+            state.dlMngr.saveState()
+            true
+          } catch {
+            case ex: Exception ⇒
+              displayError(
+                title = Some(state.stage.getTitle),
+                contentText = Some(s"${Strings.writeIssue}\n${Main.statePath}"),
+                ex = ex
+              )
+              false
+          }
+          if (ok) {
+            context.stop(self)
+            Main.shutdown(state.stage)
+          }
+        }(Main.Akka.dispatcher)
+      }
     }
 
     def onOptions(state: State, display: OptionsController.Display): Unit = {
