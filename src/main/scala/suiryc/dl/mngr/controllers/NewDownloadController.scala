@@ -166,21 +166,23 @@ class NewDownloadController extends StagePersistentView {
         case Some(download) ⇒
           // This download (URI) already exists
           val r = if (auto) {
-            // In automatic mode, resume download
-            Some(false)
+            // In automatic mode, do nothing
+            Some(ConflictResolution.Noop)
           } else {
-            restartOrResume(
+            resolveConflict(
               header = Strings.downloadAlreadyUri,
               content = uri.toString,
               canRestart = download.canRestart,
               canResume = download.canResume,
+              canRename = false,
               defaultRestart = false
             )
           }
-          r.map { restart ⇒
+          r.map { resolution ⇒
             Result(
               download = download,
-              restart = restart,
+              restart = resolution == ConflictResolution.Restart,
+              start = resolution != ConflictResolution.Noop,
               select = !auto
             )
           }
@@ -205,20 +207,25 @@ class NewDownloadController extends StagePersistentView {
           if (exists.nonEmpty) {
             // A file already exists
             val (path, r) = if (auto) {
-              // In automatic mode, don't restart, but rename download if needed.
+              // In automatic mode, find available name.
               val path = findAvailablePath(path0)
-              (path, Some(false))
+              (path, Some(ConflictResolution.Rename))
             } else {
-              // TODO: also propose to rename ?
-              val r = restartOrResume(
+              val r = resolveConflict(
                 header = Strings.downloadAlreadyFile,
                 content = exists.mkString("\n"),
                 canRestart = true,
                 // We can only resume the file to which we are to write (temporary or not)
                 canResume = temporary.isEmpty || temporaryExists,
+                canRename = true,
                 defaultRestart = true
               )
-              (path0, r)
+              val path = if (r.contains(ConflictResolution.Rename)) {
+                findAvailablePath(path0)
+              } else {
+                path0
+              }
+              (path, r)
             }
             // Inform if target was renamed
             if (path != path0) {
@@ -229,9 +236,9 @@ class NewDownloadController extends StagePersistentView {
                 contentText = Some(s"$path0\n$path")
               )
             }
-            r.map { restart ⇒
+            r.map { resolution ⇒
               // Upon restarting, delete existing files
-              if (restart) {
+              if (resolution == ConflictResolution.Restart) {
                 path.toFile.delete()
                 temporary.foreach(_.toFile.delete())
               }
@@ -242,7 +249,8 @@ class NewDownloadController extends StagePersistentView {
                 cookie = cookie,
                 userAgent = userAgent,
                 path = path,
-                reused = !restart,
+                // Existing file is only re-used upon resuming
+                reused = resolution == ConflictResolution.Resume,
                 // For 'restarting' we actually deleted the file (so no need to 'restart' its content)
                 restart = false,
                 insertFirst = insertFirstField.isSelected,
@@ -287,29 +295,34 @@ class NewDownloadController extends StagePersistentView {
     }
   }
 
-  def restartOrResume(header: String, content: String, canResume: Boolean, canRestart: Boolean, defaultRestart: Boolean): Option[Boolean] = {
+  def resolveConflict(header: String, content: String,
+    canResume: Boolean, canRestart: Boolean, canRename: Boolean,
+    defaultRestart: Boolean): Option[ConflictResolution.Value] =
+  {
     val buttonRestart = new ButtonType(Strings.restart)
     val buttonResume = new ButtonType(Strings.resume)
+    val buttonRename = new ButtonType(Strings.rename)
     val buttonCancel = ButtonType.CANCEL
     val b1 = if (canRestart) Some(buttonRestart) else None
     val b2 = if (canResume) Some(buttonResume) else None
+    val b3 = if (canRename) Some(buttonRename) else None
     val buttons = (if (defaultRestart) {
       b1.toList ::: b2.toList
     } else {
       b2.toList ::: b1.toList
-    }) ::: List(buttonCancel)
+    }) ::: b3.toList ::: List(buttonCancel)
     val defaultButton = (if (defaultRestart) b1 else b2).orElse(Some(buttonCancel))
-    val r = Dialogs.confirmation(
+    Dialogs.confirmation(
       owner = Option(stage),
       title = None,
       headerText = Some(header),
       contentText = Some(content),
       buttons = buttons,
       defaultButton = defaultButton
-    )
-    r.flatMap {
-      case `buttonRestart` ⇒ Some(true)
-      case `buttonResume` ⇒ Some(false)
+    ).flatMap {
+      case `buttonRestart` ⇒ Some(ConflictResolution.Restart)
+      case `buttonResume` ⇒ Some(ConflictResolution.Resume)
+      case `buttonRename` ⇒ Some(ConflictResolution.Rename)
       case _ ⇒ None
     }
   }
@@ -396,6 +409,10 @@ object NewDownloadController {
       Settings.KEY_SUIRYC, Settings.KEY_DL_MNGR, Settings.KEY_STAGE, settingsKeyPrefix, "insert-first")
   }
 
+  protected object ConflictResolution extends Enumeration {
+    val Noop, Resume, Restart, Rename = Value
+  }
+
   protected case class Result(
     download: Option[Download],
     uri: URI,
@@ -412,7 +429,7 @@ object NewDownloadController {
 
   object Result {
 
-    def apply(download: Download, restart: Boolean, select: Boolean): Result = Result(
+    def apply(download: Download, restart: Boolean, start: Boolean, select: Boolean): Result = Result(
       download = Some(download),
       uri = download.uri,
       referrer = download.referrer,
@@ -423,8 +440,7 @@ object NewDownloadController {
       reused = true,
       restart = restart,
       insertFirst = false,
-      // Start download since we either choose resume or restart
-      start = true,
+      start = start,
       select = select
     )
 
@@ -464,13 +480,19 @@ object NewDownloadController {
 
       Some(dialog)
     } else {
+      // Note: closing the dialog is the same as hitting the 'Cancel' button,
+      // which do trigger result conversion. Since in this mode we did check
+      // received download info and prepared a 'result' (unless issue), this
+      // effectively validates the download as if the dialog had been shown
+      // to the user.
       dialog.close()
       None
     }
   }
 
   def resultConverter(mainController: MainController, controller: NewDownloadController)(@unused buttonType: ButtonType): Option[Download] = {
-    // Note: controller result is only set upon "OK"
+    // Note: controller result is only set upon "OK" (or in automatic mode),
+    // which is why we don't check which button was hit.
     controller.result.map { result ⇒
       val dlMngr = controller.dlMngr
       val download = result.download.getOrElse {

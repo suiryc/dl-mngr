@@ -29,6 +29,7 @@ object I18N extends suiryc.scala.util.I18N("i18n.dl-mngr") with I18NWithConfigEn
     def positiveValueExpected: String = getString("Positive value expected")
     def progress: String = getString("Progress")
     def readIssue: String = getString("error.read-issue")
+    def rename: String = getString("Rename")
     def renamedFile: String = getString("information.renamed-file")
     def reservedChars: String = getString("information.reserved-chars")
     def reset: String = getString("Reset")
