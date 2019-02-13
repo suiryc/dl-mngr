@@ -161,10 +161,19 @@ object DownloadManager {
   case class DownloadEntry(
     /** Download. */
     download: Download,
+    /** Promise completed when download is done (state changed). */
+    done: Promise[Unit],
     /** Actor handling the download. */
     dler: ActorRef
   ) {
-    def withDownload(download: Download): DownloadEntry = copy(download = download)
+    def resume(reusedOpt: Option[Boolean], restart: Boolean): DownloadEntry = {
+      // Belt and suspenders: make sure 'done' is completed.
+      done.tryFailure(DownloadException("Download is being resumed"))
+      copy(
+        download = download.resume(reusedOpt, restart),
+        done = Promise()
+      )
+    }
   }
 
   /** Connections information per server. */
@@ -322,7 +331,7 @@ class DownloadManager extends StrictLogging {
 
   def addDownload(download: Download, insertFirst: Boolean): Download = {
     val dler = system.actorOf(Props(new FileDownloader(dlMngr = this, dl = download)))
-    val dlEntry = DownloadEntry(download = download, dler = dler)
+    val dlEntry = DownloadEntry(download = download, done = Promise(), dler = dler)
     if (download.isDone) {
       logger.info(s"${download.context} Download uri=<${download.uri}> referrer=<${download.referrer.getOrElse("")}> file=<${download.path}> done")
       download.info.addLog(LogKind.Info, s"Download file=<${download.path}> available")
@@ -342,19 +351,27 @@ class DownloadManager extends StrictLogging {
     }.map(_.download)
   }
 
-  def stopDownload(id: UUID): Unit = {
-    getDownloadEntry(id).foreach(stopDownload)
+  def stopDownload(id: UUID): Option[Future[Unit]] = {
+    getDownloadEntry(id).map(stopDownload)
   }
 
-  private def stopDownload(dlEntry: DownloadEntry): Unit = {
-    if (dlEntry.download.canStop) dlEntry.dler ! FileDownloader.DownloadStop
+  private def stopDownload(dlEntry: DownloadEntry): Future[Unit] = {
+    if (dlEntry.download.canStop) {
+      dlEntry.dler ! FileDownloader.DownloadStop
+      // If stopping was done, this is a success (not a 'real' failure).
+      dlEntry.done.future.recover {
+        case ex: DownloadException if ex.stopped ⇒ ()
+      }
+    } else {
+      Future.successful(())
+    }
   }
 
   def resumeDownload(id: UUID, reusedOpt: Option[Boolean], restart: Boolean, force: Boolean = false): Unit = {
     if (!stopping) {
       getDownloadEntry(id).foreach { dlEntry ⇒
         if (dlEntry.download.canResume(restart)) {
-          val download = updateDownloadEntry(dlEntry.withDownload(dlEntry.download.resume(reusedOpt = reusedOpt, restart = restart))).download
+          val download = updateDownloadEntry(dlEntry.resume(reusedOpt, restart)).download
           followDownload(download)
           dlEntry.dler ! FileDownloader.DownloadResume(download, restart = restart, force = force)
         }
@@ -420,6 +437,8 @@ class DownloadManager extends StrictLogging {
               DownloadState.Success
           }
           download.info.state.setValue(state)
+          // This entry is now 'done'.
+          dlEntry.done.tryComplete(result)
           // Now that the state changed, give other downloads a chance to start and/or
           // get another connection.
           tryConnection(Some(id))

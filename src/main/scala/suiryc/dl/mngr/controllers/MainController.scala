@@ -22,6 +22,7 @@ import monix.execution.Cancelable
 import scala.collection.JavaConverters._
 import scala.concurrent.{Future, Promise}
 import scala.concurrent.duration._
+import scala.util.{Failure, Success}
 import suiryc.dl.mngr.model._
 import suiryc.scala.misc.Units
 import suiryc.dl.mngr.{DownloadManager, I18N, Main, Settings}
@@ -444,8 +445,7 @@ class MainController extends StagePersistentView with StrictLogging {
           case _ ⇒
         }
       } else if (event.getCode == KeyCode.DELETE) {
-        // TODO: Shift+Delete = delete file (for failed only ?) downloads ?
-        onDownloadsRemove(null)
+        onDownloadsRemove(force = event.isShiftDown)
       }
     })
 
@@ -757,7 +757,7 @@ class MainController extends StagePersistentView with StrictLogging {
   }
 
   private def enableMenuRemove(menu: MenuItem, data: List[DownloadData]): Unit = {
-    menu.setDisable(data.forall(_.download.isActive))
+    menu.setDisable(data.isEmpty)
   }
 
   private val downloadsContextMenu: ContextMenu = {
@@ -974,7 +974,11 @@ class MainController extends StagePersistentView with StrictLogging {
   }
 
   def onDownloadsRemove(@unused event: ActionEvent): Unit = {
-    actor ! OnDownloadsRemove
+    onDownloadsRemove(force = false)
+  }
+
+  private def onDownloadsRemove(force: Boolean): Unit = {
+    actor ! OnDownloadsRemove(force)
   }
 
   def onDlServerSettings(@unused event: ActionEvent): Unit = {
@@ -1027,7 +1031,7 @@ class MainController extends StagePersistentView with StrictLogging {
       case OnExit                          ⇒ onExit(state)
       case OnDownloadsAdd(dlInfo, promise) ⇒ onDownloadsAdd(state, dlInfo, promise)
       case OnDownloadsRemoveCompleted      ⇒ onDownloadsRemoveCompleted(state)
-      case OnDownloadsRemove               ⇒ onDownloadsRemove(state)
+      case OnDownloadsRemove(force)        ⇒ onDownloadsRemove(state, force)
       case AddDownload(id, first, select)  ⇒ addDownload(state, id, first, select)
       case MoveDownloads(ids, up, most)    ⇒ moveDownloads(state, ids, up, most)
     }
@@ -1056,7 +1060,7 @@ class MainController extends StagePersistentView with StrictLogging {
           } catch {
             case ex: Exception ⇒
               displayError(
-                title = Some(state.stage.getTitle),
+                title = None,
                 contentText = Some(s"${Strings.writeIssue}\n${Main.statePath}"),
                 ex = ex
               )
@@ -1144,62 +1148,116 @@ class MainController extends StagePersistentView with StrictLogging {
       }
     }
 
-    def onDownloadsRemove(state: State): Unit = {
-      // We don't remove 'active' downloads
-      val selected = selectedDownloadsData.filter(!_.download.isActive)
+    def onDownloadsRemove(state: State, force: Boolean): Unit = {
+      val selected = selectedDownloadsData
 
-      // We can safely remove if done (success) or not started (failure or not)
-      val safe = selected.filter { data ⇒
-        data.download.isDone || !data.download.isStarted
-      }
-      safe.foreach { data ⇒
-        removeDownload(state, data.download.id)
-      }
+      def doRemove() {
+        // We don't remove 'active' downloads
+        val removable = selected.filter(!_.download.isActive)
 
-      // Get remaining selected downloads (started and unfinished)
-      val unfinished = selected.filterNot(safe.contains)
-      if (unfinished.nonEmpty) {
-        // Build simple dialog to confirm removal
-        val buttonRemove = new ButtonType(Strings.remove)
-        val dialog = new Dialog[Option[Boolean]]()
-        Stages.initOwner(dialog, stage)
-        dialog.getDialogPane.getButtonTypes.addAll(buttonRemove, ButtonType.CANCEL)
-        Dialogs.setDefaultButton(dialog, buttonRemove)
-        val loader = new FXMLLoader(getClass.getResource("/fxml/remove-unfinished.fxml"), I18N.getResources)
-        dialog.getDialogPane.setContent(loader.load[Node]())
-
-        // Insert list of downloads in message field
-        val messageField = dialog.getDialogPane.lookup("#messageField").asInstanceOf[Label]
-        messageField.setText(s"${messageField.getText}\n${unfinished.map(_.path.get.getFileName).mkString("\n")}")
-
-        // Track (and persist) whether to remove from disk too
-        val removeFromDiskField = dialog.getDialogPane.lookup("#removeFormDiskField").asInstanceOf[CheckBox]
-        removeFromDiskField.setSelected(removeUnfinishedFromDisk.get)
-        BindingsEx.bind(removeUnfinishedFromDisk, removeFromDiskField.selectedProperty) {
-          removeFromDiskField.isSelected
+        // We can safely remove if done (success) or not started (failure or not)
+        val safe = removable.filter { data ⇒
+          data.download.isDone || !data.download.isStarted
+        }
+        safe.foreach { data ⇒
+          removeDownload(state, data.download.id)
         }
 
-        // Determine the dialog result
-        dialog.setResultConverter {
-          case `buttonRemove` ⇒ Some(removeFromDiskField.isSelected)
-          case _ ⇒ None
-        }
+        // Get remaining selected downloads (started and unfinished)
+        val unfinished = removable.filterNot(safe.contains)
+        if (unfinished.nonEmpty) {
+          val confirmation = if (!force) {
+            // Build simple dialog to confirm removal
+            val buttonRemove = new ButtonType(Strings.remove)
+            val dialog = new Dialog[Option[Boolean]]()
+            Stages.initOwner(dialog, stage)
+            dialog.getDialogPane.getButtonTypes.addAll(buttonRemove, ButtonType.CANCEL)
+            Dialogs.setDefaultButton(dialog, buttonRemove)
+            val loader = new FXMLLoader(getClass.getResource("/fxml/remove-unfinished.fxml"), I18N.getResources)
+            dialog.getDialogPane.setContent(loader.load[Node]())
 
-        // Show, wait and apply action
-        dialog.showAndWait().flatten.foreach { removeFromDisk ⇒
-          unfinished.foreach { data ⇒
-            val download = data.download
-            // Remove download entry
-            removeDownload(state, download.id)
-            // Remove from disk when requested
-            if (removeFromDisk) {
-              // Since the download is unfinished, we only need to delete the
-              // temporary file if any (or the real file otherwise).
-              download.downloadFile.getTemporaryPath.getOrElse(download.downloadFile.getPath).toFile.delete()
+            // Insert list of downloads in message field
+            val messageField = dialog.getDialogPane.lookup("#messageField").asInstanceOf[Label]
+            messageField.setText(s"${messageField.getText}\n${unfinished.map(_.path.get.getFileName).mkString("\n")}")
+
+            // Track (and persist) whether to remove from disk too
+            val removeFromDiskField = dialog.getDialogPane.lookup("#removeFromDiskField").asInstanceOf[CheckBox]
+            removeFromDiskField.setSelected(removeUnfinishedFromDisk.get)
+            BindingsEx.bind(removeUnfinishedFromDisk, removeFromDiskField.selectedProperty) {
+              removeFromDiskField.isSelected
+            }
+
+            // Determine the dialog result
+            dialog.setResultConverter {
+              case `buttonRemove` ⇒ Some(removeFromDiskField.isSelected)
+              case _ ⇒ None
+            }
+
+            // Show and wait confirmation
+            dialog.showAndWait().flatten
+          } else {
+            Some(true)
+          }
+
+          // Apply action
+          confirmation.foreach { removeFromDisk ⇒
+            unfinished.foreach { data ⇒
+              val download = data.download
+              // Remove download entry
+              removeDownload(state, download.id)
+              // Remove from disk when requested
+              if (removeFromDisk) {
+                // Since the download is unfinished, we only need to delete the
+                // temporary file if any (or the real file otherwise).
+                download.downloadFile.getTemporaryPath.getOrElse(download.downloadFile.getPath).toFile.delete()
+              }
             }
           }
         }
       }
+
+      // Stop active downloads if any. Otherwise we can remove now.
+      val active = selected.filter(_.download.isActive)
+      val removeNow = active.isEmpty || {
+        // Ask for confirmation if necessary.
+        val stop = force || Dialogs.confirmation(
+          owner = Some(stage),
+          title = None,
+          headerText = Some(Strings.stopDlsOnRemove),
+          contentText = Some(active.map(_.path.get.getFileName).mkString("\n")),
+          buttons = List(ButtonType.OK, ButtonType.CANCEL),
+          defaultButton = Some(ButtonType.OK)
+        ).contains(ButtonType.OK)
+
+        if (stop) {
+          import context.dispatcher
+          import RichFuture._
+
+          // Wait for downloads to be stopped before removing them, and fail
+          // if it takes too long.
+          // Report and don't do anything if there was a failure.
+          Future.sequence {
+            active.flatMap { dlEntry ⇒
+              state.dlMngr.stopDownload(dlEntry.download.id)
+            }
+          }.map(_ ⇒ ()).withTimeout(30.seconds).onComplete {
+            case Success(_) ⇒
+              doRemove()
+
+            case Failure(ex) ⇒
+              displayError(
+                title = None,
+                contentText = None,
+                ex = ex
+              )
+          }
+          false
+        } else {
+          // Stopping was cancelled, we only need to remove what we can.
+          true
+        }
+      }
+      if (removeNow) doRemove()
     }
 
     def removeDownload(state: State, id: UUID): Unit = {
@@ -1489,7 +1547,7 @@ object MainController {
   case object OnExit
   case class OnDownloadsAdd(dlInfo: NewDownloadInfo, promise: Promise[Unit])
   case object OnDownloadsRemoveCompleted
-  case object OnDownloadsRemove
+  case class OnDownloadsRemove(force: Boolean)
   case class AddDownload(id: UUID, first: Boolean, select: Boolean)
   case class MoveDownloads(ids: List[UUID], up: Boolean, most: Boolean)
 
