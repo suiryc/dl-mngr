@@ -596,6 +596,17 @@ class MainController extends StagePersistentView with StrictLogging {
           dlServerLink.setText(info.uri.get.getHost)
           dlFolderField.setText(info.path.get.getParent.toString)
           dlFileField.setText(info.path.get.getFileName.toString)
+          // Display the temporary path in a tooltip.
+          val tooltip = Option(info.temporaryPath.get).map { path ⇒
+            new Tooltip(
+              // Don't display the folder if it is the actual target's one.
+              if (path.getParent != info.path.get.getParent) path.toString
+              else path.getFileName.toString
+            )
+          }.orNull
+          List(dlFolderField, dlFileField).foreach { field ⇒
+            field.setTooltip(tooltip)
+          }
           dlSizeLabel.setText(if (info.isSizeDetermined && !info.isSizeUnknown) info.size.get.toString else "")
           // Somehow changed text (e.g. dlSiteLink) is not always updated until
           // layout is triggered again (e.g. resizing). Try manual trigger.
@@ -622,6 +633,9 @@ class MainController extends StagePersistentView with StrictLogging {
 
       case None ⇒
         dlFileSelectButton.setOnAction(null)
+        List(dlFolderField, dlFileField).foreach { field ⇒
+          field.setTooltip(null)
+        }
         List(dlServerLink, dlSiteLink, dlFileSelectButton).foreach { button ⇒
           button.setDisable(true)
         }

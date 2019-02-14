@@ -300,6 +300,10 @@ class DownloadFile(private var path: Path) extends LazyLogging {
             if (target == tmp) {
               // The temporary path is now the actual target.
               temporary = None
+            } else if ((channel == null) && !reused) {
+              // We won't re-use the temporary path, which is not opened yet.
+              // We can re-compute it now (may be displayed in UI).
+              renewTemporary()
             }
 
           case None ⇒

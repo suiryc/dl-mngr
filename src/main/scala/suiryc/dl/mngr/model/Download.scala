@@ -43,6 +43,8 @@ class DownloadInfo {
   val uri: SimpleObjectProperty[URI] = new SimpleObjectProperty()
   /** File path */
   val path: SimpleObjectProperty[Path] = new SimpleObjectProperty()
+  /** File temporary path */
+  val temporaryPath: SimpleObjectProperty[Path] = new SimpleObjectProperty()
   /** State (initially stopped) */
   val state: SimpleObjectProperty[DownloadState.Value] = new SimpleObjectProperty(DownloadState.Stopped)
   /** Size */
@@ -152,19 +154,27 @@ case class Download(
   info.uri.set(uri)
 
   def path: Path = downloadFile.getPath
-  info.path.set(path)
+
+  def temporaryPath: Option[Path] = downloadFile.getTemporaryPath
+
+  refreshPaths()
+
+  private def refreshPaths(): Unit = {
+    info.path.set(path)
+    info.temporaryPath.set(temporaryPath.orNull)
+  }
 
   def openFile(): Unit = {
-    if (downloadFile.createChannel()) info.path.set(path)
+    if (downloadFile.createChannel()) refreshPaths()
   }
 
   def renameFile(target: Path): Unit = {
     downloadFile.rename(target)
-    info.path.set(path)
+    refreshPaths()
   }
   def closeFile(lastModified: Option[Date], done: Boolean): Unit = {
     downloadFile.close(lastModified, done)
-    if (done) info.path.set(path)
+    if (done) refreshPaths()
   }
 
   def acceptRanges: Option[Boolean] = info.acceptRanges.get
