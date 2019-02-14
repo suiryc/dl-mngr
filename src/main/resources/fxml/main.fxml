@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
+<?import java.lang.String?>
 <?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Button?>
 <?import javafx.scene.control.ChoiceBox?>
 <?import javafx.scene.control.CustomMenuItem?>
 <?import javafx.scene.control.Hyperlink?>
@@ -28,7 +30,7 @@
    <children>
       <VBox maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
          <children>
-            <MenuBar fx:id="menuBar">
+            <MenuBar>
               <menus>
                 <Menu mnemonicParsing="false" text="%File">
                   <items>
@@ -78,10 +80,11 @@
                            <content>
                               <ScrollPane fx:id="dlPropertiesScrollPane" fitToWidth="true">
                                  <content>
-                                    <GridPane hgap="10.0" vgap="5.0">
+                                    <GridPane hgap="5.0" vgap="5.0">
                                       <columnConstraints>
                                         <ColumnConstraints hgrow="NEVER" />
-                                        <ColumnConstraints hgrow="SOMETIMES" minWidth="50.0" />
+                                        <ColumnConstraints hgrow="NEVER" maxWidth="1.7976931348623157E308" minWidth="10.0" />
+                                          <ColumnConstraints hgrow="ALWAYS" maxWidth="1.7976931348623157E308" />
                                       </columnConstraints>
                                       <rowConstraints>
                                         <RowConstraints minHeight="25.0" vgrow="NEVER" />
@@ -100,55 +103,61 @@
                                                 <Font name="System Bold" size="12.0" />
                                              </font>
                                           </Label>
-                                          <TextField fx:id="dlURIField" editable="false" GridPane.columnIndex="1" />
+                                          <TextField fx:id="dlURIField" editable="false" GridPane.columnIndex="1" GridPane.columnSpan="2" />
                                           <Label text="%Server:" GridPane.rowIndex="1">
                                              <font>
                                                 <Font name="System Bold" size="12.0" />
                                              </font>
                                           </Label>
-                                          <Hyperlink fx:id="dlServerLink" disable="true" onAction="#onDlServerSettings" GridPane.columnIndex="1" GridPane.rowIndex="1" />
+                                          <Hyperlink fx:id="dlServerLink" disable="true" onAction="#onDlServerSettings" GridPane.columnIndex="1" GridPane.columnSpan="2" GridPane.rowIndex="1" />
                                           <Label text="%Site:" GridPane.rowIndex="2">
                                              <font>
                                                 <Font name="System Bold" size="12.0" />
                                              </font>
                                           </Label>
-                                          <Hyperlink fx:id="dlSiteLink" disable="true" onAction="#onDlSiteSettings" GridPane.columnIndex="1" GridPane.rowIndex="2" />
+                                          <Hyperlink fx:id="dlSiteLink" disable="true" onAction="#onDlSiteSettings" GridPane.columnIndex="1" GridPane.columnSpan="2" GridPane.rowIndex="2" />
                                           <Label text="Referrer:" GridPane.rowIndex="3">
                                              <font>
                                                 <Font name="System Bold" size="12.0" />
                                              </font>
                                           </Label>
-                                          <TextField fx:id="dlReferrerField" editable="false" GridPane.columnIndex="1" GridPane.rowIndex="3" />
+                                          <TextField fx:id="dlReferrerField" editable="false" GridPane.columnIndex="1" GridPane.columnSpan="2" GridPane.rowIndex="3" />
                                           <Label text="Cookie:" GridPane.rowIndex="4">
                                              <font>
                                                 <Font name="System Bold" size="12.0" />
                                              </font>
                                           </Label>
-                                          <TextField fx:id="dlCookieField" editable="false" GridPane.columnIndex="1" GridPane.rowIndex="4" />
+                                          <TextField fx:id="dlCookieField" editable="false" GridPane.columnIndex="1" GridPane.columnSpan="2" GridPane.rowIndex="4" />
                                           <Label text="User agent:" GridPane.rowIndex="5">
                                              <font>
                                                 <Font name="System Bold" size="12.0" />
                                              </font>
                                           </Label>
-                                          <TextField fx:id="dlUserAgentField" editable="false" GridPane.columnIndex="1" GridPane.rowIndex="5" />
+                                          <TextField fx:id="dlUserAgentField" editable="false" GridPane.columnIndex="1" GridPane.columnSpan="2" GridPane.rowIndex="5" />
                                           <Label text="%Folder:" GridPane.rowIndex="6">
                                              <font>
                                                 <Font name="System Bold" size="12.0" />
                                              </font>
                                           </Label>
-                                          <TextField fx:id="dlFolderField" editable="false" GridPane.columnIndex="1" GridPane.rowIndex="6" />
+                                          <Button fx:id="dlFileSelectButton" disable="true" mnemonicParsing="false" GridPane.columnIndex="1" GridPane.rowIndex="6" GridPane.rowSpan="2">
+                                             <styleClass>
+                                                <String fx:value="icon-save" />
+                                                <String fx:value="button-square-icon" />
+                                             </styleClass>
+                                          </Button>
+                                          <TextField fx:id="dlFolderField" editable="false" GridPane.columnIndex="2" GridPane.rowIndex="6" />
                                           <Label text="%File:" GridPane.rowIndex="7">
                                              <font>
                                                 <Font name="System Bold" size="12.0" />
                                              </font>
                                           </Label>
-                                          <TextField fx:id="dlFileField" editable="false" GridPane.columnIndex="1" GridPane.rowIndex="7" />
+                                          <TextField fx:id="dlFileField" editable="false" GridPane.columnIndex="2" GridPane.rowIndex="7" />
                                           <Label text="%Size:" GridPane.rowIndex="8">
                                              <font>
                                                 <Font name="System Bold" size="12.0" />
                                              </font>
                                           </Label>
-                                          <Label fx:id="dlSizeLabel" GridPane.columnIndex="1" GridPane.rowIndex="8" />
+                                          <Label fx:id="dlSizeLabel" GridPane.columnIndex="1" GridPane.columnSpan="2" GridPane.rowIndex="8" />
                                        </children>
                                        <padding>
                                           <Insets bottom="10.0" left="10.0" right="10.0" top="10.0" />

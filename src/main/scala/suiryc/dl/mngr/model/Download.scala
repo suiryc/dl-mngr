@@ -158,6 +158,10 @@ case class Download(
     if (downloadFile.createChannel()) info.path.set(path)
   }
 
+  def renameFile(target: Path): Unit = {
+    downloadFile.rename(target)
+    info.path.set(path)
+  }
   def closeFile(lastModified: Option[Date], done: Boolean): Unit = {
     downloadFile.close(lastModified, done)
     if (done) info.path.set(path)
@@ -204,9 +208,7 @@ case class Download(
   def resume(reusedOpt: Option[Boolean], restart: Boolean): Download = {
     if (restart) info.restart()
     val reason = if (restart) "re-started" else "resumed"
-    // Make sure that previous resources cannot be used anymore
-    closeFile(None, done = false)
-    downloadFile.reset(reusedOpt = reusedOpt, truncate = restart)
+    downloadFile.reset(reusedOpt = reusedOpt, restart = restart)
     // Belt and suspenders:
     // The current download should have properly been failed/stopped already.
     // We still try to fail the promise, and in case it had not yet been

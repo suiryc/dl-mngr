@@ -32,6 +32,9 @@ object DownloadFile {
 
 class DownloadFile(private var path: Path) extends LazyLogging {
 
+  /** Whether download was done (success). */
+  private var isDone: Boolean = false
+
   /** Whether file is being reused. */
   private var reused: Boolean = false
 
@@ -39,7 +42,8 @@ class DownloadFile(private var path: Path) extends LazyLogging {
   private var truncate: Boolean = false
 
   /** The temporary file to download into. */
-  private var temporary = Main.settings.getTemporaryFile(path)
+  private var temporary: Option[Path] = _
+  renewTemporary()
 
   /** The channel to write to. */
   private var channel: FileChannel = _
@@ -65,11 +69,19 @@ class DownloadFile(private var path: Path) extends LazyLogging {
   /** Temporary path. */
   def getTemporaryPath: Option[Path] = temporary
 
+  private def renewTemporary(): Unit = temporary = Main.settings.getTemporaryFile(path)
+
   /** Resets. */
-  def reset(reusedOpt: Option[Boolean], truncate: Boolean): Unit = {
-    close(None, done = false)
+  def reset(reusedOpt: Option[Boolean], restart: Boolean): Unit = this.synchronized {
+    // Notes:
+    // We only allow to delete temporary path. Having created a file also means
+    // we reserved its name, so don't delete the real target if we created it.
+    // In this case, we simply need to truncate it when we will (re-)open it.
+    close(None, done = false, canDelete = restart && temporary.isDefined)
     reusedOpt.foreach(reused = _)
-    this.truncate = truncate
+    // We could also restrict truncating to 'without temporary path' cases, but
+    // that is not necessary.
+    this.truncate = restart
   }
 
   /**
@@ -107,14 +119,17 @@ class DownloadFile(private var path: Path) extends LazyLogging {
   /**
    * Creates the channel (if not already done).
    *
-   * Must be called before before starting (writing).
+   * Must be called before starting (writing).
    * Automatically uses another filename if file already exists (and was not
    * owned by us yet).
    *
    * @return whether channel was created (false if already done)
    */
-  def createChannel(): Boolean = {
+  def createChannel(): Boolean = this.synchronized {
     if (channel == null) {
+      // If we don't re-use an existing file, re-compute temporary path if any.
+      // (useful if target was renamed in-between)
+      if (!reused) renewTemporary()
       val target = temporary.getOrElse(path)
       // If not owned, make sure the file does not exist upon creating it.
       val options = List(StandardOpenOption.CREATE, StandardOpenOption.WRITE) ++
@@ -260,11 +275,85 @@ class DownloadFile(private var path: Path) extends LazyLogging {
     ()
   }
 
-  def close(lastModified: Option[Date], done: Boolean): Unit = {
+  /**
+   * Renames target path.
+   *
+   * Depending on the situation (download done, temporary file used, etc.), the
+   * file may be renamed right now. If target path is already used, a new name
+   * will be automatically chosen.
+   *
+   * @param target new target path
+   * @return the new target path
+   */
+  def rename(target: Path): Path = this.synchronized {
+    // Do nothing if target does not change.
+    if (target != path) {
+      if (isDone) {
+        // If we were done the current 'path' is the real file.
+        path = move(path, target)
+      } else {
+        // The download is not done. Is there a temporary path ?
+        temporary match {
+          case Some(tmp) ⇒
+            // There is a temporary path, so we only need to set the target path.
+            path = target
+            if (target == tmp) {
+              // The temporary path is now the actual target.
+              temporary = None
+            }
+
+          case None ⇒
+            if ((channel == null) && reused) {
+              // We will re-use the path, which is not opened yet. So we only
+              // need to rename it now.
+              path = move(path, target)
+            } else {
+              // Either file is opened, or we don't own it: we cannot safely
+              // rename it, so we make it temporary and change the target.
+              temporary = Some(path)
+              path = target
+            }
+        }
+      }
+    }
+
+    path
+  }
+
+  /**
+   * Moves (or renames if possible) file.
+   *
+   * If target already exists, a new name will be automatically chosen.
+   *
+   * @param source source path
+   * @param target target path
+   * @return actual target path
+   */
+  private def move(source: Path, target: Path): Path = {
+    @scala.annotation.tailrec
+    def loop(remainingAttempts: Int): Path = {
+      val probed = PathsEx.getAvailable(target)
+      if (probed != target) logger.warn(s"Path=<$target> already exists; saving to=<$probed> instead")
+      try {
+        Files.move(source, probed)
+        probed
+      } catch {
+        case ex: Exception ⇒
+          if (remainingAttempts == 0) throw ex
+          loop(remainingAttempts - 1)
+      }
+    }
+
+    // If we are competing to use the target name, try more than once.
+    loop(3)
+  }
+
+  def close(lastModified: Option[Date], done: Boolean, canDelete: Boolean = false): Unit = this.synchronized {
+    isDone = done
     if (channel != null) {
       flush(force = true)
-      // If not done, and file is empty, delete it.
-      val delete = !done && (channel.size == 0)
+      // If not done, and file is empty (or caller allows deletion), delete it.
+      val delete = !done && (canDelete || (channel.size == 0))
       channel.close()
       channel = null
       lastModified.foreach { date ⇒
@@ -282,10 +371,7 @@ class DownloadFile(private var path: Path) extends LazyLogging {
         temporary.foreach { tempPath ⇒
           // We only reuse the file we write to (temporary in this case).
           // If the target file exists, rename ours.
-          val probed = PathsEx.getAvailable(path)
-          if (probed != path) logger.warn(s"Path=<$path> already exists; saving to=<$probed> instead")
-          path = probed
-          Files.move(tempPath, path)
+          path = move(tempPath, path)
         }
       } else if (delete) {
         temporary.getOrElse(path).toFile.delete()

@@ -16,7 +16,7 @@ import javafx.scene.control._
 import javafx.scene.input._
 import javafx.scene.layout.{Pane, Region, StackPane}
 import javafx.scene.text.{Font, Text}
-import javafx.stage.{Modality, Stage, WindowEvent}
+import javafx.stage.{FileChooser, Modality, Stage, WindowEvent}
 import javafx.util.StringConverter
 import monix.execution.Cancelable
 import scala.collection.JavaConverters._
@@ -39,7 +39,7 @@ import suiryc.scala.javafx.concurrent.JFXSystem
 import suiryc.scala.javafx.scene.{Graphics, Styles}
 import suiryc.scala.javafx.scene.control.{Dialogs, Panes, TableCellEx, TableViews}
 import suiryc.scala.javafx.scene.control.skin.SplitPaneSkinEx
-import suiryc.scala.javafx.stage.{StagePersistentView, Stages}
+import suiryc.scala.javafx.stage.{PathChoosers, StagePersistentView, Stages}
 import suiryc.scala.javafx.stage.Stages.StageLocation
 import suiryc.scala.settings.ConfigEntry
 import suiryc.scala.unused
@@ -48,9 +48,6 @@ import suiryc.scala.unused
 class MainController extends StagePersistentView with StrictLogging {
 
   import MainController._
-
-  @FXML
-  protected var menuBar: MenuBar = _
 
   @FXML
   protected var downloadsMenu: Menu = _
@@ -113,6 +110,9 @@ class MainController extends StagePersistentView with StrictLogging {
   protected var dlFileField: TextField = _
 
   @FXML
+  protected var dlFileSelectButton: Button = _
+
+  @FXML
   protected var dlSizeLabel: Label = _
 
   private val clipboard = Clipboard.getSystemClipboard
@@ -167,8 +167,8 @@ class MainController extends StagePersistentView with StrictLogging {
     // We sometimes need to get the current state. So store it as user data.
     state.save()
 
-    // Inject icons in menu
-    Icons.setIcons(menuBar)
+    // Inject icons in menu and panes
+    Icons.setIcons(stage.getScene.getRoot)
 
     // When showing "Downloads" menu, update items state. We could follow table
     // items list and each download state, but that would be a bit overkill.
@@ -584,8 +584,8 @@ class MainController extends StagePersistentView with StrictLogging {
         val download = data.download
         val info = download.info
 
-        List(dlServerLink, dlSiteLink).foreach { field ⇒
-          field.setDisable(false)
+        List(dlServerLink, dlSiteLink, dlFileSelectButton).foreach { button ⇒
+          button.setDisable(false)
         }
         dlSiteLink.setText(download.siteSettings.site)
         dlReferrerField.setText(download.referrer.map(_.toString).orNull)
@@ -601,6 +601,16 @@ class MainController extends StagePersistentView with StrictLogging {
           // layout is triggered again (e.g. resizing). Try manual trigger.
           dlPropertiesScrollPane.layout()
         }
+        dlFileSelectButton.setOnAction { _ ⇒
+          val fileChooser = new FileChooser()
+          fileChooser.getExtensionFilters.addAll(
+            new FileChooser.ExtensionFilter("*.*", "*.*")
+          )
+          PathChoosers.setInitialPath(fileChooser, info.path.get.toFile)
+          Option(fileChooser.showSaveDialog(stage)).foreach { selectedFile ⇒
+            download.renameFile(selectedFile.toPath)
+          }
+        }
         val propertiesCancellable = RichObservableValue.listen(info.uri, info.path, info.size) {
           JFXSystem.runLater {
             updateProperties()
@@ -611,8 +621,9 @@ class MainController extends StagePersistentView with StrictLogging {
         dlPropertiesTab.setUserData(propertiesCancellable)
 
       case None ⇒
-        List(dlServerLink, dlSiteLink).foreach { field ⇒
-          field.setDisable(true)
+        dlFileSelectButton.setOnAction(null)
+        List(dlServerLink, dlSiteLink, dlFileSelectButton).foreach { button ⇒
+          button.setDisable(true)
         }
         List(dlServerLink, dlSiteLink, dlSizeLabel).foreach { field ⇒
           field.setText(null)
