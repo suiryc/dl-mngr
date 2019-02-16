@@ -82,12 +82,36 @@ async def processStream(src, dst):
     if not line: break
     sysWrite(dst, line)
 
-async def start():
+async def run():
   process = await asyncio.create_subprocess_exec(*cmd, stdin=None, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE, creationflags=creationflags)
   await asyncio.gather(processStream(process.stdout, sys.stdout), processStream(process.stderr, sys.stderr))
+  # The spawned process output streams are now closed. Either:
+  #  1. The process was not meant (CLI parameters) to keep on running in the
+  #     background and is now exiting
+  #  2. It was the (first) unique instance, and the process is still running
+  #  3. The arguments were passed to the unique instance, we got a response and
+  #     the instance we spawned is now exiting
+  # Due to 2. we must not indefinitely wait for the return code. Otherwise we
+  # usually get it in less than 50ms.
+  # Upon timeout, assume we were in case 2. and the command was successful.
+  try: return await asyncio.wait_for(process.wait(), 0.2)
+  except asyncio.TimeoutError: return 0
+
+async def start(remainingAttempts = 2):
+  # Execute the command, and re-try (a limited number of times) if we get a
+  # communication error code (100).
+  while True:
+    returncode = await run()
+    remainingAttempts -= 1
+    if (returncode == 100) and (remainingAttempts > 0):
+      # Wait a bit before the next attempt.
+      await asyncio.sleep(0.5)
+      continue
+    return returncode
 
 # Note:
-# Usually we would 'asyncio.run()'.
-# Alternatively (more explicitly) 'loop.run_until_complete()' then 'loop.close()'.
-# But closing the loop kills the subprocess. So don't do it.
-asyncio.get_event_loop().run_until_complete(start())
+# Usually we would 'asyncio.run()', or alternatively (more explicitly)
+# 'loop.run_until_complete()' then 'loop.close()'.
+# But this (closing the loop) kills the subprocess. So don't do it.
+# Exit with the received return code (or one we decided).
+exit(asyncio.get_event_loop().run_until_complete(start()))
