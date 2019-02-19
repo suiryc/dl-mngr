@@ -785,10 +785,21 @@ class OptionsController extends StagePersistentView {
       val snap = SiteSettingsSnapshot(siteSettings)
       // Build a unique site name to apply.
       snap.site = siteOpt.getOrElse(getName(0))
-      snap.sslTrust.draft.set(Main.settings.sitesDefault.sslTrust.opt)
-      snap.sslErrorAsk.draft.set(Main.settings.sitesDefault.sslErrorAsk.opt)
-      snap.cnxMax.draft.set(Main.settings.sitesDefault.cnxMax.opt)
-      snap.segmentsMax.draft.set(Main.settings.sitesDefault.segmentsMax.opt)
+      sitesField.getItems.get(0) match {
+        case Some(sitesDefault) ⇒
+          // Use current 'default' site snapshot values.
+          snap.sslTrust.draft.set(sitesDefault.sslTrust.getDraftValue())
+          snap.sslErrorAsk.draft.set(sitesDefault.sslErrorAsk.getDraftValue())
+          snap.cnxMax.draft.set(sitesDefault.cnxMax.getDraftValue())
+          snap.segmentsMax.draft.set(sitesDefault.segmentsMax.getDraftValue())
+
+        case None ⇒
+          // No 'default' site snapshot (should not happen)
+          snap.sslTrust.draft.set(Main.settings.sitesDefault.sslTrust.opt)
+          snap.sslErrorAsk.draft.set(Main.settings.sitesDefault.sslErrorAsk.opt)
+          snap.cnxMax.draft.set(Main.settings.sitesDefault.cnxMax.opt)
+          snap.segmentsMax.draft.set(Main.settings.sitesDefault.segmentsMax.opt)
+      }
       // Add to our known list of settings
       add(snap)
       // Refresh sites (re-ordering may be needed)
