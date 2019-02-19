@@ -195,7 +195,7 @@ object DownloadManager {
     def updateSsl(trust: Boolean, ask: Option[Boolean]): ServerConnections =
       active.copy(sslTrust = trust, sslErrorAsk = ask)
     def updateSsl(siteSettings: Main.settings.SiteSettings): ServerConnections =
-      updateSsl(siteSettings.sslTrust.get, siteSettings.sslErrorAsk.opt)
+      updateSsl(siteSettings.getSslTrust, siteSettings.sslErrorAsk.opt)
     def trustSsl(trust: Boolean): ServerConnections =
       updateSsl(trust = trust, ask = Some(false)).copy(sslChanged = true)
   }
@@ -206,7 +206,7 @@ object DownloadManager {
         lastActive = System.currentTimeMillis,
         cnxCount = 0,
         sslChanged = false,
-        sslTrust = siteSettings.sslTrust.get,
+        sslTrust = siteSettings.getSslTrust,
         sslErrorAsk = siteSettings.sslErrorAsk.opt
       )
     }

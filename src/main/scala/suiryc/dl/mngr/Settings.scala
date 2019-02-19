@@ -81,18 +81,18 @@ class Settings(path: Path) {
 
   private[mngr] val settings = PortableSettings(path, prefix)
 
+  // Note: we are sure (reference.conf) that there is at least the 'default'
+  // 'sites' entry.
+  val sitesDefault: SiteSettings = new SiteSettings(KEY_DEFAULT)
   private var sites: Map[String, SiteSettings] = {
-    val path = BaseConfig.joinPath(sitesPrefix)
-    if (settings.config.hasPath(path)) {
-      settings.config.getConfig(path).root.keySet.asScala.map { key0 ⇒
-        val key = key0.toLowerCase
-        key → new SiteSettings(key)
-      }.toMap
-    } else Map.empty
+    settings.config.getConfig(BaseConfig.joinPath(sitesPrefix)).root.keySet.asScala.map { key ⇒
+      key.toLowerCase
+    }.filterNot { key ⇒
+      key == KEY_DEFAULT
+    }.map { key ⇒
+      key → new SiteSettings(key)
+    }.toMap
   }
-
-  val sitesDefault: SiteSettings = sites.getOrElse(KEY_DEFAULT, new SiteSettings(KEY_DEFAULT))
-  sites -= KEY_DEFAULT
 
   val localeCode: ConfigEntry[String] =
     ConfigEntry.from[String](settings, prefix ++ Seq(KEY_LOCALE, KEY_CODE))
@@ -230,9 +230,13 @@ class Settings(path: Path) {
     val segmentsMax: ConfigEntry[Int] =
       ConfigEntry.from(settings, settingsPrefix ++ Seq(KEY_SEGMENTS, KEY_MAX))
 
-    def getCnxMax: Int = cnxMax.opt.orElse{
+    def getSslTrust: Boolean = sslTrust.opt.getOrElse {
+      Settings.this.sitesDefault.sslTrust.get
+    }
+
+    def getCnxMax: Int = cnxMax.opt.orElse {
       Settings.this.sitesDefault.cnxMax.opt
-    }.getOrElse{
+    }.getOrElse {
       Settings.this.cnxMax.get
     }
 
