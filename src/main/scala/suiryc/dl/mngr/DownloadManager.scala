@@ -625,6 +625,18 @@ class DownloadManager extends StrictLogging {
   }
 
   def tryAcquireConnection(download: Download, force: Boolean): Option[AcquiredConnection] = this.synchronized {
+    try {
+      _tryAcquireConnection(download, force)
+    } catch {
+      case ex: Exception ⇒
+        val msg = s"Failed to acquire connection: ${ex.getMessage}"
+        download.info.addLog(LogKind.Error, msg, Some(ex))
+        logger.error(msg, ex)
+        None
+    }
+  }
+
+  private def _tryAcquireConnection(download: Download, force: Boolean): Option[AcquiredConnection] = {
     // Use the actual URI (since this is the real one we connect to)
     val uri = download.info.uri.get
     val siteSettings = Main.settings.getSite(uri)
@@ -677,11 +689,12 @@ class DownloadManager extends StrictLogging {
       download.updateLastReason(Some(s"Limit reached: $reason"))
     }
     if (reasonOpt.isEmpty) {
+      // Note: in case it fails, (try to) open file before updating counters.
+      download.openFile()
+      download.info.state.setValue(DownloadState.Running)
       cnxTotal += 1
       cnxPerSite += (acquired.site → (perSite + 1))
       cnxPerServer += (acquired.host → perServer.acquireConnection)
-      download.openFile()
-      download.info.state.setValue(DownloadState.Running)
       // Note: don't reset last reason. What really matters are 'new' reasons
       // that we could not acquire a connection.
       // Fact is that nominally we may otherwise log multiple times - and thus
