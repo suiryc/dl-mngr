@@ -148,15 +148,24 @@ object Icons extends IconBuilders {
     )
   }
 
+  // https://fontawesome.com/icons/tachometer-alt?style=solid
+  val tachometer: Builder = iconBuilder(s"${PREFIX}tachometer") { (styleClass, targetSvgSize) ⇒
+    val params = SVGGroupParams(crop = false, svgWidth = 576, svgHeight = 512, targetSvgSize = targetSvgSize, targetSize = targetSvgSize, styleClass = styleClass)
+    SVGGroup(params,
+      svgPath("M288 32C128.94 32 0 160.94 0 320c0 52.8 14.25 102.26 39.06 144.8 5.61 9.62 16.3 15.2 27.44 15.2h443c11.14 0 21.83-5.58 27.44-15.2C561.75 422.26 576 372.8 576 320c0-159.06-128.94-288-288-288zm0 64c14.71 0 26.58 10.13 30.32 23.65-1.11 2.26-2.64 4.23-3.45 6.67l-9.22 27.67c-5.13 3.49-10.97 6.01-17.64 6.01-17.67 0-32-14.33-32-32S270.33 96 288 96zM96 384c-17.67 0-32-14.33-32-32s14.33-32 32-32 32 14.33 32 32-14.33 32-32 32zm48-160c-17.67 0-32-14.33-32-32s14.33-32 32-32 32 14.33 32 32-14.33 32-32 32zm246.77-72.41l-61.33 184C343.13 347.33 352 364.54 352 384c0 11.72-3.38 22.55-8.88 32H232.88c-5.5-9.45-8.88-20.28-8.88-32 0-33.94 26.5-61.43 59.9-63.59l61.34-184.01c4.17-12.56 17.73-19.45 30.36-15.17 12.57 4.19 19.35 17.79 15.17 30.36zm14.66 57.2l15.52-46.55c3.47-1.29 7.13-2.23 11.05-2.23 17.67 0 32 14.33 32 32s-14.33 32-32 32c-11.38-.01-20.89-6.28-26.57-15.22zM480 384c-17.67 0-32-14.33-32-32s14.33-32 32-32 32 14.33 32 32-14.33 32-32 32z")
+    )
+  }
+
+  // Alternative tachometer icon.
   // Icon made by Freepik (http://www.freepik.com) from www.flaticon.com.
   // Licensed by CC 3.0 BY (http://creativecommons.org/licenses/by/3.0/).
   // https://www.flaticon.com/free-icon/tachometer_39277
-  val tachometer: Builder = iconBuilder(s"${PREFIX}tachometer") { (styleClass, targetSvgSize) ⇒
-    val params = SVGGroupParams(crop = false, svgSize = 33.637, targetSvgSize = targetSvgSize, styleClass = styleClass)
-    SVGGroup(params,
-      svgPath("M16.819,3.281C7.546,3.281,0,10.826,0,20.102c0,3.449,1.048,6.773,3.027,9.611c0.281,0.401,0.74,0.643,1.23,0.643h25.124 c0.488,0,0.949-0.24,1.229-0.643c1.981-2.838,3.027-6.162,3.027-9.611C33.638,10.826,26.094,3.281,16.819,3.281z M28.572,27.355 H5.066c-1.354-2.186-2.065-4.678-2.065-7.254c0-7.621,6.199-13.82,13.819-13.82c7.62,0,13.819,6.2,13.819,13.82 C30.638,22.678,29.927,25.17,28.572,27.355z M14.986,9.986c0-1.013,0.821-1.834,1.833-1.834s1.833,0.821,1.833,1.834 c0,1.012-0.821,1.833-1.833,1.833S14.986,10.999,14.986,9.986z M9.319,20.487c0,1.013-0.82,1.833-1.833,1.833 s-1.834-0.82-1.834-1.833s0.821-1.834,1.834-1.834S9.319,19.475,9.319,20.487z M27.986,20.487c0,1.013-0.821,1.833-1.834,1.833 c-1.014,0-1.834-0.82-1.834-1.833s0.82-1.834,1.834-1.834C27.165,18.653,27.986,19.475,27.986,20.487z M22.809,15.443l-3.41,6.378 c1.375,0.862,2.295,2.38,2.295,4.122h-9.75c0-2.54,1.95-4.604,4.431-4.83l3.789-7.085c0.392-0.729,1.3-1.006,2.029-0.615 C22.924,13.803,23.199,14.712,22.809,15.443z")
-    )
-  }
+  //val tachometer1: Builder = iconBuilder(s"${PREFIX}tachometer1") { (styleClass, targetSvgSize) ⇒
+  //  val params = SVGGroupParams(crop = false, svgSize = 33.637, targetSvgSize = targetSvgSize, styleClass = styleClass)
+  //  SVGGroup(params,
+  //    svgPath("M16.819,3.281C7.546,3.281,0,10.826,0,20.102c0,3.449,1.048,6.773,3.027,9.611c0.281,0.401,0.74,0.643,1.23,0.643h25.124 c0.488,0,0.949-0.24,1.229-0.643c1.981-2.838,3.027-6.162,3.027-9.611C33.638,10.826,26.094,3.281,16.819,3.281z M28.572,27.355 H5.066c-1.354-2.186-2.065-4.678-2.065-7.254c0-7.621,6.199-13.82,13.819-13.82c7.62,0,13.819,6.2,13.819,13.82 C30.638,22.678,29.927,25.17,28.572,27.355z M14.986,9.986c0-1.013,0.821-1.834,1.833-1.834s1.833,0.821,1.833,1.834 c0,1.012-0.821,1.833-1.833,1.833S14.986,10.999,14.986,9.986z M9.319,20.487c0,1.013-0.82,1.833-1.833,1.833 s-1.834-0.82-1.834-1.833s0.821-1.834,1.834-1.834S9.319,19.475,9.319,20.487z M27.986,20.487c0,1.013-0.821,1.833-1.834,1.833 c-1.014,0-1.834-0.82-1.834-1.833s0.82-1.834,1.834-1.834C27.165,18.653,27.986,19.475,27.986,20.487z M22.809,15.443l-3.41,6.378 c1.375,0.862,2.295,2.38,2.295,4.122h-9.75c0-2.54,1.95-4.604,4.431-4.83l3.789-7.085c0.392-0.729,1.3-1.006,2.029-0.615 C22.924,13.803,23.199,14.712,22.809,15.443z")
+  //  )
+  //}
 
   // https://fontawesome.com/icons/undo?style=solid
   val undo: Builder = iconBuilder(s"${PREFIX}undo") { (styleClass, targetSvgSize) ⇒
@@ -167,7 +176,7 @@ object Icons extends IconBuilders {
   }
 
   val icons: Map[String, Builder] = List(checkSquare, cog, download, eraser,
-    exclamationTriangle, minus, play, save, signOut, stop, sync, undo).map { builder ⇒
+    exclamationTriangle, minus, play, save, signOut, stop, sync, tachometer, undo).map { builder ⇒
     builder().params.styleClass.head → builder
   }.toMap
 
