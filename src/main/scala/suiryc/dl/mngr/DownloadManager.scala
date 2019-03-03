@@ -578,7 +578,7 @@ class DownloadManager extends StrictLogging {
         info.remainingRanges = remainingRanges
         info.rangeValidator = downloadBackupInfo.rangeValidator
         info.acceptRanges.set(downloadBackupInfo.acceptRanges)
-        info.lastModified = downloadBackupInfo.lastModified
+        info.lastModified.set(downloadBackupInfo.lastModified.orNull)
         // Handle case where downloadRanges is non-empty yet remainingRanges is.
         // e.g. restoring a file that was 'resumed' ('downloaded' known) but
         // actually not started again before closing the app.

@@ -522,7 +522,7 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
       download.info.remainingRanges = if (contentLength >= 0) Some(new SegmentRanges(contentLength)) else None
       download.info.rangeValidator = validator
       download.acceptRanges(acceptRanges)
-      download.info.lastModified = lastModified
+      download.info.lastModified.set(lastModified.orNull)
 
       if (!acceptRanges) {
         download.info.addLog(LogKind.Warning, "Download resuming is not supported")
@@ -809,7 +809,7 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
 
   def done(state0: State): State = {
     val download = state0.download
-    val lastModified = state0.download.info.lastModified
+    val lastModified = Option(state0.download.info.lastModified.get)
     val complete = (download.info.remainingRanges.isEmpty && state0.started && state0.failed.isEmpty) ||
       download.info.remainingRanges.exists(_.getRanges.isEmpty)
 

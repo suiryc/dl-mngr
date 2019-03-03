@@ -102,6 +102,7 @@
                                           <RowConstraints minHeight="25.0" vgrow="NEVER" />
                                           <RowConstraints minHeight="25.0" vgrow="NEVER" />
                                           <RowConstraints minHeight="25.0" vgrow="NEVER" />
+                                          <RowConstraints minHeight="25.0" vgrow="NEVER" />
                                       </rowConstraints>
                                        <children>
                                           <Label text="URI:">
@@ -164,6 +165,12 @@
                                              </font>
                                           </Label>
                                           <Label fx:id="dlSizeLabel" GridPane.columnIndex="1" GridPane.columnSpan="2" GridPane.rowIndex="8" />
+                                          <Label text="%Last\nmodified:" GridPane.rowIndex="9">
+                                             <font>
+                                                <Font name="System Bold" size="12.0" />
+                                             </font>
+                                          </Label>
+                                          <Label fx:id="dlLastModifiedLabel" GridPane.columnIndex="1" GridPane.columnSpan="2" GridPane.rowIndex="9" />
                                        </children>
                                        <padding>
                                           <Insets bottom="10.0" left="10.0" right="10.0" top="10.0" />

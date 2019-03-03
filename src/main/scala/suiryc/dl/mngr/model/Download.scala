@@ -49,6 +49,8 @@ class DownloadInfo {
   val state: SimpleObjectProperty[DownloadState.Value] = new SimpleObjectProperty(DownloadState.Stopped)
   /** Size */
   val size: SimpleLongProperty = new SimpleLongProperty(Long.MinValue)
+  /** File last modified time on server */
+  var lastModified: SimpleObjectProperty[Date] = new SimpleObjectProperty()
   /** Number of active segments */
   val activeSegments: SimpleIntegerProperty = new SimpleIntegerProperty(0)
   /** Segments limit. */
@@ -67,8 +69,6 @@ class DownloadInfo {
   var rangeValidator: Option[String] = None
   /** Whether server accept ranges */
   var acceptRanges: SimpleObjectProperty[Option[Boolean]] = new SimpleObjectProperty(None)
-  /** File last modified time on server */
-  var lastModified: Option[Date] = None
 
   // Note: size is Long.MinValue before download actually starts,
   // and is -1 when started and size is unknown.
@@ -79,7 +79,7 @@ class DownloadInfo {
     remainingRanges = None
     rangeValidator = None
     acceptRanges.set(None)
-    lastModified = None
+    lastModified.set(null)
     downloaded.set(0)
   }
 
@@ -244,7 +244,7 @@ case class Download(
       sizeHint = sizeHint,
       rangeValidator = info.rangeValidator,
       acceptRanges = acceptRanges,
-      lastModified = info.lastModified,
+      lastModified = Option(info.lastModified.get),
       downloadedRanges = downloadFile.getDownloadedRanges(info)
     )
   }

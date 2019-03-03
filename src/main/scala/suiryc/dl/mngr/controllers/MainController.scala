@@ -6,6 +6,7 @@ import com.sun.javafx.tk.Toolkit
 import com.typesafe.scalalogging.StrictLogging
 import java.io.{PrintWriter, StringWriter}
 import java.nio.file.Path
+import java.text.SimpleDateFormat
 import java.time.format.DateTimeFormatter
 import java.util.UUID
 import javafx.beans.property.{SimpleBooleanProperty, SimpleObjectProperty, SimpleStringProperty}
@@ -115,6 +116,9 @@ class MainController extends StagePersistentView with StrictLogging {
   @FXML
   protected var dlSizeLabel: Label = _
 
+  @FXML
+  protected var dlLastModifiedLabel: Label = _
+
   private val clipboard = Clipboard.getSystemClipboard
 
   private val CTRL_C = new KeyCodeCombination(KeyCode.C, KeyCombination.CONTROL_DOWN)
@@ -140,6 +144,7 @@ class MainController extends StagePersistentView with StrictLogging {
 
   private val columnLogTime = new TableColumn[LogEntry, String](Strings.time)
   private val timeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS")
+  private val dateFormatter = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss Z")
   private val columnLogMessage = new TableColumn[LogEntry, LogEntry](Strings.message)
 
   private val logsColumns = List(
@@ -607,7 +612,15 @@ class MainController extends StagePersistentView with StrictLogging {
           List(dlFolderField, dlFileField).foreach { field ⇒
             field.setTooltip(tooltip)
           }
-          dlSizeLabel.setText(if (info.isSizeDetermined && !info.isSizeUnknown) info.size.get.toString else "")
+          dlSizeLabel.setText {
+            if (info.isSizeDetermined && !info.isSizeUnknown) {
+              val size = info.size.get
+              s"$size (${Units.storage.toHumanReadable(size)})"
+            } else {
+              ""
+            }
+          }
+          dlLastModifiedLabel.setText(Option(info.lastModified.get).map(dateFormatter.format).orNull)
           // Somehow changed text (e.g. dlSiteLink) is not always updated until
           // layout is triggered again (e.g. resizing). Try manual trigger.
           dlPropertiesScrollPane.layout()
@@ -622,7 +635,7 @@ class MainController extends StagePersistentView with StrictLogging {
             download.renameFile(selectedFile.toPath)
           }
         }
-        val propertiesCancellable = RichObservableValue.listen(info.uri, info.path, info.size) {
+        val propertiesCancellable = RichObservableValue.listen(info.uri, info.path, info.size, info.lastModified) {
           JFXSystem.runLater {
             updateProperties()
           }
@@ -639,7 +652,7 @@ class MainController extends StagePersistentView with StrictLogging {
         List(dlServerLink, dlSiteLink, dlFileSelectButton).foreach { button ⇒
           button.setDisable(true)
         }
-        List(dlServerLink, dlSiteLink, dlSizeLabel).foreach { field ⇒
+        List(dlServerLink, dlSiteLink, dlSizeLabel, dlLastModifiedLabel).foreach { field ⇒
           field.setText(null)
         }
         List(dlURIField, dlReferrerField, dlCookieField, dlUserAgentField,
