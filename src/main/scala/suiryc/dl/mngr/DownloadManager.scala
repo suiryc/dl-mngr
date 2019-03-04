@@ -7,6 +7,9 @@ import java.nio.charset.StandardCharsets
 import java.nio.file.{Files, Path}
 import java.util.UUID
 import monix.execution.Cancelable
+import org.apache.http.{HttpHeaders, HttpHost}
+import org.apache.http.client.config.RequestConfig
+import org.apache.http.client.methods.{HttpGet, HttpHead, HttpRequestBase}
 import org.apache.http.config.RegistryBuilder
 import org.apache.http.conn.ssl.{NoopHostnameVerifier, TrustAllStrategy}
 import org.apache.http.impl.client.DefaultRedirectStrategy
@@ -457,6 +460,45 @@ class DownloadManager extends StrictLogging {
     dlEntries.foreach { dlEntry ⇒
       dlEntry.dler ! FileDownloader.Refresh
     }
+  }
+
+  def newRequest(uri: URI, head: Boolean, referrer: Option[URI], cookie: Option[String],
+    userAgent: Option[String], rangeValidator: Option[String], range: SegmentRange): HttpRequestBase =
+  {
+    val request = if (head) {
+      new HttpHead(uri)
+    } else {
+      new HttpGet(uri)
+    }
+
+    referrer.foreach { referrer ⇒
+      request.addHeader(HttpHeaders.REFERER, referrer.toASCIIString)
+    }
+    cookie.foreach { cookie ⇒
+      // Standard way would be to parse the cookie, create a cookie store and
+      // attach it to the client or at least the request context. On the other
+      // hand, it is easier and faster to set the header as requested.
+      request.addHeader("Cookie", cookie)
+    }
+    userAgent.foreach { userAgent ⇒
+      request.addHeader(HttpHeaders.USER_AGENT, userAgent)
+    }
+    if (range.length > 0) {
+      request.addHeader(HttpHeaders.RANGE, s"bytes=${range.start}-${range.end}")
+      rangeValidator.foreach(v ⇒ request.addHeader(HttpHeaders.IF_RANGE, v))
+    }
+    val rcb = RequestConfig.custom
+      .setConnectionRequestTimeout(Main.settings.connectionRequestTimeout.get.toMillis.toInt)
+      .setConnectTimeout(Main.settings.connectTimeout.get.toMillis.toInt)
+      .setSocketTimeout(Main.settings.socketTimeout.get.toMillis.toInt)
+    Main.settings.proxy.opt.map(_.trim).filterNot(_.isEmpty).foreach { proxy0 ⇒
+      // Cleanup URI
+      val proxyUri = URI.create(proxy0)
+      val proxy = s"${proxyUri.getScheme}://${proxyUri.getAuthority}"
+      rcb.setProxy(HttpHost.create(proxy))
+    }
+    request.setConfig(rcb.build)
+    request
   }
 
   def tryConnection(sid: Option[UUID] = None): Unit = {

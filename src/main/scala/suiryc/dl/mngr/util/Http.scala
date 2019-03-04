@@ -1,9 +1,10 @@
 package suiryc.dl.mngr.util
 
 import com.typesafe.scalalogging.StrictLogging
-import java.net.URI
+import java.net.{URI, URLDecoder}
 import java.util.Date
 import org.apache.http.client.utils.DateUtils
+import org.apache.http.entity.ContentType
 import org.apache.http.{HttpHeaders, HttpResponse}
 
 /** HTTP helpers. */
@@ -46,6 +47,108 @@ object Http extends StrictLogging {
     val parts = Option(uri.getPath).map(_.split('/').toList).getOrElse(Nil)
     if (parts.nonEmpty) parts.reverse.head
     else ""
+  }
+
+  /** Gets filename from String, dropping any hierarchy part. */
+  def getFilename(s: String): String = s.split("\\|/").last
+
+  /** Gets filename from HTTP response. */
+  def getFilename(response: HttpResponse): Option[String] = {
+    // Notes:
+    // Content-Disposition 'filename' is preferred over Content-Type 'name'.
+    // And RFC 8187 encoded parameter (for non-ASCII characters) is preferred
+    // over standard (plain US-ASCII) parameter.
+    //
+    // With HTTP, we only expect either a standard parameter (e.g. 'name') or
+    // an RFC 8187 encode value (e.g. 'name*', emphasis on the trailing '*').
+    // Unlike MIME, HTTP does not allow splitting the value over multiple
+    // parameters. e.g. 'name*0', 'name*1', ... or 'name*0*', 'name*1*', ...
+    // would split a plain or encoded (if there is a trailing '*') value in
+    // MIME, but are not defined (and thus not expected) in HTTP.
+    Option(response.getFirstHeader("Content-Disposition")).flatMap { h ⇒
+      h.getElements.toList.flatMap { element ⇒
+        Option(element.getParameterByName("filename*")).toList.map { p ⇒
+          decodeString(p.getValue, rfc8187 = true)
+        } ::: Option(element.getParameterByName("filename")).map { p ⇒
+          decodeString(p.getValue, rfc8187 = false)
+        }.toList
+      }.headOption
+    }.orElse {
+      val contentType = Option(ContentType.get(response.getEntity))
+      contentType.flatMap { ct ⇒
+        Option(ct.getParameter("name*"))
+      }.map { p ⇒
+        decodeString(p, rfc8187 = true)
+      }.orElse {
+        contentType.flatMap { ct ⇒
+          Option(ct.getParameter("name"))
+        }.map { p ⇒
+          decodeString(p, rfc8187 = false)
+        }
+      }
+    }
+  }
+
+  /**
+   * Decodes string parameter value.
+   *
+   * Standard parameter string value is expected to be either an atom (no
+   * special characters) or a quoted (characters can be escaped, but only '"'
+   * is expected to be).
+   * RFC 8187 encoded value is expected to contain a charset (usually UTF8), an
+   * optional language tag and an URL-encoded (percent encoding) value, each
+   * separated by the "'" (quote) character.
+   *
+   * @param s string to decode
+   * @param rfc8187 whether this is a RFC 8187 encoded value
+   * @return decoded string, possibly equal to the given value
+   */
+  def decodeString(s: String, rfc8187: Boolean): String = {
+    val cleaned = s.trim()
+    if (rfc8187) {
+      // RFC 8187 value: decode with indicated charset.
+      val split = cleaned.split("'", 3)
+      // If the format or encoding is invalid, just return the original value.
+      if (split.length < 3) cleaned
+      else try {
+        URLDecoder.decode(split(2), split(0))
+      } catch {
+        case _: Exception ⇒ cleaned
+      }
+    } else if (cleaned.startsWith("\"")) {
+      // Quoted value.
+      val chars = cleaned.toCharArray
+      val charsLength = chars.length
+      def loop(offset: Int, unquoted: String): String = {
+        if (offset >= charsLength) unquoted
+        else {
+          val c = chars(offset)
+          c match {
+            case '\\' ⇒
+              // Escape sequence. Append next character.
+              // If the escape was the last character, drop it.
+              if (offset + 1 < charsLength) loop(offset + 2, unquoted + chars(offset + 1))
+              else unquoted
+
+            case '"' ⇒
+              // We only expect the ending quote to be unescaped, in which case
+              // we drop it (for the unquoted value done).
+              // Otherwise keep any unescaped '"'.
+              if (offset + 1 == charsLength) unquoted
+              else loop(offset + 1, unquoted + '"')
+
+            case _ ⇒
+              // Append this character.
+              loop(offset + 1, unquoted + c)
+          }
+        }
+      }
+      // Unquote and unescape characters.
+      loop(1, "")
+    } else {
+      // Unquoted (atom) value.
+      cleaned
+    }
   }
 
   /**

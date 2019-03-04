@@ -8,8 +8,8 @@ import javafx.fxml.{FXML, FXMLLoader}
 import javafx.scene.Node
 import javafx.scene.control._
 import javafx.scene.input.Clipboard
-import javafx.stage.{FileChooser, Stage, Window}
-import suiryc.dl.mngr.model.{Download, NewDownloadInfo}
+import javafx.stage.{FileChooser, Modality, Stage, Window}
+import suiryc.dl.mngr.model.{Download, NewDownloadInfo, SegmentRange}
 import suiryc.dl.mngr.util.{Http, Icons}
 import suiryc.dl.mngr.{DownloadManager, I18N, Main, Settings}
 import suiryc.scala.io.PathsEx
@@ -196,7 +196,7 @@ class NewDownloadController extends StagePersistentView {
             Dialogs.information(
               owner = Option(stage),
               title = None,
-              headerText = Some(Strings.reservedChars),
+              headerText = Some(s"${Strings.reservedChars}\n$pathRaw1"),
               contentText = Some(path0.toString)
             )
           }
@@ -273,6 +273,35 @@ class NewDownloadController extends StagePersistentView {
               select = !auto
             ))
           }
+      }
+    }
+  }
+
+  def onUriDebug(@unused event: ActionEvent): Unit = {
+    import suiryc.scala.RichOption._
+
+    getURI.foreach { uri ⇒
+      val request = dlMngr.newRequest(
+        uri = uri,
+        head = true,
+        referrer = getReferrer,
+        cookie = getCookie,
+        userAgent = getUserAgent,
+        rangeValidator = None,
+        range = SegmentRange.zero
+      )
+
+      // Execute HEAD request, display retrieved information, and apply hints
+      // if requested.
+      val dialog = HeadRequestController.buildDialog(stage, dlMngr, request)
+      dialog.initModality(Modality.WINDOW_MODAL)
+      dialog.setResizable(true)
+      dialog.showAndWait().flatten.foreach { hints ⇒
+        hints.uri.foreach { uri ⇒
+          uriField.setText(uri.toString)
+        }
+        if (hints.size.isDefined) dlInfo = dlInfo.copy(sizeHint = hints.size)
+        hints.filename.foreach(filenameField.setText)
       }
     }
   }

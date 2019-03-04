@@ -87,6 +87,9 @@ class MainController extends StagePersistentView with StrictLogging {
   protected var dlPropertiesScrollPane: ScrollPane = _
 
   @FXML
+  protected var dlURIDebugButton: Button = _
+
+  @FXML
   protected var dlURIField: TextField = _
 
   @FXML
@@ -144,7 +147,6 @@ class MainController extends StagePersistentView with StrictLogging {
 
   private val columnLogTime = new TableColumn[LogEntry, String](Strings.time)
   private val timeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS")
-  private val dateFormatter = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss Z")
   private val columnLogMessage = new TableColumn[LogEntry, LogEntry](Strings.message)
 
   private val logsColumns = List(
@@ -589,7 +591,7 @@ class MainController extends StagePersistentView with StrictLogging {
         val download = data.download
         val info = download.info
 
-        List(dlServerLink, dlSiteLink, dlFileSelectButton).foreach { button ⇒
+        List(dlServerLink, dlSiteLink, dlURIDebugButton, dlFileSelectButton).foreach { button ⇒
           button.setDisable(false)
         }
         dlSiteLink.setText(download.siteSettings.site)
@@ -625,6 +627,36 @@ class MainController extends StagePersistentView with StrictLogging {
           // layout is triggered again (e.g. resizing). Try manual trigger.
           dlPropertiesScrollPane.layout()
         }
+        dlURIDebugButton.setOnAction { _ ⇒
+          val dlMngr = getState.dlMngr
+          val request = dlMngr.newRequest(
+            uri = info.uri.get,
+            head = true,
+            referrer = download.referrer,
+            cookie = download.cookie,
+            userAgent = download.userAgent,
+            rangeValidator = None,
+            range = SegmentRange.zero
+          )
+
+          // Execute HEAD request, display retrieved information, and apply hints
+          // if requested.
+          val dialog = HeadRequestController.buildDialog(stage, dlMngr, request)
+          dialog.initModality(Modality.WINDOW_MODAL)
+          dialog.setResizable(true)
+          dialog.showAndWait().flatten.foreach { hints ⇒
+            hints.uri.foreach { uri ⇒
+              info.uri.set(uri)
+              val message = s"Actual (redirected) uri=<${info.uri.get}>"
+              logger.info(s"${download.context} $message")
+              download.info.addLog(LogKind.Info, message)
+            }
+            hints.size.foreach(info.size.set)
+            hints.filename.filter(_ != info.path.get.getFileName.toString).foreach { filename ⇒
+              download.renameFile(info.path.get.getParent.resolve(filename))
+            }
+          }
+        }
         dlFileSelectButton.setOnAction { _ ⇒
           val fileChooser = new FileChooser()
           fileChooser.getExtensionFilters.addAll(
@@ -645,11 +677,12 @@ class MainController extends StagePersistentView with StrictLogging {
         dlPropertiesTab.setUserData(propertiesCancellable)
 
       case None ⇒
+        dlURIDebugButton.setOnAction(null)
         dlFileSelectButton.setOnAction(null)
         List(dlFolderField, dlFileField).foreach { field ⇒
           field.setTooltip(null)
         }
-        List(dlServerLink, dlSiteLink, dlFileSelectButton).foreach { button ⇒
+        List(dlServerLink, dlSiteLink, dlURIDebugButton, dlFileSelectButton).foreach { button ⇒
           button.setDisable(true)
         }
         List(dlServerLink, dlSiteLink, dlSizeLabel, dlLastModifiedLabel).foreach { field ⇒
@@ -1507,6 +1540,8 @@ class MainController extends StagePersistentView with StrictLogging {
 }
 
 object MainController {
+
+  val dateFormatter = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss Z")
 
   case class State(
     stage: Stage,

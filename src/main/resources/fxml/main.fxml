@@ -27,7 +27,7 @@
 <?import javafx.scene.layout.VBox?>
 <?import javafx.scene.text.Font?>
 
-<AnchorPane maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" minHeight="360.0" minWidth="600.0" xmlns="http://javafx.com/javafx/10.0.1" xmlns:fx="http://javafx.com/fxml/1" fx:controller="suiryc.dl.mngr.controllers.MainController">
+<AnchorPane maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" minHeight="360.0" minWidth="600.0" xmlns="http://javafx.com/javafx/10.0.2" xmlns:fx="http://javafx.com/fxml/1" fx:controller="suiryc.dl.mngr.controllers.MainController">
    <children>
       <VBox maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
          <children>
@@ -110,7 +110,13 @@
                                                 <Font name="System Bold" size="12.0" />
                                              </font>
                                           </Label>
-                                          <TextField fx:id="dlURIField" editable="false" GridPane.columnIndex="1" GridPane.columnSpan="2" />
+                                          <Button fx:id="dlURIDebugButton" disable="true" maxHeight="1.7976931348623157E308" mnemonicParsing="false" GridPane.columnIndex="1" GridPane.halignment="CENTER" GridPane.valignment="CENTER">
+                                             <styleClass>
+                                                <String fx:value="icon-bug" />
+                                                <String fx:value="button-square-icon" />
+                                             </styleClass>
+                                          </Button>
+                                          <TextField fx:id="dlURIField" editable="false" GridPane.columnIndex="2" />
                                           <Label text="%Server:" GridPane.rowIndex="1">
                                              <font>
                                                 <Font name="System Bold" size="12.0" />

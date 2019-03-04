@@ -2,10 +2,8 @@ package suiryc.dl.mngr
 
 import akka.actor.{Actor, ActorRef}
 import com.typesafe.scalalogging.StrictLogging
-import java.net.URI
 import monix.execution.Cancelable
-import org.apache.http.client.config.RequestConfig
-import org.apache.http.client.methods.{HttpGet, HttpHead, HttpRequestBase}
+import org.apache.http.client.methods.HttpRequestBase
 import org.apache.http.client.utils.URIUtils
 import org.apache.http.entity.ContentType
 import org.apache.http.nio.protocol.{AbstractAsyncResponseConsumer, BasicAsyncRequestProducer}
@@ -399,57 +397,26 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
     try {
       val message = s"Starting range=$range sslTrust=${acquired.sslTrust}"
       logger.info(s"${download.context(range)} $message")
-      state.download.info.addLog(LogKind.Debug, message)
+      download.info.addLog(LogKind.Debug, message)
 
-      // Upon 'resuming' (!started and downloaded already set), only do a HEAD
-      // request to determine size, accept ranges, etc. The way requests are
-      // handled the response consumer will end upon receiving the response, on
-      // which we updated our state (actual remaining ranges etc), and a new
-      // segment will be tried right away (starting from the already downloaded
-      // offset).
+      // Upon resuming a new download (!started and downloaded already set),
+      // only do a HEAD request to determine size, accept ranges, etc. The way
+      // requests are handled, the response consumer will end upon receiving the
+      // response, on which we update our state (actual remaining ranges etc),
+      // and a new segment will be tried right away (starting from the already
+      // downloaded offset).
       val downloaded = download.info.downloaded.get
-      val request = if (!state.started && (downloaded > 0)) {
-        new HttpHead(uri)
-      } else {
-        new HttpGet(uri)
-      }
+      val request = state.dlMngr.newRequest(
+        uri = uri,
+        head = !state.started && (downloaded > 0),
+        referrer = download.referrer,
+        cookie = download.cookie,
+        userAgent = download.userAgent,
+        rangeValidator = download.info.rangeValidator,
+        range = range
+      )
 
-      download.referrer.foreach { referrer ⇒
-        request.addHeader(HttpHeaders.REFERER, referrer.toASCIIString)
-      }
-      download.cookie.foreach { cookie ⇒
-        // Standard way would be to parse the cookie, create a cookie store and
-        // attach it to the client or at least the request context. On the other
-        // hand, it is easier and faster to set the header as requested.
-        request.addHeader("Cookie", cookie)
-      }
-      download.userAgent.foreach { userAgent ⇒
-        request.addHeader(HttpHeaders.USER_AGENT, userAgent)
-      }
-      if (range.length > 0) {
-        request.addHeader(HttpHeaders.RANGE, s"bytes=${range.start}-${range.end}")
-        download.info.rangeValidator.foreach(v ⇒ request.addHeader(HttpHeaders.IF_RANGE, v))
-      }
-      val rcb = RequestConfig.custom
-        .setConnectionRequestTimeout(Main.settings.connectionRequestTimeout.get.toMillis.toInt)
-        .setConnectTimeout(Main.settings.connectTimeout.get.toMillis.toInt)
-        .setSocketTimeout(Main.settings.socketTimeout.get.toMillis.toInt)
-      Main.settings.proxy.opt.map(_.trim).filterNot(_.isEmpty).foreach { proxy0 ⇒
-        try {
-          // Cleanup URI
-          val proxyUri = URI.create(proxy0)
-          val proxy = s"${proxyUri.getScheme}://${proxyUri.getAuthority}"
-          rcb.setProxy(HttpHost.create(proxy))
-        } catch {
-          case ex: Exception ⇒
-            val message = s"Cannot set proxy: ${ex.getMessage}"
-            logger.error(s"${download.context(range)} $message", ex)
-            state.download.info.addLog(LogKind.Error, message, Some(ex))
-        }
-      }
-      request.setConfig(rcb.build)
       val requestProducer = new BasicAsyncRequestProducer(URIUtils.extractHost(uri), request)
-
       // Attach a context so that we can retrieve redirection URIs.
       // It happens that redirection URIs are stored in the HTTP context.
       // An alternative would be to add an interceptor:
@@ -479,7 +446,7 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
       case ex: Exception ⇒
         val message = s"Failed to start segment range=$range download: ${ex.getMessage}"
         logger.error(s"${download.context(range)} $message", ex)
-        state.download.info.addLog(LogKind.Error, message, Some(ex))
+        download.info.addLog(LogKind.Error, message, Some(ex))
         segmentDone(state, None, range, acquired, downloaded = false, Some(ex))
     }
   }
