@@ -16,8 +16,10 @@ import suiryc.scala.io.PathsEx
 import suiryc.scala.io.RichFile._
 import suiryc.scala.javafx.beans.binding.BindingsEx
 import suiryc.scala.javafx.beans.property.ConfigEntryProperty
+import suiryc.scala.javafx.beans.value.RichObservableValue
 import suiryc.scala.javafx.beans.value.RichObservableValue._
 import suiryc.scala.javafx.concurrent.JFXSystem
+import suiryc.scala.javafx.scene.Styles
 import suiryc.scala.javafx.scene.control.{Dialogs, TextFieldWithButton}
 import suiryc.scala.javafx.stage.Stages.StageLocation
 import suiryc.scala.javafx.stage.{PathChoosers, StagePersistentView, Stages}
@@ -61,6 +63,8 @@ class NewDownloadController extends StagePersistentView {
 
   private lazy val stage: Stage = Stages.getStage(dialog)
 
+  private lazy val buttonOk = dialog.getDialogPane.lookupButton(ButtonType.OK)
+
   private var dlMngr: DownloadManager = _
 
   private var dlInfo: NewDownloadInfo = _
@@ -71,6 +75,9 @@ class NewDownloadController extends StagePersistentView {
     this.dialog = dialog
     this.dlMngr = dlMngr
     this.dlInfo = dlInfo
+
+    // Load css
+    Styles.addStylesheet(stage.getScene)
 
     filenameField.getButtons.head.arrowButton.getStyleClass.add("icon-sync")
 
@@ -130,13 +137,14 @@ class NewDownloadController extends StagePersistentView {
       insertFirstField.isSelected
     }
 
-    val buttonOk = dialog.getDialogPane.lookupButton(ButtonType.OK)
     buttonOk.addEventFilter(ActionEvent.ACTION, (event: ActionEvent) ⇒ {
       result = checkForm(auto = false)
       if (result.isEmpty) event.consume()
     })
 
     if (dlInfo.auto) result = checkForm(auto = dlInfo.auto)
+    else RichObservableValue.listen(uriField.textProperty, folderField.textProperty, filenameField.textProperty)(checkForm())
+    ()
   }
 
   /** Restores (persisted) view. */
@@ -155,6 +163,19 @@ class NewDownloadController extends StagePersistentView {
     // Persist stage location
     // Note: if iconified, resets it
     stageLocation.set(Stages.getLocation(stage).orNull)
+  }
+
+  protected def checkForm(): Unit = {
+    val uriOk = getURI.isDefined
+    val folderOk = getFolder.isDefined
+    val filenameOk = getFilename(sanitize = true).isDefined
+
+    Styles.toggleError(uriField, !uriOk, Strings.mustNonEmpty)
+    Styles.toggleError(folderField, !folderOk, Strings.mustNonEmpty)
+    Styles.toggleError(filenameField, !filenameOk, Strings.mustNonEmpty)
+
+    val ok = uriOk && folderOk && filenameOk
+    buttonOk.setDisable(!ok)
   }
 
   protected def checkForm(auto: Boolean): Option[Result] = {
@@ -356,9 +377,7 @@ class NewDownloadController extends StagePersistentView {
     }
   }
 
-  def getText(s: String): Option[String] = {
-    Option(s).filterNot(_.trim.isEmpty)
-  }
+  def getText(s: String): Option[String] = Option(s).filterNot(_.trim.isEmpty)
 
   def getURI(s: String): Option[URI] = {
     try {
@@ -383,10 +402,16 @@ class NewDownloadController extends StagePersistentView {
 
   def getUserAgent: Option[String] = getText(userAgentField.getText)
 
+  def getFolder: Option[String] = getText(folderField.getText)
+
+  def getFilename(sanitize: Boolean): Option[String] = {
+    val file0 = getText(filenameField.getText)
+    if (sanitize) file0.map(PathsEx.sanitizeFilename) else file0
+  }
+
   def getPathRaw(sanitize: Boolean): String = {
-    val file0 = Option(filenameField.getText)
-    val file = if (sanitize) file0.map(PathsEx.sanitizeFilename) else file0
-    (Option(folderField.getText).toList ::: file.toList).mkString(File.separator)
+    val file = getFilename(sanitize)
+    (getFolder.toList ::: file.toList).mkString(File.separator)
   }
 
   def getPath: Path = Paths.get(getPathRaw(sanitize = true))

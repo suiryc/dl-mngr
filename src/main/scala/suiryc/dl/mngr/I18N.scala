@@ -24,6 +24,7 @@ object I18N extends suiryc.scala.util.I18N("i18n.dl-mngr") with I18NWithConfigEn
     def moveFirst: String = getString("Move first")
     def moveLast: String = getString("Move last")
     def moveUp: String = getString("Move up")
+    def mustNonEmpty: String = getString("error.must-non-empty")
     def mustNonEmptyUnique: String = getString("error.must-non-empty-unique")
     def options: String = getString("Options")
     def positiveValueExpected: String = getString("Positive value expected")
