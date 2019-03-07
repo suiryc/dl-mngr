@@ -85,6 +85,18 @@ object FileDownloader {
       this
     }
 
+    def canForceSegment: Boolean = {
+      // We can force a new segment if all conditions are fulfilled:
+      //  - a maximum number of segments was specifically set on this download
+      //  - it is above the nominal (site-related) value: the difference is the
+      //    number of forced connections that are allowed for this download
+      //  - there are currently less than allowed forced connections
+      maxSegments.exists { max ⇒
+        val allowed = max - download.maxSegments
+        segmentConsumers.values.count(_.forced) < allowed
+      }
+    }
+
     def withDownload(download: Download): State = copy(download = download)
 
     private def updatedConsumers(state: State): Unit = {
@@ -203,9 +215,17 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
 
     val segmentConsumers = state.segmentConsumers.map {
       case (consumer, data) ⇒
-        val acquired = state.dlMngr.tryAcquireConnection(state.download, force = true).getOrElse(data.acquired)
-        state.dlMngr.releaseConnection(data.acquired)
-        consumer → data.copy(acquired = acquired)
+        // Acquire (forced) 'new' connection with refreshed settings.
+        state.dlMngr.tryAcquireConnection(state.download, force = true, count = data.acquired.count).map { acquired ⇒
+          // Release the previously acquired one, effectively transferring it
+          // to any new site when applicable.
+          state.dlMngr.releaseConnection(data.acquired)
+          consumer → data.copy(acquired = acquired)
+        }.getOrElse {
+          // If we could not acquire a new connection (due to error), leave the
+          // current one alone. This is however not supposed to happen.
+          consumer → data
+        }
     }
     state.copy(segmentConsumers = segmentConsumers)
   }
@@ -303,10 +323,16 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
     // reached max number of segments (and a TrySegment is not currently
     // scheduled).
     val download = state0.download
-    val canTry = !state0.stopping && (force || (state0.trySegment.isEmpty && !state0.hasTooManyErrors))
-    lazy val tryAcquireConnection = state0.dlMngr.tryAcquireConnection(download, force)
+    // 'force' is whether we are (manually) asked to force connection.
+    // 'forced' is whether new connection will be forced, which may also happen
+    // automatically because the number of max segments was raised manually
+    // (previous manually forced connection).
+    // When forcing, don't count this connection relatively to limits.
+    val forced = force || state0.canForceSegment
+    val canTry = !state0.stopping && (forced || (state0.trySegment.isEmpty && !state0.hasTooManyErrors))
+    lazy val tryAcquireConnection = state0.dlMngr.tryAcquireConnection(download, force = forced, count = !forced)
     lazy val canAddSegment = {
-      if (force) true
+      if (forced) true
       else {
         val limit = state0.getMaxSegments
         val ok = state0.segmentConsumers.size < limit
@@ -371,16 +397,16 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
                 start = range.start + range.length / 2 + 1
               )
               val state1 = changeSegmentEnd(state0, consumer, newRange.start - 1)
-              segmentStart(state1, newRange, acquired, forced = force)
+              segmentStart(state1, newRange, acquired, force, forced)
 
             case None ⇒
-              segmentStart(state0, range, acquired, forced = force)
+              segmentStart(state0, range, acquired, force, forced)
           }
       }.getOrElse(state0)
     } else if (canTry && download.info.remainingRanges.isEmpty && state0.segmentConsumers.isEmpty) {
       // Special case: initial request failed, so re-try it (if possible)
       tryAcquireConnection.map { acquired ⇒
-        segmentStart(state0, SegmentRange(0, -1), acquired, forced = force)
+        segmentStart(state0, SegmentRange(0, -1), acquired, force, forced)
       }.getOrElse(state0)
     } else {
       // We cannot try a new segment.
@@ -390,7 +416,7 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
     }
   }
 
-  def segmentStart(state: State, range: SegmentRange, acquired: AcquiredConnection, forced: Boolean): State = {
+  def segmentStart(state: State, range: SegmentRange, acquired: AcquiredConnection, force: Boolean, forced: Boolean): State = {
     val download = state.download
     val uri = download.info.uri.get
     download.rateLimiter.addDownload()
@@ -439,8 +465,9 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
         responseConsumer = responseConsumer
       )
       val state1 = state.addConsumer(responseConsumer, data)
-      // Reset errors if there were too many but we were forced to start segment.
-      if (forced && state1.hasTooManyErrors) state1.copy(cnxErrors = 0, dlErrors = 0)
+      // Reset errors if there were too many but we were manually forced to
+      // start segment.
+      if (force && state1.hasTooManyErrors) state1.copy(cnxErrors = 0, dlErrors = 0)
       else state1
     } catch {
       case ex: Exception ⇒

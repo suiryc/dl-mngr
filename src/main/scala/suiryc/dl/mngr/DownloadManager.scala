@@ -666,9 +666,9 @@ class DownloadManager extends StrictLogging {
     cnxTotal < Main.settings.cnxMax.get
   }
 
-  def tryAcquireConnection(download: Download, force: Boolean): Option[AcquiredConnection] = this.synchronized {
+  def tryAcquireConnection(download: Download, force: Boolean, count: Boolean): Option[AcquiredConnection] = this.synchronized {
     try {
-      _tryAcquireConnection(download, force)
+      _tryAcquireConnection(download, force, count)
     } catch {
       case ex: Exception ⇒
         val msg = s"Failed to acquire connection: ${ex.getMessage}"
@@ -678,7 +678,7 @@ class DownloadManager extends StrictLogging {
     }
   }
 
-  private def _tryAcquireConnection(download: Download, force: Boolean): Option[AcquiredConnection] = {
+  private def _tryAcquireConnection(download: Download, force: Boolean, count: Boolean): Option[AcquiredConnection] = {
     // Use the actual URI (since this is the real one we connect to)
     val uri = download.info.uri.get
     val siteSettings = Main.settings.getSite(uri)
@@ -696,7 +696,8 @@ class DownloadManager extends StrictLogging {
       isDefaultSite = siteSettings.isDefault,
       host = host,
       sslTrust = perServer.sslTrust,
-      sslErrorAsk = perServer.sslErrorAsk
+      sslErrorAsk = perServer.sslErrorAsk,
+      count = count
     )
 
     val reasonOpt = {
@@ -734,9 +735,12 @@ class DownloadManager extends StrictLogging {
       // Note: in case it fails, (try to) open file before updating counters.
       download.openFile()
       download.info.state.setValue(DownloadState.Running)
-      cnxTotal += 1
-      cnxPerSite += (acquired.site → (perSite + 1))
-      cnxPerServer += (acquired.host → perServer.acquireConnection)
+      // Don't count connection when requested.
+      if (count) {
+        cnxTotal += 1
+        cnxPerSite += (acquired.site → (perSite + 1))
+        cnxPerServer += (acquired.host → perServer.acquireConnection)
+      }
       // Note: don't reset last reason. What really matters are 'new' reasons
       // that we could not acquire a connection.
       // Fact is that nominally we may otherwise log multiple times - and thus
@@ -750,13 +754,16 @@ class DownloadManager extends StrictLogging {
   }
 
   def releaseConnection(acquired: AcquiredConnection): Unit = this.synchronized {
-    val perSite = cnxPerSite(acquired.site)
+    // Don't count connection when requested.
+    if (acquired.count) {
+      val perSite = cnxPerSite(acquired.site)
 
-    if (cnxTotal > 0) cnxTotal -= 1
-    if (perSite > 1) cnxPerSite += (acquired.site → (perSite - 1))
-    else cnxPerSite -= acquired.site
-    cnxPerServer.get(acquired.host).foreach { perServer ⇒
-      cnxPerServer += (acquired.host → perServer.releaseConnection)
+      if (cnxTotal > 0) cnxTotal -= 1
+      if (perSite > 1) cnxPerSite += (acquired.site → (perSite - 1))
+      else cnxPerSite -= acquired.site
+      cnxPerServer.get(acquired.host).foreach { perServer ⇒
+        cnxPerServer += (acquired.host → perServer.releaseConnection)
+      }
     }
   }
 
@@ -805,7 +812,8 @@ case class AcquiredConnection(
   isDefaultSite: Boolean,
   host: String,
   sslTrust: Boolean,
-  sslErrorAsk: Option[Boolean]
+  sslErrorAsk: Option[Boolean],
+  count: Boolean
 )
 
 object DownloadsJanitor {
