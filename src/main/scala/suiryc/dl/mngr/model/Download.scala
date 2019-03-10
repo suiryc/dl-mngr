@@ -57,7 +57,19 @@ class DownloadInfo {
   val maxSegments: SimpleIntegerProperty = new SimpleIntegerProperty(0)
   /** How many bytes are already downloaded. */
   val downloaded: SimpleLongProperty = new SimpleLongProperty(0)
-  /** Logs */
+  /**
+   * Logs.
+   *
+   * Notes:
+   * FXCollections are sensible to concurrent changes when dealing with added
+   * elements: the exposed sublist wraps the original collection, and iterating
+   * over it may throw a ConcurrentModificationException if the collection has
+   * been changed since the exposed change.
+   * This means the bare minimum is for both modifications and listeners to
+   * either work in the same thread or synchronize themselves. The easiest
+   * solution is to first synchronize 'addLog' (prevent concurrent modifications
+   * on this end) and make sure listeners work on changes in the caller thread.
+   */
   val logs: ObservableList[LogEntry] = FXCollections.observableArrayList()
 
   /** Whether download was active when download manager stopping was requested. */
@@ -83,7 +95,7 @@ class DownloadInfo {
     downloaded.set(0)
   }
 
-  def addLog(kind: LogKind.Value, message: String, exOpt: Option[Exception] = None): Unit = {
+  def addLog(kind: LogKind.Value, message: String, exOpt: Option[Exception] = None): Unit = logs.synchronized {
     val entry = LogEntry(time = LocalDateTime.now, kind = kind, message = message, exOpt = exOpt)
     logs.add(entry)
     ()

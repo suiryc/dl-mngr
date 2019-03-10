@@ -517,9 +517,12 @@ class MainController extends StagePersistentView with StrictLogging {
         }
         def setLogs(): Unit = {
           val logs = getLogs(info.logs)
-          logsTable.getItems.setAll(logs:_*)
-          updateLogMessageMinWidth(logs)
-          ()
+          // Note: we may not be in the JavaFX thread yet (e.g. dealing with
+          // logs changes).
+          JFXSystem.run {
+            logsTable.getItems.setAll(logs: _*)
+            updateLogMessageMinWidth(logs)
+          }
         }
 
         def updateLogMessageMinWidth(els: List[LogEntry]): Unit = {
@@ -547,9 +550,15 @@ class MainController extends StagePersistentView with StrictLogging {
         }
 
         // Listen to this download logs.
+        // Notes:
         // We only expect entries to be added, which can be propagated easily in
         // the table. For any other change, re-set all the items.
         // In either case, update the column minimum width accordingly.
+        // Don't forget to delegate UI changes to the JavaFX thread.
+        // As indicated in 'logs' field comments, no other change must happen
+        // while we iterate over added elements: thus only switch to the JavaFX
+        // thread when we are done with the change content, so that handling
+        // changes is done in the caller thread (which holds a lock).
         val logsCancellable = info.logs.listen { change ⇒
           def loop(): Unit = {
             if (change.next()) {
@@ -558,19 +567,19 @@ class MainController extends StagePersistentView with StrictLogging {
               } else {
                 val logs = getLogs(change.getAddedSubList)
                 if (logs.nonEmpty) {
-                  // We only expect adding at the end. Adding at position
-                  // 'change.getFrom' fails when filtering debug messages.
-                  logsTable.getItems.addAll(logs.asJava)
-                  updateLogMessageMinWidth(logs)
+                  JFXSystem.run {
+                    // We only expect adding at the end. Adding at position
+                    // 'change.getFrom' fails when filtering debug messages.
+                    logsTable.getItems.addAll(logs.asJava)
+                    updateLogMessageMinWidth(logs)
+                  }
                 }
                 loop()
               }
             }
           }
 
-          JFXSystem.runLater {
-            loop()
-          }
+          loop()
         }
         // Set initial value (only changes are listened)
         setLogs()
