@@ -465,9 +465,9 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
         responseConsumer = responseConsumer
       )
       val state1 = state.addConsumer(responseConsumer, data)
-      // Reset errors if there were too many but we were manually forced to
-      // start segment.
-      if (force && state1.hasTooManyErrors) state1.copy(cnxErrors = 0, dlErrors = 0)
+      // If we forced segment to start, cancel any pending attempt and reset
+      // errors.
+      if (force) state1.cancelTrySegment.copy(cnxErrors = 0, dlErrors = 0)
       else state1
     } catch {
       case ex: Exception ⇒
