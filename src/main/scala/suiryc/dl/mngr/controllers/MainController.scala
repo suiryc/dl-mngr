@@ -854,15 +854,17 @@ class MainController extends StagePersistentView with StrictLogging {
     resumeDownload.setGraphic(Icons.play().pane)
     resumeDownload.setOnAction { _ ⇒
       selectedDownloadsData.filter(_.download.canResume(restart = false)).foreach { data ⇒
-        getState.dlMngr.resumeDownload(data.download.id, reusedOpt = None, restart = false)
+        getState.dlMngr.resumeDownload(data.download.id, reusedOpt = None, restart = false, tryCnx = false)
       }
+      getState.dlMngr.tryConnection()
     }
     val restartDownload = new MenuItem(Strings.restart)
     restartDownload.setGraphic(Icons.undo().pane)
     restartDownload.setOnAction { _ ⇒
       selectedDownloadsData.filter(_.download.canResume(restart = true)).foreach { data ⇒
-        getState.dlMngr.resumeDownload(data.download.id, reusedOpt = None, restart = true)
+        getState.dlMngr.resumeDownload(data.download.id, reusedOpt = None, restart = true, tryCnx = false)
       }
+      getState.dlMngr.tryConnection()
     }
 
     val stopAll = new MenuItem(Strings.stopAll)
@@ -1045,8 +1047,9 @@ class MainController extends StagePersistentView with StrictLogging {
 
   def onDownloadsResumeAll(@unused event: ActionEvent): Unit = {
     getDownloadsData.filter(_.download.canResume(restart = false)).foreach { data ⇒
-      getState.dlMngr.resumeDownload(data.download.id, reusedOpt = None, restart = false)
+      getState.dlMngr.resumeDownload(data.download.id, reusedOpt = None, restart = false, tryCnx = false)
     }
+    getState.dlMngr.tryConnection()
   }
 
   def onDownloadsRemoveCompleted(@unused event: ActionEvent): Unit = {

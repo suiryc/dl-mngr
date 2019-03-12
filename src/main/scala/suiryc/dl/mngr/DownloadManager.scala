@@ -370,13 +370,15 @@ class DownloadManager extends StrictLogging {
     }
   }
 
-  def resumeDownload(id: UUID, reusedOpt: Option[Boolean], restart: Boolean, force: Boolean = false): Unit = {
+  def resumeDownload(id: UUID, reusedOpt: Option[Boolean], restart: Boolean, tryCnx: Boolean = true): Unit = {
     if (!stopping) {
       getDownloadEntry(id).foreach { dlEntry ⇒
         if (dlEntry.download.canResume(restart)) {
           val download = updateDownloadEntry(dlEntry.resume(reusedOpt, restart)).download
+          download.info.state.setValue(DownloadState.Pending)
           followDownload(download)
-          dlEntry.dler ! FileDownloader.DownloadResume(download, restart = restart, force = force)
+          dlEntry.dler ! FileDownloader.DownloadResume(download, restart = restart)
+          if (tryCnx) tryConnection()
         }
       }
     }
@@ -385,11 +387,11 @@ class DownloadManager extends StrictLogging {
   def addDownloadConnection(id: UUID): Unit = {
     if (!stopping) {
       getDownloadEntry(id).foreach { dlEntry ⇒
-        if (dlEntry.download.isActive) {
-          dlEntry.dler ! FileDownloader.AddConnection
-        } else if (dlEntry.download.canResume) {
-          resumeDownload(id, reusedOpt = None, restart = false, force = true)
-        }
+        val add = if (dlEntry.download.canResume) {
+          resumeDownload(id, reusedOpt = None, restart = false, tryCnx = false)
+          true
+        } else dlEntry.download.isActive
+        if (add) dlEntry.dler ! FileDownloader.AddConnection
       }
     }
   }
@@ -630,8 +632,9 @@ class DownloadManager extends StrictLogging {
           info.downloaded.set(remainingRanges.getRemovedLength)
         }
         addDownload(download, insertFirst = false)
-        if (downloadBackupInfo.canResume) resumeDownload(download.id, reusedOpt = None, restart = false)
+        if (downloadBackupInfo.canResume) resumeDownload(download.id, reusedOpt = None, restart = false, tryCnx = false)
       }
+      tryConnection()
     }
 
     def readFile(path: Path): Boolean = {

@@ -14,16 +14,17 @@ import org.apache.http.client.protocol.HttpClientContext
 import scala.collection.JavaConverters._
 import scala.concurrent.Promise
 import scala.concurrent.duration._
-import scala.util.Success
+import scala.util.{Failure, Success}
 import suiryc.dl.mngr.model._
 import suiryc.dl.mngr.util.Http
+import suiryc.scala.concurrent.RichFuture
 
 
 object FileDownloader {
 
   sealed trait FileDownloaderMsg
   case object DownloadStop extends FileDownloaderMsg
-  case class DownloadResume(download: Download, restart: Boolean, force: Boolean) extends FileDownloaderMsg
+  case class DownloadResume(download: Download, restart: Boolean) extends FileDownloaderMsg
   case class SegmentStarted(consumer: ResponseConsumer, response: HttpResponse) extends FileDownloaderMsg
   case class SegmentDone(consumer: ResponseConsumer, exOpt: Option[Exception]) extends FileDownloaderMsg
   case class Downloaded(range: SegmentRange) extends FileDownloaderMsg
@@ -34,11 +35,49 @@ object FileDownloader {
   case class TryConnection(promise: Promise[Unit]) extends FileDownloaderMsg
   case object TryResume
 
+  case class TryCnxData(caller: Promise[Unit], attempt: Promise[Unit] = Promise()) {
+
+    import RichFuture._
+    import Main.Akka._
+
+    // When caller wants us to try a cnx, we try a new segment if possible.
+    // If attempt fails, upon timeout, or we cannot try a new segment, complete
+    // the caller promise. But if the attempt succeeds, and we can try another
+    // segment, renew the attempt (until we cannot anymore, fail or timeout).
+
+    attempt.future.withTimeout(Main.settings.errorDelay.get).onComplete {
+      case Failure(_) ⇒ done()
+      case _ ⇒
+    }
+
+    def renew: TryCnxData = {
+      attemptSuccess()
+      copy(attempt = Promise())
+    }
+
+    def attemptFailure(ex: Exception): Unit = {
+      attempt.tryFailure(ex)
+      ()
+    }
+
+    def attemptSuccess(): Unit = {
+      attempt.trySuccess(())
+      ()
+    }
+
+    def done(): Unit = {
+      caller.trySuccess(())
+      ()
+    }
+
+  }
+
   case class SegmentHandlerData(
     range: SegmentRange,
     originalRange: SegmentRange,
     acquired: AcquiredConnection,
     forced: Boolean,
+    tryCnx: Option[TryCnxData],
     context: HttpClientContext,
     request: HttpRequestBase,
     responseConsumer: ResponseConsumer,
@@ -60,6 +99,7 @@ object FileDownloader {
     dlErrors: Int = 0,
     failed: Option[DownloadException] = None,
     segmentConsumers: Map[ResponseConsumer, SegmentHandlerData] = Map.empty,
+    tryCnx: Option[TryCnxData] = None,
     trySegment: Option[Cancelable] = None,
     maxSegments: Option[Int] = None
   ) {
@@ -123,9 +163,17 @@ object FileDownloader {
       stateNew
     }
 
+    def readyTryCnx: (State, Option[TryCnxData]) = (copy(tryCnx = None), tryCnx)
+
+    def completeTryCnx: State = {
+      // Complete any pending cnx attempt.
+      tryCnx.foreach(_.done())
+      copy(tryCnx = None)
+    }
+
     def cancelTrySegment: State = {
       trySegment.foreach(_.cancel())
-      copy(trySegment = None)
+      completeTryCnx.copy(trySegment = None)
     }
 
     def resume(restart: Boolean): State = {
@@ -165,15 +213,8 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
   override def receive: Receive = receive(State(dlMngr, dl, started = dl.info.isSizeDetermined))
 
   def receive(state: State): Receive = {
-    case DownloadResume(download, restart, force) ⇒
-      val action = if (restart) {
-        "re-starting"
-      } else if (state.started) {
-        "resuming"
-      } else {
-        "starting"
-      }
-      applyState(resume(state.resume(restart).withDownload(download), action, force))
+    case DownloadResume(download, restart) ⇒
+      applyState(resume(state, download, restart))
 
     case TryResume ⇒
       applyState(tryResume(state))
@@ -191,7 +232,8 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
       applyState(stopSegment(state))
 
     case TrySegment ⇒
-      applyState(trySegment(state.cancelTrySegment))
+      val (state1, tryCnx) = state.readyTryCnx
+      applyState(trySegment(state1.cancelTrySegment, tryCnx = tryCnx))
 
     case SegmentStarted(consumer, response) ⇒
       applyState(segmentStarted(state, consumer, response))
@@ -230,11 +272,19 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
     state.copy(segmentConsumers = segmentConsumers)
   }
 
-  def resume(state: State, action: String, force: Boolean): State = {
+  def resume(state0: State, download: Download, restart: Boolean): State = {
+    val action = if (restart) {
+      "re-starting"
+    } else if (state0.started) {
+      "resuming"
+    } else {
+      "starting"
+    }
     val message = s"Download $action"
+    val state = state0.resume(restart).withDownload(download)
     logger.info(s"${state.download.context} $message")
     state.download.info.addLog(LogKind.Info, message)
-    trySegment(state, force = force)
+    state
   }
 
   def tryResume(state: State): State = {
@@ -251,7 +301,7 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
     logger.info(s"${download.context} Download stopping")
     download.info.addLog(LogKind.Info, "Download stopping")
 
-    val state = state0.copy(
+    val state = state0.cancelTrySegment.copy(
       stopping = true,
       failed = Some(ex)
     )
@@ -302,18 +352,24 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
   }
 
   def tryConnection(state: State, promise: Promise[Unit]): State = {
+    lazy val tryCnx = TryCnxData(promise)
     // Pending segment trying counts as connection trying.
-    try {
-      if (state.trySegment.isEmpty) {
-        trySegment(state)
-      } else state
-    } finally {
-      promise.trySuccess(())
-      ()
+    if (state.trySegment.isEmpty) {
+      trySegment(state, tryCnx = Some(tryCnx))
+    } else {
+      // Use any previous attempt result.
+      state.tryCnx match {
+        case Some(previous) ⇒
+          promise.completeWith(previous.caller.future)
+          state
+
+        case None ⇒
+          state.copy(tryCnx = Some(tryCnx))
+      }
     }
   }
 
-  def trySegment(state0: State, force: Boolean = false): State = {
+  def trySegment(state0: State, force: Boolean = false, tryCnx: Option[TryCnxData] = None): State = {
     // Notes:
     // Active segments should complete all remaining segments. Some active
     // segments may not have yet started to download.
@@ -341,6 +397,12 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
       }
     }
     lazy val canStartSegment = canTry && canAddSegment
+    lazy val untriedSegment = {
+      // For whatever reason, we did not try a new segment. When applicable,
+      // consider this cnx attempt done.
+      tryCnx.foreach(_.done())
+      state0
+    }
     if (download.acceptRanges.contains(true) && canStartSegment) {
       // Clone the current remaining ranges (we will work with it)
       download.info.remainingRanges.map(_.clone()).flatMap { remainingRanges ⇒
@@ -397,26 +459,26 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
                 start = range.start + range.length / 2 + 1
               )
               val state1 = changeSegmentEnd(state0, consumer, newRange.start - 1)
-              segmentStart(state1, newRange, acquired, force, forced)
+              segmentStart(state1, newRange, acquired, force, forced, tryCnx)
 
             case None ⇒
-              segmentStart(state0, range, acquired, force, forced)
+              segmentStart(state0, range, acquired, force, forced, tryCnx)
           }
-      }.getOrElse(state0)
+      }.getOrElse(untriedSegment)
     } else if (canTry && download.info.remainingRanges.isEmpty && state0.segmentConsumers.isEmpty) {
       // Special case: initial request failed, so re-try it (if possible)
       tryAcquireConnection.map { acquired ⇒
-        segmentStart(state0, SegmentRange(0, -1), acquired, force, forced)
-      }.getOrElse(state0)
+        segmentStart(state0, SegmentRange(0, -1), acquired, force, forced, tryCnx)
+      }.getOrElse(untriedSegment)
     } else {
       // We cannot try a new segment.
       // We also end up here if first connection request is ongoing (no response
       // yet); may happen if a TryConnection is triggered.
-      state0
+      untriedSegment
     }
   }
 
-  def segmentStart(state: State, range: SegmentRange, acquired: AcquiredConnection, force: Boolean, forced: Boolean): State = {
+  def segmentStart(state: State, range: SegmentRange, acquired: AcquiredConnection, force: Boolean, forced: Boolean, tryCnx: Option[TryCnxData]): State = {
     val download = state.download
     val uri = download.info.uri.get
     download.rateLimiter.addDownload()
@@ -460,6 +522,7 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
         originalRange = range,
         acquired = acquired,
         forced = forced,
+        tryCnx = tryCnx,
         context = context,
         request = request,
         responseConsumer = responseConsumer
@@ -474,12 +537,14 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
         val message = s"Failed to start segment range=$range download: ${ex.getMessage}"
         logger.error(s"${download.context(range)} $message", ex)
         download.info.addLog(LogKind.Error, message, Some(ex))
+        tryCnx.foreach(_.attemptFailure(ex))
         segmentDone(state, None, range, acquired, downloaded = false, Some(ex))
     }
   }
 
   def segmentStarted(state0: State, consumer: ResponseConsumer, response: HttpResponse): State = {
     val download = state0.download
+    val tryCnx = state0.segmentConsumers.get(consumer).flatMap(_.tryCnx)
     val state1 = if (state0.started) {
       // We don't need anything anymore, this serves only to trigger a new
       // segment start if possible.
@@ -544,38 +609,47 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
     // Only try a new segment when applicable.
     val active = download.info.activeSegments.get
     if (state2.segmentConsumers(consumer).forced && (active > state2.getMaxSegments)) {
+      // When applicable consider the cnx attempt done, since we didn't try a
+      // new segment.
+      tryCnx.foreach(_.done())
       state2.setMaxSegments(active)
     } else {
-      trySegment(state2)
+      // Keep on trying new cnx as we try a new segment.
+      trySegment(state2, tryCnx = tryCnx.map(_.renew))
     }
   }
 
-  def segmentDone(state: State, consumer: ResponseConsumer, ex: Option[Exception]): State = {
+  def segmentDone(state: State, consumer: ResponseConsumer, exOpt: Option[Exception]): State = {
     state.segmentConsumers.get(consumer).map { data ⇒
       val downloaded = consumer.position > data.range.start
-      segmentDone(state.removeConsumer(consumer), Some(data), data.range, data.acquired, downloaded, ex)
+      // Fail segment attempt when applicable.
+      for {
+        tryCnx ← data.tryCnx
+        ex ← exOpt
+      } tryCnx.attemptFailure(ex)
+      segmentDone(state.removeConsumer(consumer), Some(data), data.range, data.acquired, downloaded, exOpt)
     }.getOrElse(state)
   }
 
-  def segmentDone(state0: State, dataOpt: Option[SegmentHandlerData], range: SegmentRange, acquired: AcquiredConnection, downloaded: Boolean, ex0: Option[Exception]): State = {
+  def segmentDone(state0: State, dataOpt: Option[SegmentHandlerData], range: SegmentRange, acquired: AcquiredConnection, downloaded: Boolean, exOpt0: Option[Exception]): State = {
     var state = state0
     val download = state.download
     state.dlMngr.releaseConnection(acquired)
     download.rateLimiter.removeDownload()
     // Take into account our failure if any.
-    val exOpt0: Option[DownloadException] = ex0.map {
+    val exOpt1: Option[DownloadException] = exOpt0.map {
       case ex0: DownloadException ⇒ ex0
       case ex0: Exception ⇒ DownloadException(message = ex0.getMessage, cause = ex0, started = dataOpt.exists(_.started))
     }
     // Note: aborting request should not have triggered an exception.
     val aborted = dataOpt.exists(_.aborted)
     val exOpt: Option[DownloadException] = if (!aborted) {
-      exOpt0
+      exOpt1
     } else {
       None
     }
 
-    state = handleWriteError(state, exOpt0)
+    state = handleWriteError(state, exOpt1)
     exOpt.foreach { ex ⇒
       state = state.copy(
         cnxErrors = state.cnxErrors + (if (!ex.started) 1 else 0),
