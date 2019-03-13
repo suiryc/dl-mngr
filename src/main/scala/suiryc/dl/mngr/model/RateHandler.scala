@@ -18,6 +18,9 @@ class RateHandler(startValue: Long, duration: FiniteDuration, val step: FiniteDu
 
   private val history = new jLinkedList[TimedValue]()
   private var lastValue = startValue
+  private var cachedRate = 0L
+
+  def currentRate: Long = cachedRate
 
   def update(value: Long): Long = this.synchronized {
     // Adjust time according to requested 'step' precision
@@ -57,7 +60,8 @@ class RateHandler(startValue: Long, duration: FiniteDuration, val step: FiniteDu
     }
     val (start, downloaded) = loop(time, 0)
     val delay = math.max(time - start, stepMs)
-    downloaded * 1000 / delay
+    cachedRate = downloaded * 1000 / delay
+    cachedRate
   }
 
 }

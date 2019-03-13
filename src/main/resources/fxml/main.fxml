@@ -11,6 +11,7 @@
 <?import javafx.scene.control.MenuBar?>
 <?import javafx.scene.control.MenuItem?>
 <?import javafx.scene.control.ScrollPane?>
+<?import javafx.scene.control.Separator?>
 <?import javafx.scene.control.SeparatorMenuItem?>
 <?import javafx.scene.control.SplitPane?>
 <?import javafx.scene.control.Tab?>
@@ -27,7 +28,7 @@
 <?import javafx.scene.layout.VBox?>
 <?import javafx.scene.text.Font?>
 
-<AnchorPane maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" minHeight="360.0" minWidth="600.0" xmlns="http://javafx.com/javafx/10.0.2" xmlns:fx="http://javafx.com/fxml/1" fx:controller="suiryc.dl.mngr.controllers.MainController">
+<AnchorPane maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" minHeight="360.0" minWidth="600.0" xmlns="http://javafx.com/javafx/10.0.1" xmlns:fx="http://javafx.com/fxml/1" fx:controller="suiryc.dl.mngr.controllers.MainController">
    <children>
       <VBox maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
          <children>
@@ -190,6 +191,33 @@
                   </TabPane>
               </items>
             </SplitPane>
+            <GridPane hgap="5.0">
+              <columnConstraints>
+                  <ColumnConstraints hgrow="NEVER" />
+                  <ColumnConstraints hgrow="NEVER" />
+                <ColumnConstraints hgrow="NEVER" />
+                <ColumnConstraints halignment="CENTER" hgrow="ALWAYS" />
+                  <ColumnConstraints hgrow="NEVER" />
+              </columnConstraints>
+              <rowConstraints>
+                <RowConstraints valignment="CENTER" vgrow="SOMETIMES" />
+              </rowConstraints>
+               <children>
+                  <Label fx:id="allDlRunningLabel" minWidth="90.0" />
+                  <Separator orientation="VERTICAL" GridPane.columnIndex="1" />
+                  <Label fx:id="allDlProgressLabel" GridPane.columnIndex="2" />
+                  <Separator orientation="VERTICAL" GridPane.columnIndex="3" />
+                  <HBox alignment="CENTER_RIGHT" spacing="5.0" GridPane.columnIndex="4">
+                     <children>
+                        <StackPane fx:id="allDlSpeedIcon" styleClass="icon-tachometer" />
+                        <Label fx:id="allDlSpeedLabel" minWidth="130.0" />
+                     </children>
+                  </HBox>
+               </children>
+               <VBox.margin>
+                  <Insets bottom="5.0" left="10.0" right="10.0" top="5.0" />
+               </VBox.margin>
+            </GridPane>
          </children>
       </VBox>
    </children>

@@ -45,7 +45,7 @@ import suiryc.scala.javafx.stage.Stages.StageLocation
 import suiryc.scala.settings.ConfigEntry
 import suiryc.scala.unused
 
-// TODO: status bar ? (display current speed / limit, number of running downloads + pending + finished / total, number of connections)
+
 class MainController extends StagePersistentView with StrictLogging {
 
   import MainController._
@@ -121,6 +121,15 @@ class MainController extends StagePersistentView with StrictLogging {
 
   @FXML
   protected var dlLastModifiedLabel: Label = _
+
+  @FXML
+  protected var allDlRunningLabel: Label = _
+
+  @FXML
+  protected var allDlProgressLabel: Label = _
+
+  @FXML
+  protected var allDlSpeedLabel: Label = _
 
   private val clipboard = Clipboard.getSystemClipboard
 
@@ -212,6 +221,7 @@ class MainController extends StagePersistentView with StrictLogging {
       getState.dlMngr.setRateLimit(bytesPerSecond)
       Main.settings.rateLimitValue.set(value)
       Main.settings.rateLimitUnit.set(unit.label)
+      refreshAllDlSpeed()
     }
     rateLimitField.setOnAction { _ ⇒
       updateRateLimiter()
@@ -455,6 +465,22 @@ class MainController extends StagePersistentView with StrictLogging {
         onDownloadsRemove(force = event.isShiftDown)
       }
     })
+    // Refresh status bar when changing items.
+    downloadsTable.getItems.listen { change ⇒
+      // Only DL being added/removed matters here.
+      @scala.annotation.tailrec
+      def loop(): Boolean = {
+        if (change.next()) {
+          if (change.wasAdded() || change.wasRemoved()) true
+          else loop()
+        } else false
+      }
+
+      if (loop()) {
+        refreshAllDlRunning()
+        refreshAllDlProgress()
+      }
+    }
 
     logsTable.getSelectionModel.setSelectionMode(SelectionMode.MULTIPLE)
     // Handle 'Ctrl-c' to copy log(s).
@@ -560,6 +586,7 @@ class MainController extends StagePersistentView with StrictLogging {
         // thread when we are done with the change content, so that handling
         // changes is done in the caller thread (which holds a lock).
         val logsCancellable = info.logs.listen { change ⇒
+          @scala.annotation.tailrec
           def loop(): Unit = {
             if (change.next()) {
               if (change.wasPermutated() || change.wasUpdated() || change.wasRemoved() || !change.wasAdded()) {
@@ -702,6 +729,50 @@ class MainController extends StagePersistentView with StrictLogging {
           field.setText(null)
         }
     }
+  }
+
+  private def refreshAllDlRunning(): Unit = {
+    val (running, done, total) = getDownloadsData.foldLeft((0, 0, 0)) {
+      case ((running0, done0, total0), data) ⇒
+        val running = if (data.download.isRunning) running0 + 1 else running0
+        val done = if (data.download.isDone) done0 + 1 else done0
+        (running, done, total0 + 1)
+    }
+    val text =
+      if (total == 0) ""
+      else s"$running + $done / $total"
+    allDlRunningLabel.setText(text)
+  }
+
+  private def refreshAllDlProgress(): Unit = {
+    val (downloaded, total) = getDownloadsData.foldLeft((0L, 0L)) {
+      case ((downloaded0, total0), data) ⇒
+        val info = data.download.info
+        val size =
+          if (info.isSizeDetermined && !info.isSizeUnknown) info.size.get
+          else data.download.sizeHint.getOrElse(0L)
+        val downloaded =
+          if (size > 0) info.downloaded.get
+          else 0
+        (downloaded0 + downloaded, total0 + size)
+    }
+    val text = if (total == 0) ""
+    else {
+      val sDownloaded = Units.storage.toHumanReadable(downloaded)
+      val sTotal = Units.storage.toHumanReadable(total)
+      val percent = downloaded * 100.0 / total
+      s"%s / %s  (%.1f%%)".format(sDownloaded, sTotal, percent)
+    }
+    allDlProgressLabel.setText(text)
+  }
+
+  private def refreshAllDlSpeed(): Unit = {
+    val rate = Units.storage.toHumanReadable(getDownloadsData.filter(_.download.isRunning).map(_.rateHandler.currentRate).sum)
+    val limit = Main.settings.rateLimitValue.get
+    val sLimit = if (limit > 0) {
+      s"$limit ${Main.settings.rateLimitUnit.get}/s"
+    } else "∞"
+    allDlSpeedLabel.setText(s"$rate/s  [$sLimit]")
   }
 
   /** Restores (persisted) view. */
@@ -1365,6 +1436,7 @@ class MainController extends StagePersistentView with StrictLogging {
           }
 
           def displaySize: String = {
+            refreshAllDlProgress()
             val size = if (info.isSizeDetermined) Option(info.size.get) else download.sizeHint
             size.filter(_ >= 0).map { size ⇒
               Units.storage.toHumanReadable(size)
@@ -1406,12 +1478,13 @@ class MainController extends StagePersistentView with StrictLogging {
             }:Double
           }
           BindingsEx.bind(data.downloadedProgressText.textProperty, 500.millis, JFXSystem.scheduler, info.downloaded) {
+            refreshAllDlProgress()
             val downloaded = info.downloaded.get
             val size = info.size.get
             if (downloaded <= 0) null
             else if (size > 0) {
               val percent = downloaded * 100.0 / size
-              s"%.1f%% [%s]".format(percent, Units.storage.toHumanReadable(downloaded))
+              "%.1f%% [%s]".format(percent, Units.storage.toHumanReadable(downloaded))
             } else {
               Units.storage.toHumanReadable(downloaded)
             }
@@ -1421,17 +1494,19 @@ class MainController extends StagePersistentView with StrictLogging {
           // It is sensible to use the same duration for the rate display
           // throttling and the rate handler step.
           new BindingsEx.Builder(JFXSystem.scheduler).add(data.rate) {
-            if (download.state == DownloadState.Running) {
+            val v = if (download.isRunning) {
               val rate = data.rateHandler.update(info.downloaded.get)
-              s"%s/s".format(Units.storage.toHumanReadable(rate))
+              s"${Units.storage.toHumanReadable(rate)}/s"
             } else {
               null
             }
+            refreshAllDlSpeed()
+            v
           }.add(data.eta) {
-            if (download.state == DownloadState.Running) {
+            if (download.isRunning) {
               Option(info.size.get).filter(_ > 0).map { size ⇒
-                val remaining = size - info.downloaded.getValue
-                val rate = data.rateHandler.update(info.downloaded.get)
+                val remaining = size - info.downloaded.get
+                val rate = data.rateHandler.currentRate
                 if (rate > 0) {
                   val seconds = (remaining.toDouble / rate).ceil.toLong
                   s"%02d:%02d:%02d".format(seconds / (60 * 60), (seconds / 60) % 60, seconds % 60)
@@ -1443,6 +1518,7 @@ class MainController extends StagePersistentView with StrictLogging {
           }.bind(data.rateHandler.step, info.downloaded, info.state, data.rateUpdate)
 
           new BindingsEx.Builder(JFXSystem.scheduler).add(data.stateIcon) {
+            refreshAllDlRunning()
             download.state match {
               case DownloadState.Pending ⇒
                 Icons.hourglass().pane
@@ -1462,7 +1538,7 @@ class MainController extends StagePersistentView with StrictLogging {
                 Icons.exclamationTriangle().pane
             }
           }.add(data.segments) {
-            if (download.state == DownloadState.Running) {
+            if (download.isRunning) {
               s"${info.activeSegments.get}/${info.maxSegments.get}"
             } else {
               null
