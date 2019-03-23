@@ -19,6 +19,9 @@ class RateLimiter(private var _bytesPerSecond: Long) {
   // For smoother limiting, time slices must not be too big (at most 1s), and
   // cannot be too small (triggers too much pause/resume in downloads activity).
   // The value used is 200ms.
+  // We also adjust slice start to be a multiple of time slice, so that we can
+  // easily determine when the current slice started (e.g. to display live dl
+  // rate).
 
   /** Whether rate is actually limited. */
   private var _isLimited: Boolean = false
@@ -27,13 +30,16 @@ class RateLimiter(private var _bytesPerSecond: Long) {
   /** How many slices per second. */
   private val slicesPerSecond: Long  = 5
   /** Time slice duration (ms). */
-  private val timeSlice: Long = 1000 / slicesPerSecond
+  val timeSlice: Long = 1000 / slicesPerSecond
   /** How many tokens (bytes) are allocated per time slice. */
   private var tokensPerSlice: Long = Long.MaxValue
   /** When did the 'current' time slice started. */
-  private var sliceStart: Long = System.currentTimeMillis
+  private var sliceStart: Long = adjustSliceStart(System.currentTimeMillis)
   /** How many tokens (bytes) are still available in the 'current' time slice. */
   private var availableTokens: Long = Long.MaxValue
+
+  /** Adjust slice start to be a multiple of the time slice. */
+  private def adjustSliceStart(v: Long): Long = v - (v % timeSlice)
 
   /** Time slice end. */
   private def sliceEnd: Long = sliceStart + timeSlice

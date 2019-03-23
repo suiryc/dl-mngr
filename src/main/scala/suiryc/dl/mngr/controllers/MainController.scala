@@ -9,7 +9,7 @@ import java.nio.file.Path
 import java.text.SimpleDateFormat
 import java.time.format.DateTimeFormatter
 import java.util.UUID
-import javafx.beans.property.{SimpleBooleanProperty, SimpleObjectProperty, SimpleStringProperty}
+import javafx.beans.property.{SimpleBooleanProperty, SimpleLongProperty, SimpleObjectProperty, SimpleStringProperty}
 import javafx.event.ActionEvent
 import javafx.fxml.{FXML, FXMLLoader}
 import javafx.scene.{Node, Parent, Scene}
@@ -23,6 +23,7 @@ import monix.execution.Cancelable
 import scala.collection.JavaConverters._
 import scala.concurrent.{Future, Promise}
 import scala.concurrent.duration._
+import scala.math.BigDecimal.RoundingMode
 import scala.util.{Failure, Success}
 import suiryc.dl.mngr.model._
 import suiryc.scala.misc.Units
@@ -1462,10 +1463,11 @@ class MainController extends StagePersistentView with StrictLogging {
 
           BindingsEx.bind(data.downloadedProgress.progressProperty, 500.millis, JFXSystem.scheduler, info.downloaded, info.state) {
             Option(info.size.get).filter(_ >= 0).map { size ⇒
-              val v =
-                if (size > 0) info.downloaded.getValue.toDouble / size
-                else 0.0
-              v
+              // Limit precision to 3 digits (1/10th of percent), so that actual
+              // progress is not updated more than 1000 times (which limits CPU
+              // usage even if we are called very frequently).
+              if (size > 0) BigDecimal(info.downloaded.getValue.toDouble / size).setScale(3, RoundingMode.DOWN).doubleValue()
+              else 0.0
             }.getOrElse {
               // Note: Usually we would set progress to -1.0 if isSizeDetermined
               // when running. But the "indeterminate state" animation consumes
@@ -1490,12 +1492,12 @@ class MainController extends StagePersistentView with StrictLogging {
             }
           }
 
-          // Note:
-          // It is sensible to use the same duration for the rate display
-          // throttling and the rate handler step.
+          // Notes:
+          // Rate value is computed often (depends on rate handler time slice),
+          // but displayed less often.
           new BindingsEx.Builder(JFXSystem.scheduler).add(data.rate) {
             val v = if (download.isRunning) {
-              val rate = data.rateHandler.update(info.downloaded.get)
+              val rate = data.rateHandler.currentRate
               s"${Units.storage.toHumanReadable(rate)}/s"
             } else {
               null
@@ -1515,7 +1517,7 @@ class MainController extends StagePersistentView with StrictLogging {
             } else {
               null
             }
-          }.bind(data.rateHandler.step, info.downloaded, info.state, data.rateUpdate)
+          }.bind(1.second, data.rateValue, info.downloaded, info.state)
 
           new BindingsEx.Builder(JFXSystem.scheduler).add(data.stateIcon) {
             refreshAllDlRunning()
@@ -1639,6 +1641,8 @@ object MainController {
   }
 
   class DownloadData(var download: Download) {
+    private val info = download.info
+
     // Notes:
     // In the downloads table, we may wish to bind some Cell properties to a
     // download. Since the cell item may change, we must be able to 'reset' the
@@ -1685,10 +1689,18 @@ object MainController {
       }
     }
 
-    download.info.state.listen(refreshRateUpdate _)
+    info.state.listen(refreshRateUpdate _)
     refreshRateUpdate(download.state)
 
-    val rateHandler = new RateHandler(download.info.downloaded.get, 4.seconds, 800.millis)
+    val rateHandler = new RateHandler(download.rateLimiter, download.info.downloaded.get, 4.seconds)
+    val rateValue = new SimpleLongProperty()
+    BindingsEx.bind(rateValue, rateHandler.timeSlice, Main.scheduler, info.downloaded, info.state, rateUpdate) {
+      if (download.isRunning) {
+        rateHandler.update(info.downloaded.get)
+      } else {
+        0L
+      }
+    }
 
     val downloadedProgress: ProgressBar = new ProgressBar()
     downloadedProgress.setProgress(0.0)

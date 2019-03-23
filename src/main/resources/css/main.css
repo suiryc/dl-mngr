@@ -1,6 +1,6 @@
 /* Progress cell: remove padding so that progress bar fills the whole space. */
 .table-cell-downloaded {
-    -fx-padding: 0;
+  -fx-padding: 0;
 }
 
 /* Progress cell: translate back text a bit due to padding removal.
@@ -8,7 +8,7 @@
  * below what it should ...
  */
 .table-cell-downloaded .text {
-    -fx-translate-y: -0.083em;
+  -fx-translate-y: -0.083em;
 }
 
 /* Override table view selected row CSS.
