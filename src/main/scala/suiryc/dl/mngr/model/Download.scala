@@ -95,6 +95,10 @@ class DownloadInfo {
     downloaded.set(0)
   }
 
+  def withLogs[A](f: ObservableList[LogEntry] ⇒ A): A = logs.synchronized {
+    f(logs)
+  }
+
   def addLog(kind: LogKind.Value, message: String, exOpt: Option[Exception] = None): Unit = logs.synchronized {
     val entry = LogEntry(time = LocalDateTime.now, kind = kind, message = message, exOpt = exOpt)
     logs.add(entry)

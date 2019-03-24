@@ -543,7 +543,10 @@ class MainController extends StagePersistentView with StrictLogging {
           }
         }
         def setLogs(): Unit = {
-          val logs = getLogs(info.logs)
+          // If we are called to initially populate the table, logs may be
+          // changed while we work with the list. To prevent concurrent access
+          // issues, lock the logs.
+          val logs = info.withLogs(getLogs)
           // Note: we may not be in the JavaFX thread yet (e.g. dealing with
           // logs changes).
           JFXSystem.run {
