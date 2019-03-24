@@ -2,21 +2,21 @@ import sbt._
 import Keys._
 
 lazy val versions = Map[String, String](
-  "akka"                  → "2.5.13",
-  "bouncycastle"          → "1.59",
+  "akka"                  → "2.5.21",
+  "bouncycastle"          → "1.61",
   "config"                → "1.3.3",
   "dl-mngr"               → "0.0.1-SNAPSHOT",
-  "httpclient"            → "4.5.6",
+  "httpclient"            → "4.5.7",
   "httpasyncclient"       → "4.1.4",
   "logback"               → "1.2.3",
-  "monix"                 → "3.0.0-RC1",
-  "netty"                 → "4.1.29.Final",
-  "scala"                 → "2.12.6",
-  "scala-logging"         → "3.9.0",
+  "monix"                 → "3.0.0-RC2",
+  "netty"                 → "4.1.34.Final",
+  "scala"                 → "2.12.8",
+  "scala-logging"         → "3.9.2",
   "scalatest"             → "3.0.5",
-  "scopt"                 → "3.7.0",
-  "slf4j"                 → "1.7.25",
-  "spray-json"            → "1.3.4",
+  "scopt"                 → "3.7.1",
+  "slf4j"                 → "1.7.26",
+  "spray-json"            → "1.3.5",
   "suiryc-scala"          → "0.0.3-SNAPSHOT"
 )
 
