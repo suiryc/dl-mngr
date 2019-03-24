@@ -1035,7 +1035,7 @@ class ResponseConsumer(
     // read once per call. If limit is reached, we suspend input until next
     // time we can consume again.
     @scala.annotation.tailrec
-    def loop(): Boolean = {
+    def loop(first: Boolean): Boolean = {
       // Use hint when rate is limited
       val count0 = if (end >= 0) end + 1 - position else Long.MaxValue
       val count = math.min(count0, download.rateLimiter.getReadSizeHint)
@@ -1070,9 +1070,19 @@ class ResponseConsumer(
         // Leave loop if transferred size is lower than requested; usually means
         // there is nothing more buffered (at worst we will be called again).
         // TODO: the very first call exceeds 'count' ...
-        if (!endReached && !download.rateLimiter.isLimited && (transferred >= count)) loop()
+        if (!endReached && !download.rateLimiter.isLimited && (transferred >= count)) loop(first = false)
         else endReached
       } else {
+        if (first) {
+          // In some cases (usually after a period of rate limiting, i.e.
+          // suspending/resuming) the content decoder may remain stuck: content
+          // is considered received but reading it returns nothing. It does not
+          // seem possible to unblock the situation, so fail the consumer.
+          failed(DownloadException(
+            message = "I/O error: no data was read",
+            started = true
+          ))
+        }
         false
       }
     }
@@ -1090,7 +1100,7 @@ class ResponseConsumer(
     }
 
     if (!skip && !isDone) {
-      val endReached = loop()
+      val endReached = loop(first = true)
       if (endReached) ioctrl.shutdown()
     }
   }
