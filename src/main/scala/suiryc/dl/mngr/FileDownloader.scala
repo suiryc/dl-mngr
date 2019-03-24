@@ -259,7 +259,7 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
     val segmentConsumers = state.segmentConsumers.map {
       case (consumer, data) ⇒
         // Acquire (forced) 'new' connection with refreshed settings.
-        state.dlMngr.tryAcquireConnection(state.download, force = true, count = data.acquired.count).map { acquired ⇒
+        state.dlMngr.tryAcquireConnection(state.download, force = true, count = data.acquired.count).toOption.flatten.map { acquired ⇒
           // Release the previously acquired one, effectively transferring it
           // to any new site when applicable.
           state.dlMngr.releaseConnection(data.acquired)
@@ -371,6 +371,7 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
   }
 
   def trySegment(state0: State, force: Boolean = false, tryCnx: Option[TryCnxData] = None): State = {
+    var state = state0
     // Notes:
     // Active segments should complete all remaining segments. Some active
     // segments may not have yet started to download.
@@ -379,38 +380,39 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
     // We can only start a new segment if ranges are accepted and we did not yet
     // reached max number of segments (and a TrySegment is not currently
     // scheduled).
-    val download = state0.download
+    val download = state.download
     // 'force' is whether we are (manually) asked to force connection.
     // 'forced' is whether new connection will be forced, which may also happen
     // automatically because the number of max segments was raised manually
     // (previous manually forced connection).
     // When forcing, don't count this connection relatively to limits.
-    val forced = force || state0.canForceSegment
-    val canTry = !state0.stopping && (forced || (state0.trySegment.isEmpty && !state0.hasTooManyErrors))
-    lazy val tryAcquireConnection = state0.dlMngr.tryAcquireConnection(download, force = forced, count = !forced)
+    val forced = force || state.canForceSegment
+    val canTry = !state.stopping && (forced || (state.trySegment.isEmpty && !state.hasTooManyErrors))
+    lazy val tryAcquireConnection = state.dlMngr.tryAcquireConnection(download, force = forced, count = !forced) match {
+      case Left(ex) ⇒
+        state = handleError(state, aborted = false, Some(ex))
+        None
+
+      case Right(acquired) ⇒
+        acquired
+    }
     lazy val canAddSegment = {
       if (forced) true
       else {
-        val limit = state0.getMaxSegments
-        val ok = state0.segmentConsumers.size < limit
+        val limit = state.getMaxSegments
+        val ok = state.segmentConsumers.size < limit
         if (!ok) download.updateLastReason(Some(s"Limit reached: number of segments limit=<$limit>"))
         ok
       }
     }
     lazy val canStartSegment = canTry && canAddSegment
-    lazy val untriedSegment = {
-      // For whatever reason, we did not try a new segment. When applicable,
-      // consider this cnx attempt done.
-      tryCnx.foreach(_.done())
-      state0
-    }
-    if (download.acceptRanges.contains(true) && canStartSegment) {
+    val tried = if (download.acceptRanges.contains(true) && canStartSegment) {
       // Clone the current remaining ranges (we will work with it)
       download.info.remainingRanges.map(_.clone()).flatMap { remainingRanges ⇒
         val minSize = download.minSegmentSize
         val remaining = remainingRanges.getRanges
         // Get all active remaining ranges
-        val remainingActive = state0.segmentConsumers.toList.flatMap { case (consumer, data) ⇒
+        val remainingActive = state.segmentConsumers.toList.flatMap { case (consumer, data) ⇒
           val activeRange = data.range
           remaining.asScala.find { remainingRange ⇒
             // Find the remaining range that this active segment is working on
@@ -428,7 +430,7 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
         }
 
         // Get all remaining non-active ranges
-        state0.segmentConsumers.values.foreach { data ⇒
+        state.segmentConsumers.values.foreach { data ⇒
           remainingRanges.remove(data.range)
         }
         // Note: non-active segments are not subject to size limit
@@ -450,7 +452,7 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
           Some(s"Limit reached: no segment of minimum size=<${Units.storage.toHumanReadable(minSize)}>")
         }
         remainingAvailable
-      }.map {
+      }.exists {
         case (consumerOpt, range, acquired) ⇒
           consumerOpt match {
             case Some(consumer) ⇒
@@ -464,24 +466,33 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
               val newRange = range.copy(
                 start = range.start + range.length / 2 + 1
               )
-              val state1 = changeSegmentEnd(state0, consumer, newRange.start - 1)
-              segmentStart(state1, newRange, acquired, force, forced, tryCnx)
+              state = changeSegmentEnd(state, consumer, newRange.start - 1)
+              state = segmentStart(state, newRange, acquired, force, forced, tryCnx)
 
             case None ⇒
-              segmentStart(state0, range, acquired, force, forced, tryCnx)
+              state = segmentStart(state, range, acquired, force, forced, tryCnx)
           }
-      }.getOrElse(untriedSegment)
-    } else if (canTry && download.info.remainingRanges.isEmpty && state0.segmentConsumers.isEmpty) {
+        true
+      }
+    } else if (canTry && download.info.remainingRanges.isEmpty && state.segmentConsumers.isEmpty) {
       // Special case: initial request failed, so re-try it (if possible)
-      tryAcquireConnection.map { acquired ⇒
-        segmentStart(state0, SegmentRange(0, -1), acquired, force, forced, tryCnx)
-      }.getOrElse(untriedSegment)
+      tryAcquireConnection.exists { acquired ⇒
+        state = segmentStart(state, SegmentRange(0, -1), acquired, force, forced, tryCnx)
+        true
+      }
     } else {
       // We cannot try a new segment.
       // We also end up here if first connection request is ongoing (no response
       // yet); may happen if a TryConnection is triggered.
-      untriedSegment
+      false
     }
+
+    if (!tried) {
+      // For whatever reason, we did not try a new segment. When applicable,
+      // consider this cnx attempt done.
+      tryCnx.foreach(_.done())
+    }
+    state
   }
 
   def segmentStart(state: State, range: SegmentRange, acquired: AcquiredConnection, force: Boolean, forced: Boolean, tryCnx: Option[TryCnxData]): State = {
@@ -739,10 +750,8 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
       state
     } else if (finished) {
       done(state)
-    } else if (!state.hasTooManyErrors) {
-      segmentFinished(state, aborted, exOpt)
     } else {
-      tooManyErrors(state, exOpt)
+      handleError(state, aborted, exOpt)
     }
 
     // Now that we may have tried a new connection, give a chance to other
@@ -782,6 +791,14 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
       }
     } else {
       state
+    }
+  }
+
+  def handleError(state: State, aborted: Boolean, exOpt: Option[DownloadException]): State = {
+    if (!state.hasTooManyErrors) {
+      segmentFinished(state, aborted, exOpt)
+    } else {
+      tooManyErrors(state, exOpt)
     }
   }
 

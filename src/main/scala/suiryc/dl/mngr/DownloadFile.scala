@@ -5,7 +5,7 @@ import com.typesafe.scalalogging.LazyLogging
 import java.nio.ByteBuffer
 import java.nio.channels.FileChannel
 import java.nio.file.attribute.FileTime
-import java.nio.file.{FileAlreadyExistsException, Files, Path, StandardOpenOption}
+import java.nio.file._
 import java.util.Date
 import java.util.concurrent.locks.ReentrantReadWriteLock
 import org.apache.http.nio.{ContentDecoder, ContentDecoderChannel, FileContentDecoder}
@@ -139,7 +139,7 @@ class DownloadFile(private var path: Path) extends LazyLogging {
       try {
         channel = FileChannel.open(target, options: _*)
       } catch {
-        case _: FileAlreadyExistsException ⇒
+        case _: FileAlreadyExistsException | _: AccessDeniedException ⇒
           // If the file already exists, find the next available name
           val available = PathsEx.getAvailable(target)
           channel = FileChannel.open(available, options: _*)

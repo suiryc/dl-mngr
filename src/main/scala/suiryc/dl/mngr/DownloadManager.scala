@@ -669,15 +669,24 @@ class DownloadManager extends StrictLogging {
     cnxTotal < Main.settings.cnxMax.get
   }
 
-  def tryAcquireConnection(download: Download, force: Boolean, count: Boolean): Option[AcquiredConnection] = this.synchronized {
+  def tryAcquireConnection(download: Download, force: Boolean, count: Boolean)
+    : Either[DownloadException, Option[AcquiredConnection]] = this.synchronized
+  {
     try {
-      _tryAcquireConnection(download, force, count)
+      Right(_tryAcquireConnection(download, force, count))
     } catch {
-      case ex: Exception ⇒
-        val msg = s"Failed to acquire connection: ${ex.getMessage}"
+      case ex0: Exception ⇒
+        val exMsg =
+          if (ex0.isInstanceOf[DownloadException]) ex0.getMessage
+          else s"(${ex0.getClass.getSimpleName}) ${ex0.getMessage}"
+        val msg = s"Failed to acquire connection: $exMsg"
+        val ex = DownloadException(
+          message = msg,
+          cause = ex0
+        )
         download.info.addLog(LogKind.Error, msg, Some(ex))
         logger.error(msg, ex)
-        None
+        Left(ex)
     }
   }
 
@@ -736,8 +745,8 @@ class DownloadManager extends StrictLogging {
     }
     if (reasonOpt.isEmpty) {
       // Note: in case it fails, (try to) open file before updating counters.
-      download.openFile()
       download.info.state.setValue(DownloadState.Running)
+      download.openFile()
       // Don't count connection when requested.
       if (count) {
         cnxTotal += 1
