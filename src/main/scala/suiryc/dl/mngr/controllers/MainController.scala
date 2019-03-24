@@ -1336,7 +1336,7 @@ class MainController extends StagePersistentView with StrictLogging {
 
             // Insert list of downloads in message field
             val messageField = dialog.getDialogPane.lookup("#messageField").asInstanceOf[Label]
-            messageField.setText(s"${messageField.getText}\n${unfinished.map(_.path.get.getFileName).mkString("\n")}")
+            messageField.setText(s"${messageField.getText}\n${unfinished.map(_.download.downloadFile.getWorkingPath.getFileName).mkString("\n")}")
 
             // Track (and persist) whether to remove from disk too
             val removeFromDiskField = dialog.getDialogPane.lookup("#removeFromDiskField").asInstanceOf[CheckBox]
@@ -1367,7 +1367,7 @@ class MainController extends StagePersistentView with StrictLogging {
               if (removeFromDisk) {
                 // Since the download is unfinished, we only need to delete the
                 // temporary file if any (or the real file otherwise).
-                download.downloadFile.getTemporaryPath.getOrElse(download.downloadFile.getPath).toFile.delete()
+                download.downloadFile.getWorkingPath.toFile.delete()
               }
             }
           }

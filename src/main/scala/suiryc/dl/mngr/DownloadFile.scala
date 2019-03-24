@@ -69,6 +69,9 @@ class DownloadFile(private var path: Path) extends LazyLogging {
   /** Temporary path. */
   def getTemporaryPath: Option[Path] = temporary
 
+  /** Working path (temporary or target). */
+  def getWorkingPath: Path = temporary.getOrElse(path)
+
   private def renewTemporary(): Unit = temporary = Main.settings.getTemporaryFile(path)
 
   /** Resets. */
@@ -130,7 +133,7 @@ class DownloadFile(private var path: Path) extends LazyLogging {
       // If we don't re-use an existing file, re-compute temporary path if any.
       // (useful if target was renamed in-between)
       if (!reused) renewTemporary()
-      val target = temporary.getOrElse(path)
+      val target = getWorkingPath
       // If not owned, make sure the file does not exist upon creating it.
       val options = List(StandardOpenOption.CREATE, StandardOpenOption.WRITE) ++
         (if (!reused) List(StandardOpenOption.CREATE_NEW) else List.empty) ++
@@ -369,7 +372,7 @@ class DownloadFile(private var path: Path) extends LazyLogging {
           lastModified = fileTime,
           lastAccess = null
         )
-        FilesEx.setTimes(temporary.getOrElse(path), fileTimes)
+        FilesEx.setTimes(getWorkingPath, fileTimes)
       }
       if (done) {
         temporary.foreach { tempPath ⇒
@@ -378,7 +381,7 @@ class DownloadFile(private var path: Path) extends LazyLogging {
           path = move(tempPath, path)
         }
       } else if (delete) {
-        temporary.getOrElse(path).toFile.delete()
+        getWorkingPath.toFile.delete()
         ()
       }
     }

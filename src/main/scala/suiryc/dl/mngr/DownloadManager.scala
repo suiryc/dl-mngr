@@ -326,7 +326,7 @@ class DownloadManager extends StrictLogging {
     )
     if (reused) {
       // When resuming a file, consider its current length as already downloaded.
-      val length = math.max(0, downloadFile.getTemporaryPath.getOrElse(downloadFile.getPath).toFile.length)
+      val length = math.max(0, downloadFile.getWorkingPath.toFile.length)
       download.info.downloaded.set(length)
     }
     addDownload(download, insertFirst)
