@@ -738,7 +738,7 @@ class MainController extends StagePersistentView with StrictLogging {
     }
   }
 
-  private def refreshAllDlRunning(): Unit = {
+  private val refreshAllDlRunning: () ⇒ Unit = { () ⇒
     val (running, done, total) = getDownloadsData.foldLeft((0, 0, 0)) {
       case ((running0, done0, total0), data) ⇒
         val running = if (data.download.isRunning) running0 + 1 else running0
@@ -751,7 +751,7 @@ class MainController extends StagePersistentView with StrictLogging {
     allDlRunningLabel.setText(text)
   }
 
-  private def refreshAllDlProgress(): Unit = {
+  private val refreshAllDlProgress: () ⇒ Unit = { () ⇒
     val (downloaded, total) = getDownloadsData.foldLeft((0L, 0L)) {
       case ((downloaded0, total0), data) ⇒
         val info = data.download.info
@@ -773,7 +773,7 @@ class MainController extends StagePersistentView with StrictLogging {
     allDlProgressLabel.setText(text)
   }
 
-  private def refreshAllDlSpeed(): Unit = {
+  private val refreshAllDlSpeed: () ⇒ Unit = { () ⇒
     val rate = Units.storage.toHumanReadable(getDownloadsData.filter(_.download.isRunning).map(_.rateHandler.currentRate).sum)
     val limit = Main.settings.rateLimitValue.get
     val sLimit = if (limit > 0) {
@@ -1443,7 +1443,6 @@ class MainController extends StagePersistentView with StrictLogging {
           }
 
           def displaySize: String = {
-            refreshAllDlProgress()
             val size = if (info.isSizeDetermined) Option(info.size.get) else download.sizeHint
             size.filter(_ >= 0).map { size ⇒
               Units.storage.toHumanReadable(size)
@@ -1465,7 +1464,8 @@ class MainController extends StagePersistentView with StrictLogging {
               Tooltip.install(icon, tooltip)
               icon
             } else null
-          }.bind(info.size, info.acceptRanges)
+          }.sideEffect(refreshAllDlProgress)
+           .bind(info.size, info.acceptRanges)
 
           BindingsEx.bind(data.downloadedProgress.progressProperty, throttlingFast, jfxThrottler, info.downloaded, info.state) {
             Option(info.size.get).filter(_ >= 0).map { size ⇒
@@ -1485,8 +1485,7 @@ class MainController extends StagePersistentView with StrictLogging {
               }
             }:Double
           }
-          BindingsEx.bind(data.downloadedProgressText.textProperty, throttlingFast, jfxThrottler, info.downloaded) {
-            refreshAllDlProgress()
+          new BindingsEx.Builder(jfxThrottler).add(data.downloadedProgressText.textProperty) {
             val downloaded = info.downloaded.get
             val size = info.size.get
             if (downloaded <= 0) null
@@ -1496,20 +1495,19 @@ class MainController extends StagePersistentView with StrictLogging {
             } else {
               Units.storage.toHumanReadable(downloaded)
             }
-          }
+          }.sideEffect(refreshAllDlProgress)
+           .bind(throttlingFast, info.downloaded)
 
           // Notes:
           // Rate value is computed often (depends on rate handler time slice),
           // but displayed less often.
           new BindingsEx.Builder(jfxThrottler).add(data.rate) {
-            val v = if (download.isRunning) {
+            if (download.isRunning) {
               val rate = data.rateValue.get
               s"${Units.storage.toHumanReadable(rate)}/s"
             } else {
               null
             }
-            refreshAllDlSpeed()
-            v
           }.add(data.eta) {
             if (download.isRunning) {
               Option(info.size.get).filter(_ > 0).map { size ⇒
@@ -1523,10 +1521,10 @@ class MainController extends StagePersistentView with StrictLogging {
             } else {
               null
             }
-          }.bind(throttlingSlow, data.rateValue, info.downloaded, info.state)
+          }.sideEffect(refreshAllDlSpeed)
+           .bind(throttlingSlow, data.rateValue, info.downloaded, info.state)
 
           new BindingsEx.Builder(JFXSystem.scheduler).add(data.stateIcon) {
-            refreshAllDlRunning()
             download.state match {
               case DownloadState.Pending ⇒
                 Icons.hourglass().pane
@@ -1551,7 +1549,8 @@ class MainController extends StagePersistentView with StrictLogging {
             } else {
               null
             }
-          }.bind(info.state, info.activeSegments, info.maxSegments)
+          }.sideEffect(refreshAllDlRunning)
+           .bind(info.state, info.activeSegments, info.maxSegments)
 
           if (first) items.add(0, id)
           else items.add(id)
