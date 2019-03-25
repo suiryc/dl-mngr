@@ -45,6 +45,7 @@ import suiryc.scala.javafx.stage.{PathChoosers, StagePersistentView, Stages}
 import suiryc.scala.javafx.stage.Stages.StageLocation
 import suiryc.scala.settings.ConfigEntry
 import suiryc.scala.unused
+import suiryc.scala.util.CallsThrottler
 
 
 class MainController extends StagePersistentView with StrictLogging {
@@ -165,6 +166,8 @@ class MainController extends StagePersistentView with StrictLogging {
   )
 
   lazy private val stage = splitPane.getScene.getWindow.asInstanceOf[Stage]
+
+  private val jfxThrottler = CallsThrottler(JFXSystem.scheduler)
 
   private var actor: ActorRef = _
 
@@ -1464,7 +1467,7 @@ class MainController extends StagePersistentView with StrictLogging {
             } else null
           }.bind(info.size, info.acceptRanges)
 
-          BindingsEx.bind(data.downloadedProgress.progressProperty, 500.millis, JFXSystem.scheduler, info.downloaded, info.state) {
+          BindingsEx.bind(data.downloadedProgress.progressProperty, throttlingFast, jfxThrottler, info.downloaded, info.state) {
             Option(info.size.get).filter(_ >= 0).map { size ⇒
               // Limit precision to 3 digits (1/10th of percent), so that actual
               // progress is not updated more than 1000 times (which limits CPU
@@ -1482,7 +1485,7 @@ class MainController extends StagePersistentView with StrictLogging {
               }
             }:Double
           }
-          BindingsEx.bind(data.downloadedProgressText.textProperty, 500.millis, JFXSystem.scheduler, info.downloaded) {
+          BindingsEx.bind(data.downloadedProgressText.textProperty, throttlingFast, jfxThrottler, info.downloaded) {
             refreshAllDlProgress()
             val downloaded = info.downloaded.get
             val size = info.size.get
@@ -1498,9 +1501,9 @@ class MainController extends StagePersistentView with StrictLogging {
           // Notes:
           // Rate value is computed often (depends on rate handler time slice),
           // but displayed less often.
-          new BindingsEx.Builder(JFXSystem.scheduler).add(data.rate) {
+          new BindingsEx.Builder(jfxThrottler).add(data.rate) {
             val v = if (download.isRunning) {
-              val rate = data.rateHandler.currentRate
+              val rate = data.rateValue.get
               s"${Units.storage.toHumanReadable(rate)}/s"
             } else {
               null
@@ -1511,7 +1514,7 @@ class MainController extends StagePersistentView with StrictLogging {
             if (download.isRunning) {
               Option(info.size.get).filter(_ > 0).map { size ⇒
                 val remaining = size - info.downloaded.get
-                val rate = data.rateHandler.currentRate
+                val rate = data.rateValue.get
                 if (rate > 0) {
                   val seconds = (remaining.toDouble / rate).ceil.toLong
                   s"%02d:%02d:%02d".format(seconds / (60 * 60), (seconds / 60) % 60, seconds % 60)
@@ -1520,7 +1523,7 @@ class MainController extends StagePersistentView with StrictLogging {
             } else {
               null
             }
-          }.bind(1.second, data.rateValue, info.downloaded, info.state)
+          }.bind(throttlingSlow, data.rateValue, info.downloaded, info.state)
 
           new BindingsEx.Builder(JFXSystem.scheduler).add(data.stateIcon) {
             refreshAllDlRunning()
@@ -1651,10 +1654,11 @@ object MainController {
     // download. Since the cell item may change, we must be able to 'reset' the
     // binding easily.
     // As most - if not all - download properties are not updated within JavaFX
-    // we need to go through BindindsEx (no real bindings, but Cancellables).
+    // we need to go through BindingsEx (no real bindings, but Cancellables).
     // The easiest way is then to create an intermediate Property here, which is
-    // updated though BindingsEx (created when download is added) and use a
-    // normal Binding in the table cells (with which we can simply 'unbind').
+    // updated though BindingsEx (created when download is added) in JavaFX
+    // thread and use a normal Binding in the table cells (with which we can
+    // simply 'unbind').
     val path: SimpleObjectProperty[Path] = new SimpleObjectProperty()
     val size: SimpleStringProperty = new SimpleStringProperty()
     val sizeIcon: SimpleObjectProperty[Pane] = new SimpleObjectProperty()
@@ -1681,7 +1685,7 @@ object MainController {
 
         case None ⇒
           if (running) {
-            rateUpdateCancellable = Some(Main.scheduler.scheduleWithFixedDelay(1.second, 1.second) {
+            rateUpdateCancellable = Some(Main.scheduler.scheduleWithFixedDelay(throttlingSlow, throttlingSlow) {
               // Inverting the current value is a little trick that validates
               // the observable ('get') and immediately invalidates it ('set'
               // with different value). With this, any listener is guaranteed
@@ -1726,6 +1730,12 @@ object MainController {
   case class OnDownloadsRemove(force: Boolean)
   case class AddDownload(id: UUID, first: Boolean, select: Boolean)
   case class MoveDownloads(ids: List[UUID], up: Boolean, most: Boolean)
+
+  // 'fast' throttling (for downloaded size, ...)
+  private val throttlingFast = 500.millis
+
+  // 'slow' throttling (for rate/ETA, ...)
+  private val throttlingSlow = 1.second
 
   private val settingsKeyPrefix = "main"
 

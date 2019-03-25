@@ -27,6 +27,13 @@ object RateHandler {
  * Also for better computation, it is recommended for caller to at least update
  * downloaded size once per time slice.
  *
+ * Note: beware that computing the rate from 'downloaded' data (as read from the
+ * content decoder) may result in a misleading 'burst' after disabling rate
+ * limiting: the underlying connection has received data (buffered) but rate
+ * limiting does limit how many we actually process per time period, so when
+ * removing the limit we suddenly drain the buffer which artificially increases
+ * the rate (possibly exceeding the physical limit of the connection).
+ *
  * @param rateLimiter the download rate limiter
  * @param startValue the current downloaded size
  * @param duration time duration over which the rate is computed
