@@ -1069,7 +1069,8 @@ class ResponseConsumer(
         // for other downloads to consume too.
         // Leave loop if transferred size is lower than requested; usually means
         // there is nothing more buffered (at worst we will be called again).
-        // TODO: the very first call exceeds 'count' ...
+        // Note: in some versions of Apache NIO (core < 4.4.12) the actual
+        // number of transferred bytes may exceed the requested limit.
         if (!endReached && !download.rateLimiter.isLimited && (transferred >= count)) loop(first = false)
         else endReached
       } else {

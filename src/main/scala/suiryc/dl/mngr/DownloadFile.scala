@@ -99,7 +99,10 @@ class DownloadFile(private var path: Path) extends LazyLogging {
       // Remove remaining ranges. Note: it is not mandatory to lock (which would
       // need to be also used when accessing the object inside FileDownloader).
       remainingRanges.getRanges.asScala.toList.foreach(downloaded.remove)
-      // Remove pending ranges.
+      // Remove pending ranges: we *must not* consider those as downloaded since
+      // flushing them may fail.
+      // Note: here an exclusive lock is needed; 'lock.writeLock' is enough as
+      // it prevents concurrent access from 'write' and 'flush'.
       lock.writeLock.withLock {
         pendingRanges.getRanges.asScala.toList.foreach(downloaded.remove)
       }
@@ -184,7 +187,7 @@ class DownloadFile(private var path: Path) extends LazyLogging {
   // do so for the 'Downloaded' one (while holding an exclusive lock with the
   // code handling the possible I/O failure on 'force').
   //
-  // Since 'flush' is also used upon 'close', it's easier to keep a thrown
+  // Since 'flush' is also used upon 'close', it's easier to throw a
   // DownloadException and let caller propagate/handle the issue.
   // To limit locking, we can use a ReadWriteLock with:
   //  - 'read' (shared) locking when writing to the file: so that writers don't
@@ -196,10 +199,8 @@ class DownloadFile(private var path: Path) extends LazyLogging {
   // for sure which ranges are concerned.
   //
   // Unfortunately the Apache NIO FileContentDecoder implementation is not
-  // thread-safe (uses channel position depending on situation).
-  // So for now use an exclusive lock upon writing and flushing.
-  // TODO: way to workaround this ? (then use 'shared' lock upon writing and
-  // properly lock 'pending' between writing/flushing/getDownloadRanges).
+  // thread-safe as it may use the channel current position.
+  // So for now also use an exclusive lock upon writing.
 
   def write(contentDecoder: ContentDecoder, position: Long, count: Long, dler: ActorRef): Long = {
     // If the current channel size is lower than the write position, transfer
@@ -211,6 +212,8 @@ class DownloadFile(private var path: Path) extends LazyLogging {
     // Use the 'shared' lock while writing: many callers can write at the same
     // time (NIO properly handle this), but 'force' cannot be used at the same
     // time ('exclusive' lock).
+    // Note: as explained above, actually use the exclusive lock because Apache
+    // NIO is not thread-safe.
     val actual = lock.writeLock.withLock {
       val actual = contentDecoder match {
         case fcd: FileContentDecoder ⇒
@@ -225,11 +228,13 @@ class DownloadFile(private var path: Path) extends LazyLogging {
       val range = SegmentRange(position, position + actual - 1)
       dler ! FileDownloader.Downloaded(range)
 
-      // Update 'pending' data. Don't forget to use an exclusive lock since
-      // those are not thread-safe.
-      // Note: we cannot use 'lock.writeLock' as it is not permitted/possible
-      // to upgrade from the 'shared' ('lock.readLock') to the 'exclusive' lock
-      // with ReadWriteLock.
+      // Update 'pending' data.
+      // Notes:
+      // We need an exclusive lock because those are not thread-safe.
+      // 'lock.writeLock' is fine, but we would not be able to use it if we were
+      // already using 'lock.readLock' above as it is not permitted/possible to
+      // upgrade from 'shared' to 'exclusive' lock with ReadWriteLock; in this
+      // case the easiest solution would be to 'synchronized' this access.
       //pendingRanges.synchronized {
         pendingRanges.add(range)
         pending += range.length
@@ -248,9 +253,9 @@ class DownloadFile(private var path: Path) extends LazyLogging {
     // If flushing is needed, use the 'exclusive' lock: this way we are sure
     // there won't be any writing concurrently.
     // Note: we don't need to lock while checking the condition to flush (which
-    // saves some time since most of them times we may not need to flush). But
-    // once we do flush and need use the lock, check again to make sure only one
-    // thread do it.
+    // saves some time since most of the time we may not need to flush). But
+    // once we do need to flush and use the lock, check again to make sure only
+    // one thread do it.
     @inline def needFlush: Boolean = force || (pending > Main.settings.bufferWriteFlushSize.get)
     if (needFlush) lock.writeLock.withLock {
       if (needFlush) {
@@ -261,6 +266,8 @@ class DownloadFile(private var path: Path) extends LazyLogging {
             // Pass the failed ranges ('pending') to caller and let it handle it.
             // What is guaranteed is that 'Downloaded' messages for those ranges
             // have been sent already.
+            // Note: make sure to build an immutable collection from the java
+            // one since the latter will be cleared/reused.
             throw DownloadException(
               message = s"I/O error: (${ex.getClass.getSimpleName}) ${ex.getMessage}",
               cause = ex,

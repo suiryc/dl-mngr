@@ -57,17 +57,19 @@ object DownloadManager {
 
     private var started = false
 
-    // TODO: there is no sure way to configure the read buffer (socket + apache)
+    // Note: there is no sure way to limit the read buffer (socket + apache).
     // ConnectionConfig has buffer size, but its the starting value which is
-    // automatically expanded (x2) upon filling when needed ...
+    // automatically expanded (x2) upon filling when needed ... And this buffer
+    // only seems used at the start of the connection (at least when dealing
+    // with a FileContentDecoder).
     // By forcing the buffer filling (wait upon writing), it still seems than no
-    // more than ~128KiB (by default) of data are buffered, but how does this happen ?
-    // IOReactorConfig can have rcv buffer size, but
-    //  - it only restrict the socket buffer
-    //  - with small size it seems respected
-    //  - with higher size, forcing buffer filling, usually the amount of data ready is
-    //    x2 or x3 (again, how does this happen ?)
-    // However, setting a 'low' value drastically reduces the download speed.
+    // more than ~128KiB (by default) of data are buffered ...
+    // IOReactorConfig have an rcv buffer size:
+    //  - it only restricts the socket buffer
+    //  - with small size it seems respected, and 'low' values drastically
+    //    reduces the download speed (unlike ConnectionConfig buffer size)
+    //  - with higher size, forcing buffer filling, usually the amount of data
+    //    ready is x2 or x3 ...
     /** HTTP connection manager. */
     lazy private val connManager = {
       val bufferReadMax = Main.settings.bufferReadMax.get
@@ -99,8 +101,8 @@ object DownloadManager {
     // (default maximum connections are 2 for route/host, 20 in total)
     connManager.setDefaultMaxPerRoute(Int.MaxValue)
     connManager.setMaxTotal(Int.MaxValue)
-    //val connConfig = ConnectionConfig.custom
-    //    .setBufferSize(1)
+    //private val connConfig = ConnectionConfig.custom
+    //    .setBufferSize(128)
     //    .build
     //connManager.setDefaultConnectionConfig(connConfig)
     /** HTTP client. */
