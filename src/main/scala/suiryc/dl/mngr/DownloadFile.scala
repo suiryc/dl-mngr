@@ -261,7 +261,7 @@ class DownloadFile(private var path: Path) extends LazyLogging {
             // Pass the failed ranges ('pending') to caller and let it handle it.
             // What is guaranteed is that 'Downloaded' messages for those ranges
             // have been sent already.
-            DownloadException(
+            throw DownloadException(
               message = s"I/O error: (${ex.getClass.getSimpleName}) ${ex.getMessage}",
               cause = ex,
               started = true,
