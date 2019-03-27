@@ -940,18 +940,21 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
 
   def stopSegment(state0: State): State = {
     val segments = state0.segmentConsumers.size
-
-    // Note: the number of segments may be beyond the limit (should be 1 beyond
-    // for a forced segment that has not 'started' yet).
-    val state = if (segments >= state0.getMaxSegments) {
-      // Select the farthest segment, and abort it
-      val data = state0.segmentConsumers.values.toList.maxBy(_.range.start)
-      state0.updateConsumerData(data.responseConsumer)(_.abort())
-    } else {
+    if (segments == 1) {
+      // When there is only one segment running, simply stop the download
+      self ! DownloadStop
       state0
+    } else {
+      val state = if (segments > 0) {
+        // Select the farthest segment, and abort it
+        val data = state0.segmentConsumers.values.toList.maxBy(_.range.start)
+        state0.updateConsumerData(data.responseConsumer)(_.abort())
+      } else {
+        state0
+      }
+      // Reduce the segments limit (relatively to the current number of segments)
+      state.setMaxSegments(math.max(1, segments - 1))
     }
-    // Reduce the segments limit (relatively to the current number of segments)
-    state.setMaxSegments(math.max(1, segments - 1))
   }
 
   def done(state0: State): State = {
