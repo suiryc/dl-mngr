@@ -6,6 +6,8 @@ import org.apache.http._
 import org.apache.http.message.{BasicHeader, BasicHeaderValueFormatter, BasicHttpResponse, BasicNameValuePair}
 import org.apache.http.util.CharArrayBuffer
 import org.scalatest.{Matchers, WordSpec}
+import suiryc.dl.mngr.model.SegmentRange
+import suiryc.dl.mngr.util.Http.ContentRange
 
 class HttpSpec extends WordSpec with Matchers {
 
@@ -25,6 +27,49 @@ class HttpSpec extends WordSpec with Matchers {
         Http.getContentLength(buildHttpResponse(contentLength = Some("-1234"))) shouldBe -1L
         Http.getContentLength(buildHttpResponse(contentLength = Some("1.234"))) shouldBe -1L
         Http.getContentLength(buildHttpResponse(contentLength = Some("invalid"))) shouldBe -1L
+      }
+
+    }
+
+    "getting content range from HTTP response" should {
+
+      "handle valid value" in {
+        Http.getContentRange(buildHttpResponse(contentRange = Some("bytes 12-34/56"))) shouldBe Some(ContentRange(12, 34, 56))
+        Http.getContentRange(buildHttpResponse(contentRange = Some("bytes 12-34/*"))) shouldBe Some(ContentRange(12, 34, Long.MaxValue))
+        // Also handle extra white characters
+        Http.getContentRange(buildHttpResponse(contentRange = Some(" \tbytes \t12-34/56 \t"))) shouldBe Some(ContentRange(12, 34, 56))
+      }
+
+      "handle missing value" in {
+        Http.getContentRange(buildHttpResponse()) shouldBe None
+      }
+
+      "handle invalid value" in {
+        Http.getContentRange(buildHttpResponse(contentRange = Some("something 12-34/56"))) shouldBe None
+        Http.getContentRange(buildHttpResponse(contentRange = Some("bytes -34/56"))) shouldBe None
+        Http.getContentRange(buildHttpResponse(contentRange = Some("bytes 12-/56"))) shouldBe None
+        Http.getContentRange(buildHttpResponse(contentRange = Some("bytes 34/56"))) shouldBe None
+        Http.getContentRange(buildHttpResponse(contentRange = Some("bytes 12-34/"))) shouldBe None
+        Http.getContentRange(buildHttpResponse(contentRange = Some("bytes a-34/56"))) shouldBe None
+        Http.getContentRange(buildHttpResponse(contentRange = Some("bytes 12-a/56"))) shouldBe None
+        Http.getContentRange(buildHttpResponse(contentRange = Some("bytes 12-34/a"))) shouldBe None
+        Http.getContentRange(buildHttpResponse(contentRange = Some("bytes 12-34/**"))) shouldBe None
+        Http.getContentRange(buildHttpResponse(contentRange = Some("bytes 12-34/*56"))) shouldBe None
+        Http.getContentRange(buildHttpResponse(contentRange = Some("bytes 12-34/56*"))) shouldBe None
+      }
+
+    }
+
+    "matching ContentRange and SegmentRange" should {
+
+      "match same range" in {
+        ContentRange(12, 34, 56).matches(SegmentRange(12, 34)) shouldBe true
+        ContentRange(12, 34, 56).matches(SegmentRange(12)) shouldBe true
+      }
+
+      "not match different range" in {
+        ContentRange(12, 34, 56).matches(SegmentRange(12, 35)) shouldBe false
+        ContentRange(12, 34, 56).matches(SegmentRange(11)) shouldBe false
       }
 
     }
@@ -125,7 +170,7 @@ class HttpSpec extends WordSpec with Matchers {
 
   }
 
-  private def buildHttpResponse(contentLength: Option[String] = None,
+  private def buildHttpResponse(contentLength: Option[String] = None, contentRange: Option[String] = None,
     ctype: Boolean = false, ctypeName: Option[String] = None, ctypeEncoded: Option[String] = None,
     cdisp: Boolean = false, cdispName: Option[String] = None, cdispEncoded: Option[String] = None): HttpResponse =
   {
@@ -133,6 +178,9 @@ class HttpSpec extends WordSpec with Matchers {
 
     contentLength.foreach { value ⇒
       response.addHeader(new BasicHeader(HttpHeaders.CONTENT_LENGTH, value))
+    }
+    contentRange.foreach { value ⇒
+      response.addHeader(new BasicHeader(HttpHeaders.CONTENT_RANGE, value))
     }
 
     if (ctype) {

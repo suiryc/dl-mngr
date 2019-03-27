@@ -6,9 +6,25 @@ import java.util.Date
 import org.apache.http.client.utils.DateUtils
 import org.apache.http.entity.ContentType
 import org.apache.http.{HttpHeaders, HttpResponse}
+import suiryc.dl.mngr.model.SegmentRange
 
 /** HTTP helpers. */
 object Http extends StrictLogging {
+
+  case class ContentRange(start: Long, end: Long, total: Long) {
+
+    def isInfinite: Boolean = total == Long.MaxValue
+
+    def matches(range: SegmentRange): Boolean = {
+      (start == range.start) &&
+        range.isInfinite || (end == range.end)
+    }
+
+    override def toString: String = s"$start-$end/${if (isInfinite) "*" else total}"
+
+  }
+
+  private val CONTENT_RANGE_REGEXP = """\s*bytes\s+([\d]+)-([\d]+)/([*\d]+)\s*""".r
 
   /**
    * Gets URI from string.
@@ -175,6 +191,33 @@ object Http extends StrictLogging {
    */
   def handleBytesRange(response: HttpResponse): Boolean = {
     Option(response.getFirstHeader(HttpHeaders.ACCEPT_RANGES)).map(_.getValue).contains("bytes")
+  }
+
+  /**
+   * Gets response content range.
+   *
+   * Server must return a valid "Content-Range" header.
+   */
+  def getContentRange(response: HttpResponse): Option[ContentRange] = {
+    Option(response.getFirstHeader(HttpHeaders.CONTENT_RANGE)).flatMap { h ⇒
+      try {
+        h.getValue match {
+          case CONTENT_RANGE_REGEXP(start, end, total) ⇒
+            Some(ContentRange(
+              start = start.toLong,
+              end = end.toLong,
+              total = if (total == "*") Long.MaxValue else total.toLong
+            ))
+
+          case _ ⇒
+            None
+        }
+      } catch {
+        case ex: Exception ⇒
+          logger.error(s"Failed to parse HTTP content range=<${h.getValue}>: ${ex.getMessage}", ex)
+          None
+      }
+    }
   }
 
   /**

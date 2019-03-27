@@ -216,7 +216,6 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
 
   // See RFC 7233 for range requests
 
-  // TODO: recheck range validator/size etc if 'started' is true initially ?
   override def receive: Receive = receive(State(dlMngr, dl, started = dl.info.isSizeDetermined))
 
   def receive(state: State): Receive = {
@@ -1057,14 +1056,35 @@ class ResponseConsumer(
       Some(DownloadException(s"Request failed with HTTP status=<(${statusLine.getStatusCode}) ${statusLine.getReasonPhrase}>"))
     } else if ((position > 0) || range.isDefined) {
       // We requested a partial content; ensure the response is consistent.
-      // We could check the requested range is returned, or the validator is
-      // the one we used. But that's the server responsibility to only return
-      // the appropriate HTTP code when all is fine.
+      // It's the server responsibility to only return the appropriate HTTP code
+      // when all is fine. We can still ensure that we get what we requested.
+      val rangeValidator = Http.getValidator(response)
+      val contentRange = Http.getContentRange(response)
       if (response.getStatusLine.getStatusCode != HttpStatus.SC_PARTIAL_CONTENT) {
         Some(DownloadException(
           message = s"Range request not honored; HTTP status=<(${statusLine.getStatusCode}) ${statusLine.getReasonPhrase}>",
           rangeFailed = true,
-          rangeValidator = Http.getValidator(response)
+          rangeValidator = rangeValidator
+        ))
+      } else if (download.info.rangeValidator != rangeValidator) {
+        Some(DownloadException(
+          message = s"Range request validator mismatch: expected=<${
+            download.info.rangeValidator.getOrElse("")
+          }> actual=<${
+            rangeValidator.getOrElse("")
+          }>",
+          rangeFailed = true,
+          rangeValidator = rangeValidator
+        ))
+      } else if (contentRange.exists(!_.matches(range))) {
+        Some(DownloadException(
+          message = s"Range request content mismatch: expected=<${
+            range
+          }> actual=<${
+            contentRange.getOrElse("")
+          }>",
+          rangeFailed = true,
+          rangeValidator = rangeValidator
         ))
       } else {
         None
