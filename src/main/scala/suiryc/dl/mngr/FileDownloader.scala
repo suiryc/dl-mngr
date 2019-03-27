@@ -107,9 +107,20 @@ object FileDownloader {
 
     updateMaxSegments()
 
+    def addError(ex: DownloadException, downloaded: Boolean): State = {
+      copy(
+        cnxErrors = cnxErrors + (if (!ex.started) 1 else 0),
+        dlErrors = dlErrors + (if (ex.started && !downloaded) 1 else 0)
+      )
+    }
+
     def hasTooManyErrors: Boolean = {
       (cnxErrors >= Main.settings.errorMax.get) || (dlErrors >= Main.settings.errorMax.get)
     }
+
+    def resetCnxErrors: State = copy(cnxErrors = 0)
+
+    def resetErrors: State = resetCnxErrors.copy(dlErrors = 0)
 
     def getMaxSegments: Int = {
       // If the server does not accept ranges, or if size is unknown,
@@ -118,9 +129,7 @@ object FileDownloader {
       else maxSegments.getOrElse(download.maxSegments)
     }
 
-    def setMaxSegments(max: Int): State = {
-      copy(maxSegments = Some(max)).updateMaxSegments()
-    }
+    def setMaxSegments(max: Int): State = copy(maxSegments = Some(max)).updateMaxSegments()
 
     def updateMaxSegments(): State = {
       download.info.maxSegments.set(getMaxSegments)
@@ -180,20 +189,16 @@ object FileDownloader {
 
     def resume(restart: Boolean): State = {
       if (restart) {
-        copy(
+        resetErrors.copy(
           started = false,
           stopping = false,
-          cnxErrors = 0,
-          dlErrors = 0,
           failed = None,
           segmentConsumers = Map.empty,
           maxSegments = None
         )
       } else {
-        copy(
+        resetErrors.copy(
           stopping = false,
-          cnxErrors = 0,
-          dlErrors = 0,
           failed = None,
           maxSegments = None
         )
@@ -599,7 +604,7 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
       val state1 = state.addConsumer(responseConsumer, data)
       // If we forced segment to start, cancel any pending attempt and reset
       // errors.
-      if (force) state1.cancelTrySegment.copy(cnxErrors = 0, dlErrors = 0)
+      if (force) state1.cancelTrySegment.resetErrors
       else state1
     } catch {
       case ex: Exception ⇒
@@ -617,7 +622,7 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
     val state1 = if (state0.started) {
       // We don't need anything anymore, this serves only to trigger a new
       // segment start if possible.
-      state0.copy(cnxErrors = 0)
+      state0.resetCnxErrors
     } else {
       val contentLength = Http.getContentLength(response)
       val lastModified = Http.getLastModified(response)
@@ -671,10 +676,7 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
         }
       }
       val state1 = if (contentLength >= 0) changeSegmentEnd(state0, consumer, contentLength - 1) else state0
-      state1.copy(
-        started = true,
-        cnxErrors = 0
-      )
+      state1.resetCnxErrors.copy(started = true)
     }
     val state2 = state1.updateConsumerData(consumer)(_.copy(started = true))
     // If the segment/connection was forced, and we went beyond the segment
@@ -724,10 +726,7 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
 
     state = handleWriteError(state, exOpt1)
     exOpt.foreach { ex ⇒
-      state = state.copy(
-        cnxErrors = state.cnxErrors + (if (!ex.started) 1 else 0),
-        dlErrors = state.dlErrors + (if (ex.started && !downloaded) 1 else 0)
-      )
+      state = state.addError(ex, downloaded)
     }
     val status = if (aborted) {
       "aborted"
@@ -911,31 +910,41 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
           }
         }
       } else {
-        val state1 = if (!ex.started) {
+        // If there is no concurrent segment, we cannot consider we reached a
+        // limit on how many segments we can open in parallel.
+        val (state1, canStop) = if (!ex.started && state0.segmentConsumers.nonEmpty) {
           // Request failed.
           // Assume we cannot create more segments than what we currently have.
-          // (but keep a minimum of 1)
-          val maxSegments = math.max(1, state0.segmentConsumers.size)
+          val maxSegments = state0.segmentConsumers.size
           val message = s"Too many errors; set maxSegments=<$maxSegments>"
           logger.warn(s"${download.context} $message")
           state0.download.info.addLog(LogKind.Warning, message)
-          state0.setMaxSegments(maxSegments)
+          // Now we don't consider our cnx error as a true error. Since we will
+          // now respect the deduced segments limit, reset any previous cnx
+          // error and obviously don't stop the download.
+          (state0.resetCnxErrors.setMaxSegments(maxSegments), false)
         } else {
           // Segment had an issue after successfully starting.
           val message = "Too many errors"
           logger.warn(s"${download.context} $message")
           state0.download.info.addLog(LogKind.Warning, message)
-          state0
+          // Trigger download stopping: we won't automatically try new
+          // connections, so we will need to properly consider the download
+          // stopped once the last segment is done.
+          (state0, true)
         }
-        // Trigger stopping if that was the last consumer
-        if (state1.segmentConsumers.isEmpty) {
+        // Trigger stopping when applicable
+        if (canStop) {
           stop(state1, ex, abort = false)
         } else {
           state1
         }
       }
-    }.getOrElse(state0)
-    // else: no Exception (this segment finished without issue)
+    }.getOrElse {
+      // No Exception: this segment finished without issue.
+      // Note: stopping was already triggered when applicable.
+      state0
+    }
   }
 
   def stopSegment(state0: State): State = {
