@@ -636,13 +636,31 @@ class DownloadManager extends StrictLogging {
       tryConnection()
     }
 
+    def restoreDownload(path: Path, value: JsValue): Option[DownloadBackupInfo] = {
+      try {
+        Some(value.convertTo[DownloadBackupInfo])
+      } catch {
+        case ex: Exception ⇒
+          Main.controller.displayError(
+            title = None,
+            contentText = Some(s"${I18N.Strings.readIssue}\n$path"),
+            ex = ex
+          )
+          None
+      }
+    }
+
     def readFile(path: Path): Boolean = {
       if (path.toFile.exists()) {
-        try {
+        val (ok, issues) = try {
           val state = new String(Files.readAllBytes(path), StandardCharsets.UTF_8)
-          val downloadsBackupInfo = state.parseJson.asJsObject.fields("downloads").asInstanceOf[JsArray].elements.toList.map(_.convertTo[DownloadBackupInfo])
-          restoreState(downloadsBackupInfo)
-          true
+          val restored =
+            state.parseJson.asJsObject.
+              fields("downloads").asInstanceOf[JsArray].
+              elements.toList.
+              map(restoreDownload(path, _))
+          restoreState(restored.flatten)
+          (true, restored.exists(_.isEmpty))
         } catch {
           case ex: Exception ⇒
             Main.controller.displayError(
@@ -650,8 +668,19 @@ class DownloadManager extends StrictLogging {
               contentText = Some(s"${I18N.Strings.readIssue}\n$path"),
               ex = ex
             )
-            false
+            (false, true)
         }
+
+        if (issues) {
+          // Backup this state file if there was an issue.
+          // Note: don't use 'PathsEx.backupPath' since the resulting '.bak'
+          // file may be deleted when saving back the state.
+          val atomicName = PathsEx.atomicName(path)
+          val extension = PathsEx.extension(path)
+          val backupPath = path.resolveSibling(PathsEx.filename(s"$atomicName-unrestored", extension))
+          path.toFile.renameTo(backupPath.toFile)
+        }
+        ok
       } else {
         false
       }
