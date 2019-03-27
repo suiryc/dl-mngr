@@ -11,6 +11,24 @@ class HttpSpec extends WordSpec with Matchers {
 
   "Http" when {
 
+    "getting content length from HTTP response" should {
+
+      "handle valid value" in {
+        Http.getContentLength(buildHttpResponse(contentLength = Some("1234"))) shouldBe 1234L
+      }
+
+      "handle missing value" in {
+        Http.getContentLength(buildHttpResponse()) shouldBe -1L
+      }
+
+      "handle invalid value" in {
+        Http.getContentLength(buildHttpResponse(contentLength = Some("-1234"))) shouldBe -1L
+        Http.getContentLength(buildHttpResponse(contentLength = Some("1.234"))) shouldBe -1L
+        Http.getContentLength(buildHttpResponse(contentLength = Some("invalid"))) shouldBe -1L
+      }
+
+    }
+
     "decoding HTTP header parameter string" should {
 
       "handle plain atom value" in {
@@ -107,10 +125,15 @@ class HttpSpec extends WordSpec with Matchers {
 
   }
 
-  private def buildHttpResponse(ctype: Boolean = false, ctypeName: Option[String] = None, ctypeEncoded: Option[String] = None,
+  private def buildHttpResponse(contentLength: Option[String] = None,
+    ctype: Boolean = false, ctypeName: Option[String] = None, ctypeEncoded: Option[String] = None,
     cdisp: Boolean = false, cdispName: Option[String] = None, cdispEncoded: Option[String] = None): HttpResponse =
   {
     val response = new BasicHttpResponse(HttpVersion.HTTP_1_1, HttpStatus.SC_OK, "Ok")
+
+    contentLength.foreach { value ⇒
+      response.addHeader(new BasicHeader(HttpHeaders.CONTENT_LENGTH, value))
+    }
 
     if (ctype) {
       val parameters = List(

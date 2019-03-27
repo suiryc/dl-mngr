@@ -165,7 +165,7 @@ object Http extends StrictLogging {
           logger.error(s"Failed to parse HTTP content length=<${h.getValue}>: ${ex.getMessage}", ex)
           -1L
       }
-    }.getOrElse(-1L)
+    }.filter(_ >= 0).getOrElse(-1L)
   }
 
   /**
