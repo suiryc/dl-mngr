@@ -615,24 +615,21 @@ class DownloadManager extends StrictLogging {
         )
         val info = download.info
         if (downloadBackupInfo.done) info.state.set(DownloadState.Success)
-        val remainingRanges = downloadBackupInfo.size.map { size ⇒
+        val remainingRanges = downloadBackupInfo.size.flatMap { size ⇒
           info.size.set(size)
-          val remainingRanges = new SegmentRanges(size)
-          downloadBackupInfo.downloadedRanges.foreach(remainingRanges.remove)
-          remainingRanges
+          if (size >= 0) {
+            val remainingRanges = new SegmentRanges(size)
+            downloadBackupInfo.downloadedRanges.foreach(remainingRanges.remove)
+            Some(remainingRanges)
+          } else {
+            None
+          }
         }
         info.remainingRanges = remainingRanges
         info.rangeValidator = downloadBackupInfo.rangeValidator
         info.acceptRanges.set(downloadBackupInfo.acceptRanges)
         info.lastModified.set(downloadBackupInfo.lastModified.orNull)
-        // Handle case where downloadRanges is non-empty yet remainingRanges is.
-        // e.g. restoring a file that was 'resumed' ('downloaded' known) but
-        // actually not started again before closing the app.
         info.downloaded.set(downloadBackupInfo.downloadedRanges.map(_.length).sum)
-        // In any case, if remainingRanges is known, rely on it.
-        info.remainingRanges.foreach { remainingRanges ⇒
-          info.downloaded.set(remainingRanges.getRemovedLength)
-        }
         addDownload(download, insertFirst = false)
         if (downloadBackupInfo.canResume) resumeDownload(download.id, reusedOpt = None, restart = false, tryCnx = false)
       }
