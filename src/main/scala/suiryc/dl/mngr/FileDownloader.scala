@@ -796,10 +796,10 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
     // Note:
     // Download is not fully finished if segments are still running or
     // remaining. If content length was unknown, we are done if the segment
-    // finished without issue.
+    // finished without issue (and was not aborted).
     val finished = state.segmentConsumers.isEmpty && (
       state.stopping ||
-        (download.info.remainingRanges.isEmpty && exOpt.isEmpty) ||
+        (download.info.remainingRanges.isEmpty && exOpt.isEmpty && !aborted) ||
         download.info.remainingRanges.exists(_.getRanges.isEmpty)
       )
     state = if (stopped) {
