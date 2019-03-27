@@ -86,6 +86,7 @@ class DownloadInfo {
   // and is -1 when started and size is unknown.
   def isSizeDetermined: Boolean = size.get != Long.MinValue
   def isSizeUnknown: Boolean = size.get == -1
+  def isSizeKnown: Boolean = size.get >= 0
 
   def restart(): Unit = {
     remainingRanges = None
@@ -227,7 +228,8 @@ case class Download(
   def context: String = s"[id=$id]"
 
   def context(range: SegmentRange): String = {
-    if (range.length > 0) s"$context[range=${range.start}-${range.end}]"
+    if (range.isInfinite) s"$context[range=${range.start}-∞]"
+    else if (range.length > 0) s"$context[range=${range.start}-${range.end}]"
     else context
   }
 

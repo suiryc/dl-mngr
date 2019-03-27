@@ -88,7 +88,7 @@ class HeadRequestController {
         case Some(response) ⇒
           val contentLength = Http.getContentLength(response)
           val lastModified = Http.getLastModified(response)
-          val acceptRanges = Http.handleBytesRange(response, contentLength)
+          val acceptRanges = Http.handleBytesRange(response)
           val filename = Http.getFilename(response).map { filename0 ⇒
             // Sanitize filename, and inform user if value changed.
             val filename = PathsEx.sanitizeFilename(Http.getFilename(filename0))

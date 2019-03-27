@@ -487,8 +487,8 @@ class DownloadManager extends StrictLogging {
     userAgent.foreach { userAgent ⇒
       request.addHeader(HttpHeaders.USER_AGENT, userAgent)
     }
-    if (range.length > 0) {
-      request.addHeader(HttpHeaders.RANGE, s"bytes=${range.start}-${range.end}")
+    if (range.isDefined) {
+      request.addHeader(HttpHeaders.RANGE, s"bytes=${range.start}-${if (range.isInfinite) "" else range.end}")
       rangeValidator.foreach(v ⇒ request.addHeader(HttpHeaders.IF_RANGE, v))
     }
     val rcb = RequestConfig.custom

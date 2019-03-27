@@ -4,12 +4,15 @@ import java.util.{LinkedList ⇒ jLinkedList}
 
 /** Segment range. */
 case class SegmentRange(start: Long, end: Long) {
-  def length: Long = end + 1 - start
-  override def toString: String = s"[$start,$end]"
+  def isInfinite: Boolean = end == Long.MaxValue
+  def length: Long = if (isInfinite) Long.MaxValue else end + 1 - start
+  def isDefined: Boolean = isInfinite || (length > 0)
+  override def toString: String = if (isInfinite) s"[$start,∞]" else s"[$start,$end]"
 }
 
 object SegmentRange {
   val zero = SegmentRange(0, -1)
+  def apply(start: Long): SegmentRange = SegmentRange(start, Long.MaxValue)
 }
 
 /** Segment ranges. */

@@ -171,14 +171,10 @@ object Http extends StrictLogging {
   /**
    * Gets whether server handles bytes range.
    *
-   * Content length must be known and server return "Accept-Ranges: bytes"
-   * header.
+   * Server must return "Accept-Ranges: bytes" header.
    */
-  def handleBytesRange(response: HttpResponse, contentLength: Long): Boolean = {
-    // We don't handle bytes range if either:
-    //  - content length is unknown
-    //  - server does not "Accept-Ranges: bytes"
-    (contentLength >= 0) && Option(response.getFirstHeader(HttpHeaders.ACCEPT_RANGES)).map(_.getValue).contains("bytes")
+  def handleBytesRange(response: HttpResponse): Boolean = {
+    Option(response.getFirstHeader(HttpHeaders.ACCEPT_RANGES)).map(_.getValue).contains("bytes")
   }
 
   /**

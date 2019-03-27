@@ -108,13 +108,16 @@ class DownloadFile(private var path: Path) extends LazyLogging {
       }
       downloaded.getRanges.asScala.toList
     }.getOrElse {
-      // If we did not determine the size yet, but have already 'downloaded',
-      // keep this as downloaded ranges. May happen when 'resuming' an existing
-      // file (considering its size as already downloaded) and closing the app
-      // before actually starting to download the file from its current state
-      // (and thus not having remainingRanges populated yet).
+      // If we already have 'downloaded', keep it as downloaded range. This is
+      // at least informational, and in some cases needed.
+      // e.g. when 'resuming' an existing file (size considered as already
+      // downloaded) and closing the app before actually starting to download
+      // the file from its current state, the DL 'size' is not yet determined
+      // and thus there is no remainingRanges populated yet.
+      // This is also needed when 'size' is unknown while server accept ranges:
+      // we can resume download starting from the downloaded size.
       val downloaded = info.downloaded.get
-      if (!info.isSizeDetermined && (downloaded > 0)) {
+      if (downloaded > 0) {
         List(SegmentRange(0, downloaded - 1))
       } else {
         Nil

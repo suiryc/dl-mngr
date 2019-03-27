@@ -658,7 +658,7 @@ class MainController extends StagePersistentView with StrictLogging {
             field.setTooltip(tooltip)
           }
           dlSizeLabel.setText {
-            if (info.isSizeDetermined && !info.isSizeUnknown) {
+            if (info.isSizeKnown) {
               val size = info.size.get
               s"$size (${Units.storage.toHumanReadable(size)})"
             } else {
@@ -756,7 +756,7 @@ class MainController extends StagePersistentView with StrictLogging {
       case ((downloaded0, total0), data) ⇒
         val info = data.download.info
         val size =
-          if (info.isSizeDetermined && !info.isSizeUnknown) info.size.get
+          if (info.isSizeKnown) info.size.get
           else data.download.sizeHint.getOrElse(0L)
         val downloaded =
           if (size > 0) info.downloaded.get
@@ -1443,7 +1443,7 @@ class MainController extends StagePersistentView with StrictLogging {
           }
 
           def displaySize: String = {
-            val size = if (info.isSizeDetermined) Option(info.size.get) else download.sizeHint
+            val size = if (info.isSizeKnown) Option(info.size.get) else download.sizeHint
             size.filter(_ >= 0).map { size ⇒
               Units.storage.toHumanReadable(size)
             }.orNull
