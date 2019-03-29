@@ -495,6 +495,17 @@ class MainController extends StagePersistentView with StrictLogging {
     logsTable.addEventHandler(KeyEvent.KEY_PRESSED, (event: KeyEvent) => {
       if (CTRL_C.`match`(event)) Option(logsTable.getSelectionModel.getSelectedItems.asScala.toList).foreach(copyDownloadLogsToClipboard)
     })
+    // If logs are changed (non-empty) while there is no selected download,
+    // refresh them (and properties): logs are pushed asynchronously and
+    // there may be a race condition between that and the time subscription
+    // cancellation happens.
+    logsTable.getItems.listen {
+      if (!logsTable.getItems.isEmpty && selectedDownload.isEmpty) {
+        refreshDlLogs()
+        refreshDlProperties()
+      }
+    }
+    ()
   }
 
   private def computeTextWidth(s: String): Double = {
@@ -833,7 +844,7 @@ class MainController extends StagePersistentView with StrictLogging {
     stage.getUserData.asInstanceOf[State]
   }
 
-  private def selectedDownload: Option[UUID] = Some(downloadsTable.getSelectionModel.getSelectedItem)
+  private def selectedDownload: Option[UUID] = Option(downloadsTable.getSelectionModel.getSelectedItem)
   private def selectedDownloadData: Option[DownloadData] = selectedDownload.flatMap(getDownloadData)
 
   private def selectedDownloadsIdx: List[Int] = downloadsTable.getSelectionModel.getSelectedIndices.asScala.toList.map(Int.unbox)
