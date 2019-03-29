@@ -2,6 +2,7 @@ package suiryc.dl.mngr
 
 import akka.actor.ActorRef
 import com.typesafe.scalalogging.LazyLogging
+import java.io.RandomAccessFile
 import java.nio.ByteBuffer
 import java.nio.channels.FileChannel
 import java.nio.file.attribute.FileTime
@@ -160,6 +161,76 @@ class DownloadFile(private var path: Path) extends LazyLogging {
       reused = true
       true
     } else false
+  }
+
+  /**
+   * Preallocates file size.
+   *
+   * If current file size is smaller than target, the file grows.
+   * If requested, delta is filled with zeros.
+   *
+   * @param size target size
+   * @param zero whether to fill space with zeros
+   * @return whether channel was created (false if not done)
+   */
+  def preallocate(size: Long, zero: Boolean): Boolean = this.synchronized {
+    // Notes:
+    // Preallocating space by writing the very last byte works but does not
+    // always appear to help enough in preventing/limiting fragmentation.
+    // The best solution (for both Windows and Linux) is to set the file
+    // length through 'RandomAccessFile.setLength' before writing anything.
+    // Even opening the file and immediately writing zeros until target size is
+    // reached may create more fragmentation (especially on Windows with 'small'
+    // write arrays of 64KiB for example); so always fix length before.
+
+    // Exclusive lock is needed (first connection running in the
+    // background). Don't do anything if we were already done.
+    if ((size > 0) && !isDone) lock.writeLock.withLock {
+      // Create channel if necessary (usually already done when first connection
+      // was acquired).
+      val created = createChannel()
+      val currentEnd = channel.size() - 1
+      val targetEnd = size - 1
+      if (currentEnd < targetEnd) {
+        // File needs to grow. The best solution is to fix the length through
+        // RandomAccessFile, which we need to create temporarily because there
+        // is no way to get one from our FileChannel.
+        // For the best result, caller must call us *before* writing anything.
+        val raf = new RandomAccessFile(getWorkingPath.toFile, "rwd")
+        raf.setLength(size)
+        raf.close()
+
+        if (zero) {
+          // How many zeros to write at a time.
+          // Starting from the current end (+ 1), we write aligned chunks of
+          // zeros.
+          val bufSize = 1024 * 1024
+          val bb = ByteBuffer.wrap(Array.fill(bufSize)(0x00))
+          def loop(pos: Long): Unit = {
+            if (pos <= targetEnd) {
+              // Compute how many zeros we need to write in order to fill the
+              // chunk the writing position belongs to.
+              // We determine:
+              //  - how many bytes are already used (written) in the chunk
+              val used = (pos % bufSize).toInt
+              //  - how many bytes remain until target end
+              val limit0 = math.min(Int.MaxValue, targetEnd + 1 - pos).toInt
+              //  - how many bytes remain until end of chunk or target end
+              val limit = math.min(bufSize - used, limit0)
+              // Do the writing, and go on.
+              bb.clear().limit(limit)
+              loop(pos + channel.write(bb, pos))
+            }
+          }
+          loop(currentEnd + 1)
+          // Make sure write is completed.
+          channel.force(false)
+        }
+      }
+      created
+    } else {
+      false
+    }
   }
 
   // Notes:

@@ -232,12 +232,15 @@ class NewDownloadController extends StagePersistentView {
               val path = findAvailablePath(path0)
               (path, Some(ConflictResolution.Rename))
             } else {
+              // We can only resume the file to which we are to write (temporary
+              // or not). Don't even consider resuming if we use preallocation.
+              val canResume = !Main.settings.preallocateEnabled.get &&
+                (temporary.isEmpty || temporaryExists)
               val r = resolveConflict(
                 header = Strings.downloadAlreadyFile,
                 content = exists.mkString("\n"),
                 canRestart = true,
-                // We can only resume the file to which we are to write (temporary or not)
-                canResume = temporary.isEmpty || temporaryExists,
+                canResume = canResume,
                 canRename = true,
                 defaultRestart = true
               )

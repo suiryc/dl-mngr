@@ -671,7 +671,8 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
         state0.updateMaxSegments()
       }
 
-      download.info.size.set(contentLength)
+      // Set size (if not already done by consumer)
+      download.setSize(contentLength)
       download.info.remainingRanges = if (contentLength >= 0) Some(new SegmentRanges(contentLength)) else None
       download.info.rangeValidator = validator
       download.acceptRanges(acceptRanges)
@@ -1123,6 +1124,12 @@ class ResponseConsumer(
         request.abort()
 
       case None ⇒
+        // When applicable it's better to preallocate the file size before
+        // writing anything. So set the download size if it's our role (we must
+        // be first, and not doing a ranged request).
+        if ((position == 0) && (!range.isDefined || range.isInfinite)) {
+          download.setSize(Http.getContentLength(response))
+        }
         downloadHandler ! FileDownloader.SegmentStarted(this, response)
     }
   }

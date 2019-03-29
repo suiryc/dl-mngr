@@ -698,7 +698,7 @@ class MainController extends StagePersistentView with StrictLogging {
               logger.info(s"${download.context} $message")
               download.info.addLog(LogKind.Info, message)
             }
-            hints.size.foreach(info.size.set)
+            hints.size.foreach(download.setSize)
             hints.filename.filter(_ != info.path.get.getFileName.toString).foreach { filename ⇒
               download.renameFile(info.path.get.getParent.resolve(filename))
             }

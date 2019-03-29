@@ -185,10 +185,23 @@ case class Download(
     if (downloadFile.createChannel()) refreshPaths()
   }
 
+  def setSize(size: Long): Unit = {
+    // Don't bother if size is already set
+    if (size != info.size.get) {
+      info.size.set(size)
+      // Pre-allocate space if applicable and requested.
+      if ((size > 0) && Main.settings.preallocateEnabled.get) {
+        val zero = Main.settings.preallocateZero.get
+        if (downloadFile.preallocate(size, zero)) refreshPaths()
+      }
+    }
+  }
+
   def renameFile(target: Path): Unit = {
     downloadFile.rename(target)
     refreshPaths()
   }
+
   def closeFile(lastModified: Option[Date], done: Boolean): Unit = {
     downloadFile.close(lastModified, done)
     if (done) refreshPaths()

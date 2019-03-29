@@ -26,6 +26,7 @@ object Settings {
   private val KEY_DEFAULT = "default"
   private val KEY_DELAY = "delay"
   private val KEY_DOWNLOADS = "downloads"
+  private val KEY_ENABLED = "enabled"
   private val KEY_ERROR = "error"
   private val KEY_EXTENSION = "extension"
   private val KEY_FILESYSTEM = "filesystem"
@@ -36,6 +37,7 @@ object Settings {
   private val KEY_MIN = "min"
   private val KEY_MIN_SIZE = "min-size"
   private val KEY_PATH = "path"
+  private val KEY_PREALLOCATE = "preallocate"
   private val KEY_PROXY = "proxy"
   private val KEY_RATE_LIMIT = "rate-limit"
   private val KEY_READ = "read"
@@ -51,6 +53,7 @@ object Settings {
   private val KEY_VALUE = "value"
   private val KEY_UNIT = "unit"
   private val KEY_WRITE = "write"
+  private val KEY_ZERO = "zero"
 
   private val prefix = List(KEY_SUIRYC, KEY_DL_MNGR)
   private val sitesPrefix = prefix :+ KEY_SITES
@@ -137,6 +140,11 @@ class Settings(path: Path) {
     ConfigEntry.from(settings, prefix ++ Seq(KEY_DOWNLOADS, KEY_BUFFER, KEY_READ, KEY_MIN))(ConfigEntry.bytesHandler)
   val bufferReadMax: ConfigEntry[Long] =
     ConfigEntry.from(settings, prefix ++ Seq(KEY_DOWNLOADS, KEY_BUFFER, KEY_READ, KEY_MAX))(ConfigEntry.bytesHandler)
+
+  val preallocateEnabled: ConfigEntry[Boolean] =
+    ConfigEntry.from(settings, prefix ++ Seq(KEY_FILESYSTEM, KEY_PREALLOCATE, KEY_ENABLED))
+  val preallocateZero: ConfigEntry[Boolean] =
+    ConfigEntry.from(settings, prefix ++ Seq(KEY_FILESYSTEM, KEY_PREALLOCATE, KEY_ZERO))
 
   val bufferWriteFlushSize: ConfigEntry[Long] =
     ConfigEntry.from(settings, prefix ++ Seq(KEY_FILESYSTEM, KEY_BUFFER, KEY_WRITE, KEY_FLUSH, KEY_SIZE))(ConfigEntry.bytesHandler)

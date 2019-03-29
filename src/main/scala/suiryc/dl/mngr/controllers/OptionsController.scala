@@ -62,6 +62,12 @@ class OptionsController extends StagePersistentView {
   protected var minSegmentSizeField: TextField = _
 
   @FXML
+  protected var preallocateField: CheckBox = _
+
+  @FXML
+  protected var preallocateZeroField: CheckBox = _
+
+  @FXML
   protected var writeBufferSizeField: TextField = _
 
   @FXML
@@ -192,6 +198,8 @@ class OptionsController extends StagePersistentView {
       , intSettingSnapshot(maxServerCnxField, Main.settings.cnxServerMax, isCnxLimit = true)
       , intSettingSnapshot(maxSegmentsField, Main.settings.sitesDefault.segmentsMax, isCnxLimit = true)
       , bytesSettingSnapshot(minSegmentSizeField, Main.settings.segmentsMinSize, isCnxLimit = true)
+      , booleanSettingSnapshot(preallocateField, Main.settings.preallocateEnabled)
+      , booleanSettingSnapshot(preallocateZeroField, Main.settings.preallocateZero)
       , bytesSettingSnapshot(writeBufferSizeField, Main.settings.bufferWriteFlushSize)
       , {
         val setting = Main.settings.proxy
@@ -302,7 +310,7 @@ class OptionsController extends StagePersistentView {
       languageChoice.getSelectionModel.selectedItemProperty, debugField.selectedProperty,
       downloadFolderField.textProperty, fileExtensionField.textProperty, removeCompletedField.selectedProperty,
       maxDownloadsField.textProperty, maxCnxField.textProperty, maxServerCnxField.textProperty, maxSegmentsField.textProperty, minSegmentSizeField.textProperty,
-      writeBufferSizeField.textProperty,
+      preallocateField.selectedProperty, preallocateZeroField.selectedProperty, writeBufferSizeField.textProperty,
       proxyField.textProperty, sslTrustField.selectedProperty, sslTrustField.indeterminateProperty,
       sslErrorAskField.selectedProperty, sslErrorAskField.indeterminateProperty,
       maxErrorsField.textProperty, attemptDelayField.textProperty,
