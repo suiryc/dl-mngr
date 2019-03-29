@@ -500,13 +500,28 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
           case (consumerOpt, range, acquired) ⇒
             consumerOpt match {
               case Some(consumer) ⇒
-                // TODO: wait for request 'success' before changing current consumer end ?
-                //  -> useful if request actually fails, so that we
-                //    1. don't waste time/logs changing and resetting the current consumer end
-                //    2. prevent current consumer to end if it reaches the end before the request
-                //       actually fails
-                //  -> at worst, new consumer may overwrite sections already downloaded ?
-                //  Is is worth it ?
+                // This segment is 'active': a consumer owns it and we will need
+                // to change its segment end so that a new consumer can now own
+                // this new (sub)segment.
+                //
+                // We assume the request will succeed (most of the time) and we
+                // can change the active segment end right now. In return if the
+                // new consumer fails to start the segment, we will try to give
+                // it back to the original owner (if still running).
+                // The 'worst case' would be:
+                //  1. We change consumerA segment end
+                //  2. We start consumerB (segment start follows consumerA
+                //     segment end)
+                //  3. consumerA reaches its segment end and stops
+                //  4. consumerB fails to actually start: its segment still need
+                //     to be downloaded and we will need to start a new consumer
+                //     since consumerA ended
+                // However most issues upon starting a new segment would happen
+                // with the first attempts (segments limit reached), and at this
+                // point the segments to download are still large so there is
+                // less chances for a consumer to end before another one fails.
+                // In other words: it's not worth waiting for the new segment to
+                // start before changing the previous segment end.
                 val newRange = range.copy(
                   start = range.start + range.length / 2 + 1
                 )
@@ -514,6 +529,8 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
                 state = segmentStart(state, newRange, acquired, force, forced, tryCnx)
 
               case None ⇒
+                // This segment is not 'active' (no consumer owns it) and we can
+                // (try to) start right away.
                 state = segmentStart(state, range, acquired, force, forced, tryCnx)
             }
             true

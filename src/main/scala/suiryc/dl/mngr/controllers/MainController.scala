@@ -1,7 +1,6 @@
 package suiryc.dl.mngr.controllers
 
 import akka.actor.{Actor, ActorRef, Props}
-import com.sun.javafx.scene.control.VirtualScrollBar
 import com.sun.javafx.tk.Toolkit
 import com.typesafe.scalalogging.StrictLogging
 import java.io.{PrintWriter, StringWriter}
@@ -15,7 +14,7 @@ import javafx.fxml.{FXML, FXMLLoader}
 import javafx.scene.{Node, Parent, Scene}
 import javafx.scene.control._
 import javafx.scene.input._
-import javafx.scene.layout.{Pane, Region, StackPane}
+import javafx.scene.layout.{Pane, StackPane}
 import javafx.scene.text.{Font, Text}
 import javafx.stage.{FileChooser, Modality, Stage, WindowEvent}
 import javafx.util.StringConverter
@@ -190,15 +189,17 @@ class MainController extends StagePersistentView with StrictLogging {
     // Inject icons in menu and panes
     Icons.setIcons(stage.getScene.getRoot)
 
-    // When showing "Downloads" menu, update items state. We could follow table
-    // items list and each download state, but that would be a bit overkill.
-    // TODO: unfortunately, after a while the menu item remain greyed out even if enabled ...
+    // We would like to update "Downloads" menu items upon showing (to only
+    // enable applicable actions). We could also follow table items list and
+    // each download state, but that would be a bit overkill.
+    // Unfortunately, when enabling/disabling items, after a while those items
+    // remain greyed out even if enabled ...
     //downloadsStopAllMenu.getParentMenu.setOnShowing { _ ⇒
     //  val _data = getDownloadsData
     //  enableMenuStop(downloadsStopAllMenu, _data)
     //  enableMenuResume(downloadsResumeAllMenu, _data)
     //  enableMenuRemoveCompleted(downloadsRemoveCompletedMenu, _data)
-    //  enableMenuRemove(downloadsRemove, _data)
+    //  enableMenuRemove(downloadsRemoveMenu, _data)
     //}
 
     // We wish to disable mouse events in the custom menu item (but not the
@@ -807,60 +808,8 @@ class MainController extends StagePersistentView with StrictLogging {
     TableViews.setColumnsView(downloadsTable, downloadsColumns, downloadsColumnsPref.opt)
     TableViews.setColumnsView(logsTable, logsColumns, logsColumnsPref.opt)
 
-    // Now what we want is for both columns to occupy the whole table width.
-    // Using a constrained resizing policy gets in the way of restoring the
-    // view, so a solution is to create a binding through which we set the
-    // 'message' column (preferred) width according to the width of other
-    // elements:
-    //  column2Width = tableWidth - tablePadding - column1Width
-    // However the vertical scrollbar which may appear is not taken into
-    // account in table width. It is in the "clipped-container" that is a
-    // Region of the viewed content:
-    //  column2Width = containerWidth - column1Width
-    // (the container has 0 width when there is no content in the table)
-    //
-    // The table width is changed before the container one, which triggers
-    // glitches when resizing down using the second formula: the horizontal
-    // scrollbar appears (and disappears upon interaction or resizing up).
-    // Requesting layout (in 'runLater') makes it disappear right away.
-    // But listening to table width too (which is changed first) and keeping
-    // the minimum width between 'tableWidth - tablePadding - scrollBarWidth'
-    // and 'containerWidth' prevents the horizontal scrollbar from appearing.
-    // TODO: check if all this is still right ? (especially when resizing down)
-    //
-    // Extra note: column width may be a decimal value. Keep floor value of
-    // target column width to also prevent horizontal scrollbar from appearing.
-    // Extra note: since we change the minimum width, listen to it to enforce
-    // value when necessary.
-    val clippedContainer = logsTable.lookup(".clipped-container").asInstanceOf[Region]
-    val scrollBar = logsTable.lookupAll(".scroll-bar").asScala.collect {
-      case scrollBar: VirtualScrollBar if scrollBar.getPseudoClassStates.asScala.map(_.getPseudoClassName).contains("vertical") ⇒ scrollBar
-    }.head
-
-    def updateColumnWidth(): Unit = {
-      val insets = logsTable.getPadding
-      val padding = insets.getLeft + insets.getRight
-      val scrollbarWidth =
-        if (!scrollBar.isVisible) 0
-        else scrollBar.getWidth
-      val logsWidth0 = logsTable.getWidth - padding - scrollbarWidth
-      val logsWidth =
-        if (clippedContainer.getWidth > 0) math.min(logsWidth0, clippedContainer.getWidth)
-        else logsWidth0
-      val width = (logsWidth - columnLogTime.getWidth).floor
-      columnLogMessage.setPrefWidth(width)
-      // Setting max width helps applying target width in some cases (minimum
-      // width changed to a lower value after re-setting logs).
-      val maxWidth = math.max(width, columnLogMessage.getMinWidth)
-      columnLogMessage.setMaxWidth(maxWidth)
-    }
-
-    RichObservableValue.listen[AnyRef](logsTable.widthProperty, clippedContainer.widthProperty,
-      columnLogTime.widthProperty, columnLogMessage.minWidthProperty)
-    {
-      updateColumnWidth()
-    }
-    ()
+    // Automatically resize 'message' column to fit the whole table width.
+    TableViews.autowidthColumn(columnLogMessage)
   }
 
   /** Persists view (stage location, ...). */
