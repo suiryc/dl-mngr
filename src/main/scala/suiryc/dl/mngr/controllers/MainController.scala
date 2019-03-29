@@ -214,7 +214,7 @@ class MainController extends StagePersistentView with StrictLogging {
     }
     def getRateLimitValue: Long = {
       try {
-        Option(rateLimitField.getText).map(_.toLong).getOrElse(0L)
+        Option(rateLimitField.getText).map(_.toLong).filter(_ >= 0L).getOrElse(0L)
       } catch {
         case _: Exception ⇒ 0L
       }
@@ -227,6 +227,9 @@ class MainController extends StagePersistentView with StrictLogging {
       Main.settings.rateLimitValue.set(value)
       Main.settings.rateLimitUnit.set(unit.label)
       refreshAllDlSpeed()
+      // If rate is 0, reset the field text (in case the value was actually
+      // invalid).
+      if (value == 0) rateLimitField.setText("0")
     }
     rateLimitField.setOnAction { _ ⇒
       updateRateLimiter()
