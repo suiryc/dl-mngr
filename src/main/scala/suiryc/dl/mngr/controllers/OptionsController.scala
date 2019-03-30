@@ -17,13 +17,13 @@ import suiryc.scala.javafx.concurrent.JFXSystem
 import suiryc.scala.javafx.scene.{Graphics, Styles}
 import suiryc.scala.javafx.scene.control.{CellWithSeparator, Dialogs, I18NLocaleCell}
 import suiryc.scala.javafx.stage.Stages.StageLocation
-import suiryc.scala.javafx.stage.{PathChoosers, StagePersistentView, Stages}
+import suiryc.scala.javafx.stage.{PathChoosers, StageLocationPersistentView, Stages}
 import suiryc.scala.misc.{Units, Util}
 import suiryc.scala.settings._
 import suiryc.scala.unused
 import suiryc.scala.util.I18NLocale
 
-class OptionsController extends StagePersistentView {
+class OptionsController extends StageLocationPersistentView(OptionsController.stageLocation) {
 
   import I18N.Strings
   import OptionsController._
@@ -127,7 +127,7 @@ class OptionsController extends StagePersistentView {
   @FXML
   protected var siteMaxSegmentsField: TextField = _
 
-  private var stage: Stage = _
+  protected var stage: Stage = _
 
   private var sitesChanged = false
 
@@ -376,20 +376,7 @@ class OptionsController extends StagePersistentView {
       child.setManaged(true)
     }
 
-    Stages.onStageReady(stage, first = false) {
-      // Restore stage location
-      Stages.setMinimumDimensions(stage)
-      stageLocation.opt.foreach { loc ⇒
-        Stages.setLocation(stage, loc, setSize = true)
-      }
-    }(JFXSystem.dispatcher)
-  }
-
-  /** Persists view (stage location, ...). */
-  override protected def persistView(): Unit = {
-    // Persist stage location
-    // Note: if iconified, resets it
-    stageLocation.set(Stages.getLocation(stage).orNull)
+    super.restoreView()
   }
 
   def onDownloadFolderSelect(@unused event: ActionEvent): Unit = {

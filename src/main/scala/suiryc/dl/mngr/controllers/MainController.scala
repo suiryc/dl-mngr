@@ -40,14 +40,14 @@ import suiryc.scala.javafx.concurrent.JFXSystem
 import suiryc.scala.javafx.scene.{Graphics, Styles}
 import suiryc.scala.javafx.scene.control.{Dialogs, Panes, TableCellEx, TableViews}
 import suiryc.scala.javafx.scene.control.skin.SplitPaneSkinEx
-import suiryc.scala.javafx.stage.{PathChoosers, StagePersistentView, Stages}
+import suiryc.scala.javafx.stage.{PathChoosers, StageLocationPersistentView, Stages}
 import suiryc.scala.javafx.stage.Stages.StageLocation
 import suiryc.scala.settings.ConfigEntry
 import suiryc.scala.unused
 import suiryc.scala.util.CallsThrottler
 
 
-class MainController extends StagePersistentView with StrictLogging {
+class MainController extends StageLocationPersistentView(MainController.stageLocation, first = true) with StrictLogging {
 
   import MainController._
 
@@ -164,7 +164,7 @@ class MainController extends StagePersistentView with StrictLogging {
     "message" → columnLogMessage
   )
 
-  lazy private val stage = splitPane.getScene.getWindow.asInstanceOf[Stage]
+  lazy protected val stage: Stage = splitPane.getScene.getWindow.asInstanceOf[Stage]
 
   private val jfxThrottler = CallsThrottler(JFXSystem.scheduler)
 
@@ -390,7 +390,7 @@ class MainController extends StagePersistentView with StrictLogging {
 
     logsColumns.foreach(_._2.setSortable(false))
     columnLogTime.setCellValueFactory { data ⇒
-      Option(data.getValue).map{ v ⇒
+      Option(data.getValue).map { v ⇒
         new SimpleStringProperty(v.time.format(timeFormatter))
       }.getOrElse {
         new SimpleStringProperty()
@@ -441,7 +441,7 @@ class MainController extends StagePersistentView with StrictLogging {
     downloadsTable.addEventHandler(KeyEvent.KEY_TYPED, (event: KeyEvent) ⇒ {
       event.getCharacter match {
         case "+" ⇒
-          selectedDownloadsData.filter {data ⇒
+          selectedDownloadsData.filter { data ⇒
             data.download.isActive || data.download.canResume
           }.foreach { data ⇒
             getState.dlMngr.addDownloadConnection(data.download.id)
@@ -795,19 +795,7 @@ class MainController extends StagePersistentView with StrictLogging {
 
   /** Restores (persisted) view. */
   override protected def restoreView(): Unit = {
-    Stages.onStageReady(stage, first = true) {
-      // Restore stage location
-      Stages.setMinimumDimensions(stage)
-      stageLocation.opt.foreach { loc ⇒
-        Stages.setLocation(stage, loc, setSize = true)
-      }
-
-      val state = getState
-      state.dlMngr.start()
-      state.dlMngr.getDownloads.foreach { download ⇒
-        addDownload(download.id, first = false, select = false)
-      }
-    }(JFXSystem.dispatcher)
+    super.restoreView()
 
     // Restore SplitPane divider positions
     splitPaneDividerPositions.opt.foreach { dividerPositions ⇒
@@ -822,11 +810,19 @@ class MainController extends StagePersistentView with StrictLogging {
     TableViews.autowidthColumn(columnLogMessage)
   }
 
+  override protected def restoreViewOnStageReady(): Unit = {
+    super.restoreViewOnStageReady()
+
+    val state = getState
+    state.dlMngr.start()
+    state.dlMngr.getDownloads.foreach { download ⇒
+      addDownload(download.id, first = false, select = false)
+    }
+  }
+
   /** Persists view (stage location, ...). */
   override protected def persistView(): Unit = {
-    // Persist stage location
-    // Note: if iconified, resets it
-    stageLocation.set(Stages.getLocation(stage).orNull)
+    super.persistView()
 
     // Persist table columns order and width
     downloadsColumnsPref.set(TableViews.getColumnsView(downloadsTable, downloadsColumns))
@@ -1699,6 +1695,9 @@ object MainController {
 
   private val stageLocation = ConfigEntry.from[StageLocation](Main.settings.settings,
     Settings.KEY_SUIRYC, Settings.KEY_DL_MNGR, Settings.KEY_STAGE, settingsKeyPrefix, "location")
+
+  private val uriStageLocation = ConfigEntry.from[StageLocation](Main.settings.settings,
+    Settings.KEY_SUIRYC, Settings.KEY_DL_MNGR, Settings.KEY_STAGE, s"$settingsKeyPrefix-uri", "location")
 
   private val splitPaneDividerPositions: ConfigEntry[String] = ConfigEntry.from[String](Main.settings.settings,
     Settings.KEY_SUIRYC, Settings.KEY_DL_MNGR, Settings.KEY_STAGE, settingsKeyPrefix, "splitPane", "dividerPositions")

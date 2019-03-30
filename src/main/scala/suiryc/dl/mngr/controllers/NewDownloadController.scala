@@ -18,16 +18,15 @@ import suiryc.scala.javafx.beans.binding.BindingsEx
 import suiryc.scala.javafx.beans.property.ConfigEntryProperty
 import suiryc.scala.javafx.beans.value.RichObservableValue
 import suiryc.scala.javafx.beans.value.RichObservableValue._
-import suiryc.scala.javafx.concurrent.JFXSystem
 import suiryc.scala.javafx.scene.Styles
 import suiryc.scala.javafx.scene.control.{Dialogs, TextFieldWithButton}
 import suiryc.scala.javafx.stage.Stages.StageLocation
-import suiryc.scala.javafx.stage.{PathChoosers, StagePersistentView, Stages}
+import suiryc.scala.javafx.stage.{PathChoosers, StageLocationPersistentView, Stages}
 import suiryc.scala.misc.Units
 import suiryc.scala.settings.ConfigEntry
 import suiryc.scala.unused
 
-class NewDownloadController extends StagePersistentView {
+class NewDownloadController extends StageLocationPersistentView(NewDownloadController.stageLocation) {
 
   import I18N.Strings
   import NewDownloadController._
@@ -61,9 +60,9 @@ class NewDownloadController extends StagePersistentView {
 
   private var dialog: Dialog[_] = _
 
-  private lazy val stage: Stage = Stages.getStage(dialog)
+  lazy protected val stage: Stage = Stages.getStage(dialog)
 
-  private lazy val buttonOk = dialog.getDialogPane.lookupButton(ButtonType.OK)
+  lazy private val buttonOk = dialog.getDialogPane.lookupButton(ButtonType.OK)
 
   private var dlMngr: DownloadManager = _
 
@@ -145,24 +144,6 @@ class NewDownloadController extends StagePersistentView {
     if (dlInfo.auto) result = checkForm(auto = dlInfo.auto)
     else RichObservableValue.listen(uriField.textProperty, folderField.textProperty, filenameField.textProperty)(checkForm())
     ()
-  }
-
-  /** Restores (persisted) view. */
-  override protected def restoreView(): Unit = {
-    Stages.onStageReady(stage, first = false) {
-      // Restore stage location
-      Stages.setMinimumDimensions(stage)
-      stageLocation.opt.foreach { loc ⇒
-        Stages.setLocation(stage, loc, setSize = true)
-      }
-    }(JFXSystem.dispatcher)
-  }
-
-  /** Persists view (stage location, ...). */
-  override protected def persistView(): Unit = {
-    // Persist stage location
-    // Note: if iconified, resets it
-    stageLocation.set(Stages.getLocation(stage).orNull)
   }
 
   protected def checkForm(): Unit = {
