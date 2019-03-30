@@ -25,7 +25,7 @@ object FileDownloader {
 
   sealed trait FileDownloaderMsg
   case object DownloadStop extends FileDownloaderMsg
-  case class DownloadResume(download: Download, restart: Boolean) extends FileDownloaderMsg
+  case class DownloadResume(restart: Boolean) extends FileDownloaderMsg
   case class SegmentStarted(consumer: ResponseConsumer, response: HttpResponse) extends FileDownloaderMsg
   case class SegmentDone(consumer: ResponseConsumer, exOpt: Option[Exception]) extends FileDownloaderMsg
   case class Downloaded(range: SegmentRange) extends FileDownloaderMsg
@@ -148,8 +148,6 @@ object FileDownloader {
       }
     }
 
-    def withDownload(download: Download): State = copy(download = download)
-
     private def updatedConsumers(state: State): Unit = {
       download.info.activeSegments.setValue(state.segmentConsumers.count(_._2.started))
     }
@@ -219,8 +217,8 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
   override def receive: Receive = receive(State(dlMngr, dl, started = dl.info.isSizeDetermined))
 
   def receive(state: State): Receive = {
-    case DownloadResume(download, restart) ⇒
-      applyState(resume(state, download, restart))
+    case DownloadResume(restart) ⇒
+      applyState(resume(state, restart))
 
     case TryResume ⇒
       applyState(tryResume(state))
@@ -278,7 +276,7 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
     state.copy(segmentConsumers = segmentConsumers)
   }
 
-  def resume(state0: State, download: Download, restart: Boolean): State = {
+  def resume(state0: State, restart: Boolean): State = {
     val action = if (restart) {
       "re-starting"
     } else if (state0.started) {
@@ -287,7 +285,7 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
       "starting"
     }
     val message = s"Download $action"
-    val state = state0.resume(restart).withDownload(download)
+    val state = state0.resume(restart)
     logger.info(s"${state.download.context} $message")
     state.download.info.addLog(LogKind.Info, message)
     state
@@ -1018,7 +1016,7 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
     state.failed.orElse(closeExOpt) match {
       case Some(ex) if closeExOpt.isEmpty ⇒
         // The download did fail on its own
-        state.download.promise.tryFailure(ex)
+        state.download.info.promise.tryFailure(ex)
         // Do not stop the actor (we can still resume/restart)
         state
 
@@ -1034,7 +1032,7 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
         logger.info(s"${download.context} Download uri=<${download.uri}> done: success${
           lastModified.map(v ⇒ s" (file date=<$v>)").getOrElse("")
         }")
-        state.download.promise.trySuccess(())
+        state.download.info.promise.trySuccess(())
         // Time to stop ourself
         context.stop(self)
         state

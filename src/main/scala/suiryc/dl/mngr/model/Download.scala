@@ -39,19 +39,20 @@ case class NewDownloadInfo(
 )
 
 class DownloadInfo {
-  /** Target URI */
+  // DL info which changes can be listened to.
+  /** Target URI. */
   val uri: SimpleObjectProperty[URI] = new SimpleObjectProperty()
-  /** File path */
+  /** File path. */
   val path: SimpleObjectProperty[Path] = new SimpleObjectProperty()
-  /** File temporary path */
+  /** File temporary path. */
   val temporaryPath: SimpleObjectProperty[Path] = new SimpleObjectProperty()
-  /** State (initially stopped) */
+  /** State (initially stopped). */
   val state: SimpleObjectProperty[DownloadState.Value] = new SimpleObjectProperty(DownloadState.Stopped)
-  /** Size */
+  /** Size. */
   val size: SimpleLongProperty = new SimpleLongProperty(Long.MinValue)
-  /** File last modified time on server */
+  /** File last modified time on server. */
   var lastModified: SimpleObjectProperty[Date] = new SimpleObjectProperty()
-  /** Number of active segments */
+  /** Number of active segments. */
   val activeSegments: SimpleIntegerProperty = new SimpleIntegerProperty(0)
   /** Segments limit. */
   val maxSegments: SimpleIntegerProperty = new SimpleIntegerProperty(0)
@@ -72,14 +73,18 @@ class DownloadInfo {
    */
   val logs: ObservableList[LogEntry] = FXCollections.observableArrayList()
 
+  // Other DL info which changes don't need to be listened to.
+  /** Promise completed once the download is 'finished' (success or failure). */
+  var promise: Promise[Unit] = Promise()
+
   /** Whether download was active when download manager stopping was requested. */
   var wasActive: Boolean = false
 
-  /** Remaining segment ranges */
+  /** Remaining segment ranges. */
   var remainingRanges: Option[SegmentRanges] = None
-  /** Range validator (if applicable) */
+  /** Range validator (if applicable). */
   var rangeValidator: Option[String] = None
-  /** Whether server accept ranges */
+  /** Whether server accept ranges. */
   var acceptRanges: SimpleObjectProperty[Option[Boolean]] = new SimpleObjectProperty(None)
 
   // Note: size is Long.MinValue before download actually starts,
@@ -142,7 +147,12 @@ case class DownloadBackupInfo(
   downloadedRanges: List[SegmentRange]
 )
 
-/** A download properties and settings. */
+/**
+ * A download properties and settings.
+ *
+ * Immutable values are in the class parameters.
+ * Values that can be changed are in 'info'.
+ */
 case class Download(
   /** Internal id, for logging purposes. */
   id: UUID,
@@ -160,9 +170,7 @@ case class Download(
   sizeHint: Option[Long],
   /** Rate limiter. */
   rateLimiter: RateLimiter,
-  /** Promise completed once the download is 'finished' (success or failure). */
-  promise: Promise[Unit] = Promise(),
-  /** Info */
+  /** Mutable info. */
   info: DownloadInfo = new DownloadInfo()
 ) {
 
@@ -246,7 +254,7 @@ case class Download(
     else context
   }
 
-  def resume(reusedOpt: Option[Boolean], restart: Boolean): Download = {
+  def resume(reusedOpt: Option[Boolean], restart: Boolean): Unit = {
     if (restart) info.restart()
     val reason = if (restart) "re-started" else "resumed"
     downloadFile.reset(reusedOpt = reusedOpt, restart = restart)
@@ -255,9 +263,9 @@ case class Download(
     // We still try to fail the promise, and in case it had not yet been
     // completed (and since we are resuming/restarting the download) make sure
     // (reused = true) the manager won't touch the download file.
-    promise.tryFailure(DownloadException(s"Download $reason with another promise", reused = true))
+    info.promise.tryFailure(DownloadException(s"Download $reason with another promise", reused = true))
     // Note: state will be changed through tryAcquireConnection
-    copy(promise = Promise[Unit]())
+    info.promise = Promise[Unit]()
   }
 
   def backupInfo: DownloadBackupInfo = {

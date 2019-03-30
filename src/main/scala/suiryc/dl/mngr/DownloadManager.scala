@@ -174,10 +174,8 @@ object DownloadManager {
     def resume(reusedOpt: Option[Boolean], restart: Boolean): DownloadEntry = {
       // Belt and suspenders: make sure 'done' is completed.
       done.tryFailure(DownloadException("Download is being resumed"))
-      copy(
-        download = download.resume(reusedOpt, restart),
-        done = Promise()
-      )
+      download.resume(reusedOpt, restart)
+      copy(done = Promise())
     }
   }
 
@@ -379,7 +377,7 @@ class DownloadManager extends StrictLogging {
           val download = updateDownloadEntry(dlEntry.resume(reusedOpt, restart)).download
           download.info.state.setValue(DownloadState.Pending)
           followDownload(download)
-          dlEntry.dler ! FileDownloader.DownloadResume(download, restart = restart)
+          dlEntry.dler ! FileDownloader.DownloadResume(restart = restart)
           if (tryCnx) tryConnection()
         }
       }
@@ -525,7 +523,7 @@ class DownloadManager extends StrictLogging {
   private def followDownload(download: Download): Unit = {
     // Note: we use the download id because the actual download maye have been
     // updated since we started following it.
-    download.promise.future.onComplete(r ⇒ downloadDone(download.id, r))
+    download.info.promise.future.onComplete(r ⇒ downloadDone(download.id, r))
   }
 
   // Beware that caller must have an up-to-date download to update
