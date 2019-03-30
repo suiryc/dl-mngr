@@ -1051,6 +1051,9 @@ class ResponseConsumer(
   private[mngr] var position: Long = range.start
   @volatile private[mngr] var end: Long = range.end
 
+  // How many consecutive times we actually read nothing.
+  private var withoutData = 0
+
   // IOControl will be accessed by concurrent threads.
   // For our usage, a simple 'synchronized' is enough.
   private var ioCtrl = Option.empty[IOControl]
@@ -1173,6 +1176,7 @@ class ResponseConsumer(
           0L
       }
       if (transferred > 0) {
+        withoutData = 0
         position += transferred
         download.rateLimiter.consumeTokens(transferred)
 
@@ -1188,15 +1192,21 @@ class ResponseConsumer(
         if (!endReached && !download.rateLimiter.isLimited && (transferred >= count)) loop(first = false)
         else endReached
       } else {
-        if (first) {
-          // In some cases (usually after a period of rate limiting, i.e.
-          // suspending/resuming) the content decoder may remain stuck: content
-          // is considered received but reading it returns nothing. It does not
-          // seem possible to unblock the situation, so fail the consumer.
+        // No (more) data received from content decoder.
+        // In some cases (usually after a period of rate limiting, i.e.
+        // suspending/resuming) the content decoder may remain stuck: content
+        // is considered received but reading it returns nothing. Sometimes the
+        // next time we are called data are available; otherwise it does not
+        // seem possible to unblock the situation. Leave a few chances for data
+        // to be available, then properly fail the consumer.
+        if (withoutData > 10) {
           fail(DownloadException(
             message = "I/O error: no data was read",
             started = true
           ))
+        } else if (first) {
+          // This was the first loop: there really was nothing to read.
+          withoutData += 1
         }
         false
       }
