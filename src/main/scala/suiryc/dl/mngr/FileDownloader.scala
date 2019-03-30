@@ -568,7 +568,7 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
 
   def segmentStart(state: State, range: SegmentRange, acquired: AcquiredConnection, force: Boolean, forced: Boolean, tryCnx: Option[TryCnxData]): State = {
     val download = state.download
-    val uri = download.info.uri.get
+    val uri = download.info.actualUri.get
     download.rateLimiter.addDownload()
     try {
       val message = s"Starting range=$range sslTrust=${acquired.sslTrust}"
@@ -649,8 +649,8 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
         Option(data.context.getRedirectLocations)
       }.foreach { redirectLocations ⇒
         if (!redirectLocations.isEmpty) {
-          download.info.uri.set(redirectLocations.asScala.last)
-          val message = s"Actual (redirected) uri=<${download.info.uri.get}>"
+          download.info.actualUri.set(redirectLocations.asScala.last)
+          val message = s"Actual (redirected) uri=<${download.info.actualUri.get}>"
           logger.info(s"${download.context} $message")
           download.info.addLog(LogKind.Info, message)
         }

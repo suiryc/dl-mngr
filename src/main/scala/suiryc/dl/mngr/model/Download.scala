@@ -39,9 +39,13 @@ case class NewDownloadInfo(
 )
 
 class DownloadInfo {
-  // DL info which changes can be listened to.
-  /** Target URI. */
-  val uri: SimpleObjectProperty[URI] = new SimpleObjectProperty()
+  // Note: some info changes need to be listened to (through Property).
+  /** Promise completed once the download is 'finished' (success or failure). */
+  var promise: Promise[Unit] = Promise()
+  /** Remote URI to download from. */
+  var uri: URI = _
+  /** Actual (e.g. redirected) URI. */
+  val actualUri: SimpleObjectProperty[URI] = new SimpleObjectProperty()
   /** File path. */
   val path: SimpleObjectProperty[Path] = new SimpleObjectProperty()
   /** File temporary path. */
@@ -72,10 +76,6 @@ class DownloadInfo {
    * on this end) and make sure listeners work on changes in the caller thread.
    */
   val logs: ObservableList[LogEntry] = FXCollections.observableArrayList()
-
-  // Other DL info which changes don't need to be listened to.
-  /** Promise completed once the download is 'finished' (success or failure). */
-  var promise: Promise[Unit] = Promise()
 
   /** Whether download was active when download manager stopping was requested. */
   var wasActive: Boolean = false
@@ -156,8 +156,6 @@ case class DownloadBackupInfo(
 case class Download(
   /** Internal id, for logging purposes. */
   id: UUID,
-  /** Remote URI to download from. */
-  uri: URI,
   /** Referrer URI. */
   referrer: Option[URI],
   /** Cookie. */
@@ -176,7 +174,13 @@ case class Download(
 
   private var lastReason = Option.empty[String]
 
-  info.uri.set(uri)
+  def uri: URI = info.uri
+
+  def setUri(uri: URI): Download = {
+    info.uri = uri
+    info.actualUri.set(uri)
+    this
+  }
 
   def path: Path = downloadFile.getPath
 
@@ -232,7 +236,7 @@ case class Download(
   def canRestart: Boolean = (state == DownloadState.Failure) ||
     ((state == DownloadState.Stopped) && acceptRanges.contains(false))
 
-  def siteSettings: Main.settings.SiteSettings = Main.settings.getSite(info.uri.get)
+  def siteSettings: Main.settings.SiteSettings = Main.settings.getSite(info.actualUri.get)
   def activeSegments: Int = info.activeSegments.get
   def maxSegments: Int = siteSettings.getSegmentsMax
   def minSegmentSize: Long = Main.settings.segmentsMinSize.get

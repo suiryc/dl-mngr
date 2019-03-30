@@ -316,14 +316,13 @@ class DownloadManager extends StrictLogging {
     }
     val download = Download(
       id = UUID.randomUUID,
-      uri = uri,
       referrer = referrer,
       cookie = cookie,
       userAgent = userAgent,
       downloadFile = downloadFile,
       sizeHint = sizeHint,
       rateLimiter = rateLimiter
-    )
+    ).setUri(uri)
     if (reused) {
       // When resuming a file, consider its current length as already downloaded.
       val length = math.max(0, downloadFile.getWorkingPath.toFile.length)
@@ -350,7 +349,7 @@ class DownloadManager extends StrictLogging {
   def findDownload(uri: URI): Option[Download] = {
     dlEntries.find { dlEntry ⇒
       // Check both original and actual URIs
-      (dlEntry.download.uri == uri) || (dlEntry.download.info.uri.get == uri)
+      (dlEntry.download.uri == uri) || (dlEntry.download.info.actualUri.get == uri)
     }.map(_.download)
   }
 
@@ -603,14 +602,13 @@ class DownloadManager extends StrictLogging {
         val downloadFile = DownloadFile.reuse(downloadBackupInfo.path, downloadBackupInfo.temporaryPath)
         val download = Download(
           id = downloadBackupInfo.id,
-          uri = downloadBackupInfo.uri,
           referrer = downloadBackupInfo.referrer,
           cookie = downloadBackupInfo.cookie,
           userAgent = downloadBackupInfo.userAgent,
           downloadFile = downloadFile,
           sizeHint = downloadBackupInfo.sizeHint,
           rateLimiter = rateLimiter
-        )
+        ).setUri(downloadBackupInfo.uri)
         val info = download.info
         if (downloadBackupInfo.done) info.state.set(DownloadState.Success)
         val remainingRanges = downloadBackupInfo.size.flatMap { size ⇒
@@ -718,7 +716,7 @@ class DownloadManager extends StrictLogging {
 
   private def _tryAcquireConnection(download: Download, force: Boolean, count: Boolean): Option[AcquiredConnection] = {
     // Use the actual URI (since this is the real one we connect to)
-    val uri = download.info.uri.get
+    val uri = download.info.actualUri.get
     val siteSettings = Main.settings.getSite(uri)
     val site = siteSettings.site
     val host = uri.getHost

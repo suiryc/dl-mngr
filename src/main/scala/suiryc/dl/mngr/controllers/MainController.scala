@@ -4,6 +4,7 @@ import akka.actor.{Actor, ActorRef, Props}
 import com.sun.javafx.tk.Toolkit
 import com.typesafe.scalalogging.StrictLogging
 import java.io.{PrintWriter, StringWriter}
+import java.net.URI
 import java.nio.file.Path
 import java.text.SimpleDateFormat
 import java.time.format.DateTimeFormatter
@@ -28,7 +29,7 @@ import suiryc.dl.mngr.model._
 import suiryc.scala.misc.Units
 import suiryc.dl.mngr.{DownloadManager, I18N, Main, Settings}
 import suiryc.dl.mngr.I18N.Strings
-import suiryc.dl.mngr.util.Icons
+import suiryc.dl.mngr.util.{Http, Icons}
 import suiryc.scala.RichOption._
 import suiryc.scala.concurrent.{Cancellable, RichFuture}
 import suiryc.scala.javafx.beans.binding.BindingsEx
@@ -653,8 +654,8 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
         dlCookieField.setText(download.cookie.orNull)
         dlUserAgentField.setText(download.userAgent.orNull)
         def updateProperties(): Unit = {
-          dlURIField.setText(info.uri.get.toString)
-          dlServerLink.setText(info.uri.get.getHost)
+          dlURIField.setText(info.actualUri.get.toString)
+          dlServerLink.setText(info.actualUri.get.getHost)
           dlFolderField.setText(info.path.get.getParent.toString)
           dlFileField.setText(info.path.get.getFileName.toString)
           // Display the temporary path in a tooltip.
@@ -684,7 +685,7 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
         dlURIDebugButton.setOnAction { _ ⇒
           val dlMngr = getState.dlMngr
           val request = dlMngr.newRequest(
-            uri = info.uri.get,
+            uri = info.actualUri.get,
             head = true,
             referrer = download.referrer,
             cookie = download.cookie,
@@ -700,8 +701,8 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
           dialog.setResizable(true)
           dialog.showAndWait().flatten.foreach { hints ⇒
             hints.uri.foreach { uri ⇒
-              info.uri.set(uri)
-              val message = s"Actual (redirected) uri=<${info.uri.get}>"
+              info.actualUri.set(uri)
+              val message = s"Actual (redirected) uri=<${info.actualUri.get}>"
               logger.info(s"${download.context} $message")
               download.info.addLog(LogKind.Info, message)
             }
@@ -709,6 +710,11 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
             hints.filename.filter(_ != info.path.get.getFileName.toString).foreach { filename ⇒
               download.renameFile(info.path.get.getParent.resolve(filename))
             }
+          }
+        }
+        dlURIField.setOnMouseClicked { event ⇒
+          if ((event.getButton == MouseButton.PRIMARY) && event.isControlDown && (event.getClickCount == 1)) {
+            changeDlURI(download)
           }
         }
         dlFileSelectButton.setOnAction { _ ⇒
@@ -721,7 +727,7 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
             download.renameFile(selectedFile.toPath)
           }
         }
-        val propertiesCancellable = RichObservableValue.listen(info.uri, info.path, info.size, info.lastModified) {
+        val propertiesCancellable = RichObservableValue.listen(info.actualUri, info.path, info.size, info.lastModified) {
           JFXSystem.runLater {
             updateProperties()
           }
@@ -732,6 +738,7 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
 
       case None ⇒
         dlURIDebugButton.setOnAction(null)
+        dlURIField.setOnMouseClicked(null)
         dlFileSelectButton.setOnAction(null)
         List(dlFolderField, dlFileField).foreach { field ⇒
           field.setTooltip(null)
@@ -746,6 +753,52 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
           dlFolderField, dlFileField).foreach { field ⇒
           field.setText(null)
         }
+    }
+  }
+
+  private def changeDlURI(download: Download): Unit = {
+    val originalUri = download.info.actualUri.get
+
+    // Create simple text input dialog
+    val dialog = new TextInputDialog(originalUri.toString)
+    val dialogStage = Stages.getStage(dialog)
+    Stages.initOwner(dialog, stage)
+    dialog.setResizable(true)
+    // Add simple stage location persistence
+    val persistentView = StageLocationPersistentView(dialogStage, uriStageLocation)
+    Dialogs.addPersistence(dialog, persistentView)
+    // Load css
+    Styles.addStylesheet(dialogStage.getScene)
+    // We only need to display the URI value to change
+    dialog.setHeaderText(null)
+    dialog.setContentText(null)
+
+    // Only accept valid URI that differs from original one.
+    val field = dialog.getEditor
+    val buttonOk = dialog.getDialogPane.lookupButton(ButtonType.OK)
+    def getURI: Option[URI] = try {
+      Option(field.getText).filterNot(_.trim.isEmpty).map(Http.getURI)
+    } catch {
+      case _: Exception ⇒ None
+    }
+    def checkForm(): Unit = {
+      val uri = getURI
+      val uriOk = getURI.isDefined
+      // Visual hint when URI is not valid
+      Styles.toggleError(field, !uriOk, Strings.invalidURI)
+      buttonOk.setDisable(!uriOk || uri.contains(originalUri))
+    }
+    field.textProperty.listen(checkForm())
+    checkForm()
+
+    // Allow user to change URI, and apply change when applicable
+    dialog.showAndWait().foreach { _ ⇒
+      getURI.foreach { uri ⇒
+        download.setUri(uri)
+        val message = s"Changed uri=<$uri>"
+        logger.info(s"${download.context} $message")
+        download.info.addLog(LogKind.Info, message)
+      }
     }
   }
 
@@ -1099,7 +1152,7 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
 
   def onDlServerSettings(@unused event: ActionEvent): Unit = {
     selectedDownloadData.foreach { data ⇒
-      val host = data.download.info.uri.get.getHost
+      val host = data.download.info.actualUri.get.getHost
       actor ! OnOptions(OptionsController.Display(serverSettings = Some(host)))
     }
   }
