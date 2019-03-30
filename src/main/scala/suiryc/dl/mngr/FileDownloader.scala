@@ -1065,6 +1065,16 @@ class ResponseConsumer(
     ioCtrl = None
   }
 
+  private def fail(ex: DownloadException): Unit = {
+    // First set failure.
+    failed(ex)
+    // Then abort the request.
+    // It is sometimes necessary: for some URIs, 'failed' is enough to stop
+    // the request, for others the connection actually keeps on receiving
+    // data (and stays alive in the background ...).
+    request.abort()
+  }
+
   override def onResponseReceived(response: HttpResponse): Unit = {
     val statusLine = response.getStatusLine
     val failure = if (statusLine.getStatusCode / 100 != 2) {
@@ -1113,13 +1123,7 @@ class ResponseConsumer(
     // and propagate the issue to handler.
     failure match {
       case Some(ex) ⇒
-        // First set failure
-        failed(ex)
-        // Then abort the request.
-        // It is sometimes necessary: for some URIs, 'failed' is enough to stop
-        // the request, for others the connection actually keeps on receiving
-        // data (and stays alive in the background ...)
-        request.abort()
+        fail(ex)
 
       case None ⇒
         // When applicable it's better to preallocate the file size before
@@ -1157,11 +1161,11 @@ class ResponseConsumer(
         download.downloadFile.write(decoder, position, count, downloadHandler)
       } catch {
         case ex: DownloadException ⇒
-          failed(ex)
+          fail(ex)
           0L
 
         case ex: Exception ⇒
-          failed(DownloadException(
+          fail(DownloadException(
             message = s"I/O error: (${ex.getClass.getSimpleName}) ${ex.getMessage}",
             cause = ex,
             started = true
@@ -1189,7 +1193,7 @@ class ResponseConsumer(
           // suspending/resuming) the content decoder may remain stuck: content
           // is considered received but reading it returns nothing. It does not
           // seem possible to unblock the situation, so fail the consumer.
-          failed(DownloadException(
+          fail(DownloadException(
             message = "I/O error: no data was read",
             started = true
           ))
