@@ -477,7 +477,12 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
         }
 
         // Get the best candidate
-        val remainingAvailable = (remainingActive ::: remainingNonActive).sortBy(-_._3).headOption.flatMap {
+        val candidate = (remainingActive ::: remainingNonActive).sortBy(-_._3).headOption
+        // If nothing matches, we were left with only too small active segments.
+        if (candidate.isEmpty) download.updateLastReason {
+          Some(s"Limit reached: no segment of minimum size=<${Units.storage.toHumanReadable(minSize)}>")
+        }
+        candidate.flatMap {
           case (consumerOpt, range, _) ⇒
             // Now that we know we really can start a new segment, ensure we can
             // actually create a new connection.
@@ -491,12 +496,7 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
                   (consumerOpt, range, acquired)
                 }
             }
-        }
-        // If nothing matches, we were left with only too small active segments.
-        if (remainingAvailable.isEmpty) download.updateLastReason {
-          Some(s"Limit reached: no segment of minimum size=<${Units.storage.toHumanReadable(minSize)}>")
-        }
-        remainingAvailable.exists {
+        }.exists {
           case (consumerOpt, range, acquired) ⇒
             consumerOpt match {
               case Some(consumer) ⇒
