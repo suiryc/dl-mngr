@@ -523,18 +523,14 @@ class MainController extends StagePersistentView with StrictLogging {
 
   private def copyDownloadLogsToClipboard(entries: List[LogEntry]): Unit = {
     val text = entries.map { entry ⇒
-      val lines = List(
-        s"${Strings.time}: ${entry.time.format(timeFormatter)}",
-        s"${Strings.kind}: ${entry.kind}",
-        s"${Strings.message}: ${entry.message}"
-      ) ::: entry.exOpt.map { ex ⇒
+      val lines = s"${entry.time.format(timeFormatter)} [${entry.kind}] ${entry.message}" :: entry.exOpt.map { ex ⇒
         val sw = new StringWriter()
         val pw = new PrintWriter(sw)
         ex.printStackTrace(pw)
-        s"${Strings.error}: $sw"
+        sw.toString.trim
       }.toList
       lines.mkString("", "\n", "\n")
-    }.mkString("", "\n", "")
+    }.mkString("")
     val content = new ClipboardContent()
     content.putString(text)
     clipboard.setContent(content)
