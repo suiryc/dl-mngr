@@ -1747,23 +1747,23 @@ object MainController {
   private val settingsKeyPrefix = "main"
 
   private val stageLocation = ConfigEntry.from[StageLocation](Main.settings.settings,
-    Settings.KEY_SUIRYC, Settings.KEY_DL_MNGR, Settings.KEY_STAGE, settingsKeyPrefix, "location")
+    Settings.prefix ++ Seq(Settings.KEY_STAGE, settingsKeyPrefix, Settings.KEY_LOCATION))
 
   private val uriStageLocation = ConfigEntry.from[StageLocation](Main.settings.settings,
-    Settings.KEY_SUIRYC, Settings.KEY_DL_MNGR, Settings.KEY_STAGE, s"$settingsKeyPrefix-uri", "location")
+    Settings.prefix ++ Seq(Settings.KEY_STAGE, s"$settingsKeyPrefix-uri", Settings.KEY_LOCATION))
 
   private val splitPaneDividerPositions: ConfigEntry[String] = ConfigEntry.from[String](Main.settings.settings,
-    Settings.KEY_SUIRYC, Settings.KEY_DL_MNGR, Settings.KEY_STAGE, settingsKeyPrefix, "splitPane", "dividerPositions")
+    Settings.prefix ++ Seq(Settings.KEY_STAGE, settingsKeyPrefix, "splitPane", "dividerPositions"))
 
   private val downloadsColumnsPref: ConfigEntry[String] = ConfigEntry.from[String](Main.settings.settings,
-    Settings.KEY_SUIRYC, Settings.KEY_DL_MNGR, Settings.KEY_STAGE, settingsKeyPrefix, "downloads", "columns")
+    Settings.prefix ++ Seq(Settings.KEY_STAGE, settingsKeyPrefix, "downloads", "columns"))
 
   private val logsColumnsPref: ConfigEntry[String] = ConfigEntry.from[String](Main.settings.settings,
-    Settings.KEY_SUIRYC, Settings.KEY_DL_MNGR, Settings.KEY_STAGE, settingsKeyPrefix, "logs", "columns")
+    Settings.prefix ++ Seq(Settings.KEY_STAGE, settingsKeyPrefix, "logs", "columns"))
 
   private val removeUnfinishedFromDisk = ConfigEntryProperty {
     ConfigEntry.from[Boolean](Main.settings.settings,
-      Settings.KEY_SUIRYC, Settings.KEY_DL_MNGR, Settings.KEY_STAGE, "remove-unfinished", "remove-from-disk")
+      Settings.prefix ++ Seq(Settings.KEY_STAGE, "remove-unfinished", "remove-from-disk"))
   }
 
   def build(state: State): Unit = {

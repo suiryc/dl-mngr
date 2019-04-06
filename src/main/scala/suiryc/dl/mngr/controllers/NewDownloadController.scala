@@ -435,16 +435,16 @@ object NewDownloadController {
   private val settingsKeyPrefix = "new-download"
 
   private val stageLocation = ConfigEntry.from[StageLocation](Main.settings.settings,
-    Settings.KEY_SUIRYC, Settings.KEY_DL_MNGR, Settings.KEY_STAGE, settingsKeyPrefix, "location")
+    Settings.prefix ++ Seq(Settings.KEY_STAGE, settingsKeyPrefix, Settings.KEY_LOCATION))
 
   private val startAutomatically = ConfigEntryProperty {
     ConfigEntry.from[Boolean](Main.settings.settings,
-      Settings.KEY_SUIRYC, Settings.KEY_DL_MNGR, Settings.KEY_STAGE, settingsKeyPrefix, "start-automatically")
+      Settings.prefix ++ Seq(Settings.KEY_STAGE, settingsKeyPrefix, "start-automatically"))
   }
 
   private val insertFirst = ConfigEntryProperty {
     ConfigEntry.from[Boolean](Main.settings.settings,
-      Settings.KEY_SUIRYC, Settings.KEY_DL_MNGR, Settings.KEY_STAGE, settingsKeyPrefix, "insert-first")
+      Settings.prefix ++ Seq(Settings.KEY_STAGE, settingsKeyPrefix, "insert-first"))
   }
 
   protected object ConflictResolution extends Enumeration {

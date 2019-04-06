@@ -13,6 +13,7 @@ object Settings {
   private[mngr] val KEY_SUIRYC = "suiryc"
   private[mngr] val KEY_DL_MNGR = "dl-mngr"
 
+  private[mngr] val KEY_LOCATION = "location"
   private[mngr] val KEY_STAGE = "stage"
 
   private val KEY_ASK = "ask"
@@ -55,7 +56,7 @@ object Settings {
   private val KEY_WRITE = "write"
   private val KEY_ZERO = "zero"
 
-  private val prefix = List(KEY_SUIRYC, KEY_DL_MNGR)
+  private[mngr] val prefix = List(KEY_SUIRYC, KEY_DL_MNGR)
   private val sitesPrefix = prefix :+ KEY_SITES
 
   val defaultDownloadPath: Path = {
