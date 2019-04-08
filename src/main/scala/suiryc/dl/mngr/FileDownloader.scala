@@ -56,6 +56,11 @@ object FileDownloader {
       copy(attempt = Promise())
     }
 
+    def completeWith(other: TryCnxData): Unit = {
+      attemptSuccess()
+      caller.completeWith(other.caller.future)
+    }
+
     def attemptFailure(ex: Exception): Unit = {
       attempt.tryFailure(ex)
       ()
@@ -356,7 +361,7 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
   }
 
   def tryConnection(state: State, promise: Promise[Unit]): State = {
-    lazy val tryCnx = TryCnxData(promise)
+    val tryCnx = TryCnxData(promise)
     // Pending segment trying counts as connection trying.
     if (state.trySegment.isEmpty) {
       trySegment(state, tryCnx = Some(tryCnx))
@@ -364,7 +369,7 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
       // Use any previous attempt result.
       state.tryCnx match {
         case Some(previous) ⇒
-          promise.completeWith(previous.caller.future)
+          tryCnx.completeWith(previous)
           state
 
         case None ⇒
@@ -398,7 +403,7 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
       }
     }
     lazy val canStartSegment = canTry && canAddSegment
-    val tried = if (download.acceptRanges.contains(true) && canStartSegment) {
+    val trying = if (download.acceptRanges.contains(true) && canStartSegment) {
       val r = trySegmentRange(state, download, force, forced, tryCnx)
       state = r._1
       r._2
@@ -420,10 +425,25 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
       // We cannot try a new segment.
       // We also end up here if first connection request is ongoing (no response
       // yet); may happen if a TryConnection is triggered.
-      false
+      if (canTry && !download.info.isSizeDetermined && state.segmentConsumers.nonEmpty) {
+        // If the first connection is ongoing, link any new attempt to the
+        // current one.
+        // Note: the very first connection is expected to only be triggered
+        // through a TryConnection, so there should be a previous ongoing
+        // 'tryCnx'.
+        val completedWith = for {
+          nextAttempt ← tryCnx
+          previousAttempt ← state.segmentConsumers.values.find(_.tryCnx.nonEmpty).flatMap(_.tryCnx)
+        } yield {
+          nextAttempt.completeWith(previousAttempt)
+        }
+        completedWith.nonEmpty
+      } else {
+        false
+      }
     }
 
-    if (!tried) {
+    if (!trying) {
       // For whatever reason, we did not try a new segment. When applicable,
       // consider this cnx attempt done.
       tryCnx.foreach(_.done())
@@ -443,7 +463,7 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
     var state = state0
 
     // Clone the current remaining ranges (we will work with it)
-    val tried = download.info.remainingRanges.map(_.clone()) match {
+    val trying = download.info.remainingRanges.map(_.clone()) match {
       case Some(remainingRanges) ⇒
         val minSize = download.minSegmentSize
         val remaining = remainingRanges.getRanges
@@ -557,7 +577,7 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
         }
     }
 
-    (state, tried)
+    (state, trying)
   }
 
   def tryAcquireConnection(state: State, download: Download, forced: Boolean, tryCnx: Option[TryCnxData]): Either[State, Option[AcquiredConnection]] = {
