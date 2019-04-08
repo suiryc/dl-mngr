@@ -405,7 +405,7 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
     } else if (canTry && download.info.remainingRanges.isEmpty && state.segmentConsumers.isEmpty) {
       // Either this is the very first connection attempt, or the initial
       // request failed. So (re-)try it if possible.
-      tryAcquireConnection(state, download, forced) match {
+      tryAcquireConnection(state, download, forced, tryCnx) match {
         case Left(s) ⇒
           state = s
           false
@@ -484,7 +484,7 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
           case (consumerOpt, range, _) ⇒
             // Now that we know we really can start a new segment, ensure we can
             // actually create a new connection.
-            tryAcquireConnection(state, download, forced) match {
+            tryAcquireConnection(state, download, forced, tryCnx) match {
               case Left(s) ⇒
                 state = s
                 None
@@ -541,7 +541,7 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
           // We can only specify the range start, and continue downloading past
           // what we already downloaded.
           val range = SegmentRange(download.info.downloaded.get)
-          tryAcquireConnection(state, download, forced) match {
+          tryAcquireConnection(state, download, forced, tryCnx) match {
             case Left(s) ⇒
               state = s
               false
@@ -560,8 +560,9 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
     (state, tried)
   }
 
-  def tryAcquireConnection(state: State, download: Download, forced: Boolean): Either[State, Option[AcquiredConnection]] = {
+  def tryAcquireConnection(state: State, download: Download, forced: Boolean, tryCnx: Option[TryCnxData]): Either[State, Option[AcquiredConnection]] = {
     state.dlMngr.tryAcquireConnection(download, force = forced, count = !forced).left.map { ex ⇒
+      tryCnx.foreach(_.attemptFailure(ex))
       handleError(state, aborted = false, Some(ex))
     }
   }
