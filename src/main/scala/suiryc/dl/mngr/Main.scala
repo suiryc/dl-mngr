@@ -3,7 +3,6 @@ package suiryc.dl.mngr
 import akka.actor.ActorSystem
 import java.io.Closeable
 import java.nio.file.Path
-import javafx.application.Application
 import javafx.stage.Stage
 import monix.execution.Scheduler
 import scala.concurrent.{ExecutionContextExecutor, Future, Promise}
@@ -13,12 +12,13 @@ import suiryc.dl.mngr.controllers.MainController
 import suiryc.dl.mngr.model.NewDownloadInfo
 import suiryc.scala.akka.CoreSystem
 import suiryc.scala.io.SystemStreams
+import suiryc.scala.javafx.{JFXApplication, JFXLauncher}
 import suiryc.scala.javafx.concurrent.JFXSystem
 import suiryc.scala.misc.Util
 import suiryc.scala.sys.UniqueInstance
 import suiryc.scala.sys.UniqueInstance.CommandResult
 
-object Main {
+object Main extends JFXLauncher[MainApp] {
 
   // Note: use 'lazy' for fields that indirectly trigger stdout/stderr writing
   // (e.g. through logger, or scala Console println etc), so that we can
@@ -41,7 +41,7 @@ object Main {
   private val streams = SystemStreams()
 
   // Promise to complete when we are ready to process command arguments
-  private val promise = Promise[Unit]()
+  private[mngr] val promise = Promise[Unit]()
 
   // The running controller
   var controller: MainController = _
@@ -93,7 +93,7 @@ object Main {
     }
   }
 
-  def main(args: Array[String]): Unit = {
+  override def main(args: Array[String]): Unit = {
     // Notes:
     // Application.launch() creates a new instance of the enclosing class and
     // calls 'start' on it. Either we call it from a 'launch' method in the
@@ -145,7 +145,7 @@ object Main {
           }
         }
         // 'launch' does not return until application is closed
-        Application.launch(classOf[Main])
+        super.main(args)
 
       case None ⇒
         sys.exit(UniqueInstance.CODE_CMD_ERROR)
@@ -214,12 +214,7 @@ object Main {
 
   lazy val scheduler: Scheduler = CoreSystem.scheduler
 
-  def shutdown(stage: Stage): Unit = {
-    JFXSystem.runLater(stage.close())
-    shutdown()
-  }
-
-  def shutdown(): Unit = {
+  override def shutdown(): Unit = {
     WSServer.stop()
     UniqueInstance.stop()
     // Note: we share the same system
@@ -247,7 +242,7 @@ object Main {
 
 }
 
-class Main extends Application {
+class MainApp extends JFXApplication {
 
   import Main._
 
