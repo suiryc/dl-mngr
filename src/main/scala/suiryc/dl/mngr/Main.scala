@@ -223,7 +223,7 @@ object Main {
     WSServer.stop()
     UniqueInstance.stop()
     // Note: we share the same system
-    JFXSystem.terminate(JFXSystem.dispatcher)
+    JFXSystem.terminate()
     ()
   }
 
