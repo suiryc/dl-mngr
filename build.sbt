@@ -8,6 +8,7 @@ lazy val versions = Map[String, String](
   "dl-mngr"               → "0.0.1-SNAPSHOT",
   "httpclient"            → "4.5.7",
   "httpasyncclient"       → "4.1.4",
+  "javafx"                → "12.0.1",
   "logback"               → "1.2.3",
   "monix"                 → "3.0.0-RC2",
   "netty"                 → "4.1.34.Final",
@@ -17,7 +18,7 @@ lazy val versions = Map[String, String](
   "scopt"                 → "3.7.1",
   "slf4j"                 → "1.7.26",
   "spray-json"            → "1.3.5",
-  "suiryc-scala"          → "0.0.3-SNAPSHOT"
+  "suiryc-scala"          → "0.0.4-SNAPSHOT"
 )
 
 
@@ -79,6 +80,10 @@ lazy val dlMngr = project.in(file(".")).
       "org.apache.httpcomponents"      %  "httpasyncclient"               % versions("httpasyncclient")
         exclude ("commons-logging", "commons-logging"),
       "org.bouncycastle"               %  "bcprov-jdk15on"                % versions("bouncycastle"),
+      "org.openjfx"                    %  "javafx-base"                   % versions("javafx") classifier jfxPlatform,
+      "org.openjfx"                    %  "javafx-controls"               % versions("javafx") classifier jfxPlatform,
+      "org.openjfx"                    %  "javafx-fxml"                   % versions("javafx") classifier jfxPlatform,
+      "org.openjfx"                    %  "javafx-graphics"               % versions("javafx") classifier jfxPlatform,
       "org.scalatest"                  %% "scalatest"                     % versions("scalatest")    % "test",
       "org.slf4j"                      %  "jcl-over-slf4j"                % versions("slf4j"),
       "suiryc"                         %% "suiryc-scala-core"             % versions("suiryc-scala"),
@@ -90,10 +95,18 @@ lazy val dlMngr = project.in(file(".")).
   )
 
 assemblyMergeStrategy in assembly := {
+  case "module-info.class" => MergeStrategy.discard
   case x if x.startsWith("application.conf") ⇒ MergeStrategy.discard
   case x =>
     val oldStrategy = (assemblyMergeStrategy in assembly).value
     oldStrategy(x)
+}
+
+lazy val jfxPlatform = {
+  val osName = System.getProperty("os.name", "").toLowerCase
+  if (osName.startsWith("mac")) "mac"
+  else if (osName.startsWith("win")) "win"
+  else "linux"
 }
 
 lazy val install = taskKey[Unit]("Installs application")

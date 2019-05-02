@@ -48,7 +48,7 @@ parser.add_argument('arguments', nargs='*',
 args = parser.parse_args()
 
 
-javaExe = '/usr/lib/jvm/java-10-jdk/jre/bin/java'
+javaExe = '/usr/lib/jvm/java-11-openjdk/bin/java'
 creationflags = 0
 if sys.platform.startswith('win'):
   javaExe = 'javaw'
