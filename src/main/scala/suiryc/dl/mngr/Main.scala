@@ -14,6 +14,7 @@ import suiryc.scala.akka.CoreSystem
 import suiryc.scala.io.SystemStreams
 import suiryc.scala.javafx.{JFXApplication, JFXLauncher}
 import suiryc.scala.javafx.concurrent.JFXSystem
+import suiryc.scala.log.Loggers
 import suiryc.scala.misc.Util
 import suiryc.scala.sys.UniqueInstance
 import suiryc.scala.sys.UniqueInstance.CommandResult
@@ -110,13 +111,7 @@ object Main extends JFXLauncher[MainApp] {
         // Note: scala 'Console' stores the current 'in/out/err' value. So
         // better not trigger it before redirecting streams. (methods to change
         // the values are marked deprecated)
-        val ioCapture = params.ioCapture.contains(true)
-        if (ioCapture) {
-          SystemStreams.replace(
-            SystemStreams.loggerOutput("stdout"),
-            SystemStreams.loggerOutput("stderr", error = true)
-          )
-        }
+        val ioCapture = params.ioCapture.contains(true) && Loggers.captureIo().nonEmpty
         val uniqueInstanceId = params.uniqueInstanceId.get
         val processed = UniqueInstance.start(uniqueInstanceId, _cmd _, args, promise.future, streams)
         // We only end up here if we are the (first) unique instance.
