@@ -37,7 +37,7 @@
 
   <!-- The level of root is set to DEBUG by default -->
   <root level="INFO">
-    <appender-ref ref="STDOUT" />
+    <appender-ref ref="FILE" />
   </root>
 
   <!-- Hide the "Slf4jLogger started" log -->

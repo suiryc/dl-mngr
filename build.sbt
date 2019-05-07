@@ -90,16 +90,48 @@ lazy val dlMngr = project.in(file(".")).
       "suiryc"                         %% "suiryc-scala-javafx"           % versions("suiryc-scala")
     ),
 
+    // Replace mappings for jar generation
+    mappings in (Compile, packageBin) ~= remap,
+
     publishMavenStyle := true,
     publishTo := Some(Resolver.mavenLocal)
   )
 
+def remap(mappings: Seq[(File, String)]): Seq[(File, String)] = {
+  // Files to exclude: are generated inside 'target/classes' if running
+  // from IDE. Useful when not cleaning up before packaging ...
+  // Note: "application.conf*" is also discarded in assembly merge strategy.
+  val exclude = Set("application.conf", "application.conf.bak", "state.json")
+  // The 'package' path
+  val matchPath = "package"
+  // Get all files to package, and determine the actual destination path
+  val toPackage = mappings.filter {
+    case (_, dst) ⇒ (dst != matchPath) && Path(dst).asPath.startsWith(matchPath)
+  }.map {
+    case (src, dst) ⇒
+      val dstPath = Path(dst).asPath
+      src → dstPath.getParent.resolveSibling(dstPath.getFileName).toString
+  }
+  val toPackageSrc = toPackage.map(_._1).toSet
+  val toPackageDst = toPackage.map(_._2).toSet
+  // Replace mappings that we are explicitly packaging
+  mappings.filter {
+    case (src, dst) ⇒ !toPackageSrc.contains(src) && !toPackageDst.contains(dst) && !exclude.contains(dst)
+  } ++ toPackage
+}
+
+// Replace mappings for fat jar generation
+assembledMappings in assembly ~= { mappings =>
+  mappings.map { m ⇒
+    if (m.sourcePackage.isEmpty) m.copy(mappings = remap(m.mappings).toVector)
+    else m
+  }
+}
+
 assemblyMergeStrategy in assembly := {
   case "module-info.class" => MergeStrategy.discard
   case x if x.startsWith("application.conf") ⇒ MergeStrategy.discard
-  case x =>
-    val oldStrategy = (assemblyMergeStrategy in assembly).value
-    oldStrategy(x)
+  case x => (assemblyMergeStrategy in assembly).value.apply(x)
 }
 
 lazy val jfxPlatform = {
@@ -127,7 +159,7 @@ install := {
     IO.copyFile(src, targetPath.asFile)
   }
 
-  val projectResources = projectFolder / "src" / "main" / "resources"
+  val projectResources = projectFolder / "resources"
   if (OS.isLinux) {
     // Install .desktop and icon files
     val userShare = Path(RichFile.userHome) / ".local" / "share"
