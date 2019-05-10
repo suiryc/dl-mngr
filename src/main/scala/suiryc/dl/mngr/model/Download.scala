@@ -224,17 +224,18 @@ case class Download(
 
   def state: DownloadState.Value = info.state.getValue
   def isStarted: Boolean = info.isSizeDetermined || (info.downloaded.get > 0)
+  def isStopped: Boolean = state == DownloadState.Stopped
+  def isPending: Boolean = state == DownloadState.Pending
   def isRunning: Boolean = state == DownloadState.Running
-  def isActive: Boolean = (state == DownloadState.Running) || (state == DownloadState.Pending)
+  def isActive: Boolean = isRunning || isPending
   def isDone: Boolean = state == DownloadState.Success
+  def isFailed: Boolean = state == DownloadState.Failure
   def canStop: Boolean = isActive
   def canResume(restart: Boolean): Boolean = if (restart) canRestart else canResume
   // We cannot resume if ranges are not supported.
-  def canResume: Boolean = !acceptRanges.contains(false) &&
-    ((state == DownloadState.Failure) || (state == DownloadState.Stopped))
+  def canResume: Boolean = !acceptRanges.contains(false) && (isFailed || isStopped)
   // We can restart upon failure, or if stopped and ranges are not supported.
-  def canRestart: Boolean = (state == DownloadState.Failure) ||
-    ((state == DownloadState.Stopped) && acceptRanges.contains(false))
+  def canRestart: Boolean = isFailed || (isStopped && acceptRanges.contains(false))
 
   def siteSettings: Main.settings.SiteSettings = Main.settings.getSite(info.actualUri.get)
   def activeSegments: Int = info.activeSegments.get

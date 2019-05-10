@@ -803,16 +803,30 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
   }
 
   private val refreshAllDlRunning: () ⇒ Unit = { () ⇒
-    val (running, done, total) = getDownloadsData.foldLeft((0, 0, 0)) {
-      case ((running0, done0, total0), data) ⇒
-        val running = if (data.download.isRunning) running0 + 1 else running0
-        val done = if (data.download.isDone) done0 + 1 else done0
-        (running, done, total0 + 1)
+    val resume = getDownloadsData.foldLeft(DownloadsResume()) {
+      case (acc, data) ⇒ acc.add(data.download.state)
     }
-    val text =
-      if (total == 0) ""
-      else s"$running + $done / $total"
-    allDlRunningLabel.setText(text)
+    allDlRunningLabel.setText {
+      if (resume.total == 0) ""
+      else s"${resume.get(DownloadState.Running)} + ${resume.get(DownloadState.Success)} / ${resume.total}"
+    }
+    allDlRunningLabel.setTooltip {
+      if (resume.total == 0) null
+      else {
+        val text = List(
+          DownloadState.Stopped,
+          DownloadState.Pending,
+          DownloadState.Running,
+          DownloadState.Success,
+          DownloadState.Failure
+        ).foldLeft("") { (text, state) ⇒
+          val count = resume.get(state)
+          if (count > 0) s"$text\n${Strings.getState(state)}: $count"
+          else text
+        }
+        new Tooltip(s"$text\n${Strings.total}: ${resume.total}".trim)
+      }
+    }
   }
 
   private val refreshAllDlProgress: () ⇒ Unit = { () ⇒
@@ -1728,6 +1742,12 @@ object MainController {
     downloadedProgressPane.setMaxWidth(Double.MaxValue)
     downloadedProgressPane.setMaxHeight(Double.MaxValue)
     downloadedProgressPane.getChildren.setAll(downloadedProgress, downloadedProgressText)
+  }
+
+  private case class DownloadsResume(total: Int = 0, states: Map[DownloadState.Value, Int] = Map.empty) {
+    def add(state: DownloadState.Value): DownloadsResume =
+      copy(total = total + 1, states = states + (state → (get(state) + 1)))
+    def get(state: DownloadState.Value): Int = states.getOrElse(state, 0)
   }
 
   case class OnOptions(display: OptionsController.Display = OptionsController.Display())

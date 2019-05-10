@@ -1,5 +1,6 @@
 package suiryc.dl.mngr
 
+import suiryc.dl.mngr.model.DownloadState
 import suiryc.scala.settings.ConfigEntry
 import suiryc.scala.util.{I18NWithCache, I18NWithConfigEntry}
 
@@ -8,6 +9,7 @@ object I18N extends suiryc.scala.util.I18N("i18n.dl-mngr") with I18NWithConfigEn
   override val setting: ConfigEntry[String] = Main.settings.localeCode
 
   object Strings {
+    def getState(state: DownloadState.Value): String = getString(s"state.$state")
     def addDownload: String = getString("Add download")
     def cliIssue: String = getString("error.cli-issue")
     def defaults: String = getString("Defaults")
@@ -52,6 +54,7 @@ object I18N extends suiryc.scala.util.I18N("i18n.dl-mngr") with I18NWithConfigEn
     def stopDlsOnRemove: String = getString("confirmation.downloads-remove-stop")
     def stopDlsOnExit: String = getString("confirmation.exit-running-downloads")
     def time: String = getString("Time")
+    def total: String = getString("Total")
     def unexpectedIssue: String = getString("error.unexpected-issue")
     def unknownSize: String = getString("warning.size-unknown")
     def validDurationExpected: String = getString("Valid duration expected")
