@@ -56,6 +56,8 @@ class DownloadInfo {
   val size: SimpleLongProperty = new SimpleLongProperty(Long.MinValue)
   /** File last modified time on server. */
   var lastModified: SimpleObjectProperty[Date] = new SimpleObjectProperty()
+  /** Number of segments. */
+  val segments: SimpleIntegerProperty = new SimpleIntegerProperty(0)
   /** Number of active segments. */
   val activeSegments: SimpleIntegerProperty = new SimpleIntegerProperty(0)
   /** Segments limit. */

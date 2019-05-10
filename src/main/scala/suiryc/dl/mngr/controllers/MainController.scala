@@ -1552,7 +1552,7 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
           }.sideEffect(refreshAllDlSpeed)
            .bind(throttlingSlow, data.rateValue, info.downloaded, info.state)
 
-          new BindingsEx.Builder(JFXSystem.scheduler).add(data.stateIcon) {
+          BindingsEx.jfxBind(data.stateIcon, info.state, info.activeSegments) {
             download.state match {
               case DownloadState.Pending ⇒
                 Icons.hourglass().pane
@@ -1571,14 +1571,19 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
               case DownloadState.Failure ⇒
                 Icons.exclamationTriangle().pane
             }
-          }.add(data.segments) {
+          }
+          BindingsEx.jfxBind(data.segments, info.state, info.segments, info.maxSegments) {
             if (download.isRunning) {
-              s"${info.activeSegments.get}/${info.maxSegments.get}"
+              s"${info.segments.get}/${info.maxSegments.get}"
             } else {
               null
             }
-          }.sideEffect(refreshAllDlRunning)
-           .bind(info.state, info.activeSegments, info.maxSegments)
+          }
+          info.state.listen {
+            JFXSystem.runLater {
+              refreshAllDlRunning()
+            }
+          }
 
           if (first) items.add(0, id)
           else items.add(id)
