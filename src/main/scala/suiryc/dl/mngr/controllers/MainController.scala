@@ -808,7 +808,13 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
     }
     allDlRunningLabel.setText {
       if (resume.total == 0) ""
-      else s"${resume.get(DownloadState.Running)} + ${resume.get(DownloadState.Success)} / ${resume.total}"
+      else s"${
+        resume.get(DownloadState.Pending)
+      } + ${
+        resume.get(DownloadState.Running)
+      } + ${
+        resume.get(DownloadState.Success)
+      } / ${resume.total}"
     }
     allDlRunningLabel.setTooltip {
       if (resume.total == 0) null

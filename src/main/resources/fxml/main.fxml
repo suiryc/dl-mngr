@@ -203,7 +203,7 @@
                 <RowConstraints valignment="CENTER" vgrow="SOMETIMES" />
               </rowConstraints>
                <children>
-                  <Label fx:id="allDlRunningLabel" minWidth="90.0" />
+                  <Label fx:id="allDlRunningLabel" minWidth="110.0" />
                   <Separator orientation="VERTICAL" GridPane.columnIndex="1" />
                   <Label fx:id="allDlProgressLabel" GridPane.columnIndex="2" />
                   <Separator orientation="VERTICAL" GridPane.columnIndex="3" />
