@@ -693,11 +693,11 @@ class DownloadManager extends StrictLogging {
     cnxTotal < Main.settings.cnxMax.get
   }
 
-  def tryAcquireConnection(download: Download, force: Boolean, count: Boolean)
+  def tryAcquireConnection(download: Download, force: Boolean, count: Boolean, active: Boolean)
     : Either[DownloadException, Option[AcquiredConnection]] = this.synchronized
   {
     try {
-      Right(_tryAcquireConnection(download, force, count))
+      Right(_tryAcquireConnection(download, force, count, active))
     } catch {
       case ex0: Exception ⇒
         val exMsg =
@@ -714,7 +714,7 @@ class DownloadManager extends StrictLogging {
     }
   }
 
-  private def _tryAcquireConnection(download: Download, force: Boolean, count: Boolean): Option[AcquiredConnection] = {
+  private def _tryAcquireConnection(download: Download, force: Boolean, count: Boolean, active: Boolean): Option[AcquiredConnection] = {
     // Use the actual URI (since this is the real one we connect to)
     val uri = download.info.actualUri.get
     val siteSettings = Main.settings.getSite(uri)
@@ -764,7 +764,7 @@ class DownloadManager extends StrictLogging {
     }
 
     reasonOpt.foreach { reason ⇒
-      if (download.activeSegments == 0) download.info.state.setValue(DownloadState.Pending)
+      if (!active) download.info.state.setValue(DownloadState.Pending)
       download.updateLastReason(Some(s"Limit reached: $reason"))
     }
     if (reasonOpt.isEmpty) {

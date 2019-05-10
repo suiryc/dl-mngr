@@ -112,6 +112,8 @@ object FileDownloader {
 
     updateMaxSegments()
 
+    def isActive: Boolean = trySegment.nonEmpty || segmentConsumers.nonEmpty
+
     def addError(ex: DownloadException, downloaded: Boolean): State = {
       copy(
         cnxErrors = cnxErrors + (if (!ex.started) 1 else 0),
@@ -267,7 +269,12 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
     val segmentConsumers = state.segmentConsumers.map {
       case (consumer, data) ⇒
         // Acquire (forced) 'new' connection with refreshed settings.
-        state.dlMngr.tryAcquireConnection(state.download, force = true, count = data.acquired.count).toOption.flatten.map { acquired ⇒
+        state.dlMngr.tryAcquireConnection(
+          state.download,
+          force = true,
+          count = data.acquired.count,
+          active = state.isActive
+        ).toOption.flatten.map { acquired ⇒
           // Release the previously acquired one, effectively transferring it
           // to any new site when applicable.
           state.dlMngr.releaseConnection(data.acquired)
@@ -581,7 +588,12 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
   }
 
   def tryAcquireConnection(state: State, download: Download, forced: Boolean, tryCnx: Option[TryCnxData]): Either[State, Option[AcquiredConnection]] = {
-    state.dlMngr.tryAcquireConnection(download, force = forced, count = !forced).left.map { ex ⇒
+    state.dlMngr.tryAcquireConnection(
+      download,
+      force = forced,
+      count = !forced,
+      active = state.isActive
+    ).left.map { ex ⇒
       tryCnx.foreach(_.attemptFailure(ex))
       handleError(state, aborted = false, Some(ex))
     }
