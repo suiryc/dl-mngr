@@ -1614,10 +1614,20 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
       // Save current selection
       val selectedItem = downloadsTable.getSelectionModel.getSelectedItem
       val selectedItems = selectedDownloads.toSet
-      // Clear selection before moving item
-      downloadsTable.getSelectionModel.clearSelection()
 
       val items = downloadsTable.getItems
+
+      // Scroll when necessary: we want to keep the selected items (at least the
+      // 'leading' one - first or last depending if we move up or down) visible.
+      // Do it before altering items order to prevent any glitch (updated row
+      // may not be properly rendered right after scrolling to top/bottom).
+      val idx = if (up) {
+        if (most) Int.MinValue else items.indexOf(ids.head) - 1
+      } else {
+        if (most) Int.MaxValue else items.indexOf(ids.last) + 1
+      }
+      TableViews.scrollTo(downloadsTable, idx, top = up, padding = 1)
+
       def moveDownload(id: UUID, idx: Int): Unit = {
         val idxSrc = items.indexOf(id)
         if (idx != idxSrc) {
@@ -1634,6 +1644,8 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
         }
       }
 
+      // Clear selection before moving item
+      downloadsTable.getSelectionModel.clearSelection()
       if (up) {
         // When moving up, use the first item as base.
         val dst = if (most) 0 else math.max(0, items.indexOf(ids.head) - 1)
