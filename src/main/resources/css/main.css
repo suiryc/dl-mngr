@@ -37,12 +37,10 @@
 }
 
 .root {
-  color-success: #40E040;
-  color-pending: #E0E040;
+  color-success: #40C040;
   color-warning: #E09040;
   color-failure: #E04040;
   color-neutral: #555555;
-  /*color-neutral-light: #777777;*/
 }
 
 /* Default CSS for SVG groups. */
@@ -62,12 +60,12 @@
   -fx-fill: color-warning;
 }
 
-.icon-play .svg-path {
+.icon-download-running .svg-path {
   -fx-fill: color-success;
 }
 
-.icon-play-started .svg-path {
-  -fx-fill: color-pending;
+.icon-download-started .svg-path {
+  -fx-fill: color-warning;
 }
 
 .icon-stop .svg-path {

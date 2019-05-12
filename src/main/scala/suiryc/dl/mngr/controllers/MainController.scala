@@ -957,7 +957,7 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
       }
     }
     val resumeDownload = new MenuItem(Strings.resume)
-    resumeDownload.setGraphic(Icons.play().pane)
+    resumeDownload.setGraphic(Icons.download().pane)
     resumeDownload.setOnAction { _ ⇒
       selectedDownloadsData.filter(_.download.canResume(restart = false)).foreach { data ⇒
         getState.dlMngr.resumeDownload(data.download.id, reusedOpt = None, restart = false, tryCnx = false)
@@ -977,7 +977,7 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
     stopAll.setGraphic(Icons.stop().pane)
     stopAll.setOnAction(onDownloadsStopAll)
     val resumeAll = new MenuItem(Strings.resumeAll)
-    resumeAll.setGraphic(Icons.play().pane)
+    resumeAll.setGraphic(Icons.download().pane)
     resumeAll.setOnAction(onDownloadsResumeAll)
     val removeCompleted = new MenuItem(Strings.removeCompleted)
     removeCompleted.setGraphic(Icons.eraser().pane)
@@ -1558,8 +1558,8 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
                 Icons.hourglass().pane
 
               case DownloadState.Running ⇒
-                val styleClass = if (download.activeSegments == 0) List("icon-play-started") else Nil
-                Icons.play(styleClass = styleClass).pane
+                val styleClass = if (download.activeSegments == 0) List("icon-download-started") else List("icon-download-running")
+                Icons.download(styleClass = styleClass).pane
 
               case DownloadState.Success ⇒
                 if (Main.settings.removeCompleted.get) removeDownload(state, data.download.id)

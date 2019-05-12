@@ -116,14 +116,6 @@ object Icons extends IconBuilders {
     )
   }
 
-  // https://fontawesome.com/icons/play?style=solid
-  val play: Builder = iconBuilder(s"${PREFIX}play") { (styleClass, targetSvgSize) ⇒
-    val params = SVGGroupParams(svgWidth = 448, svgHeight = 512, targetSvgSize = targetSvgSize, targetSize = targetSvgSize, styleClass = styleClass)
-    SVGGroup(params,
-      svgPath("M424.4 214.7L72.4 6.6C43.8-10.3 0 6.1 0 47.9V464c0 37.5 40.7 60.1 72.4 41.3l352-208c31.4-18.5 31.5-64.1 0-82.6z")
-    )
-  }
-
   // https://fontawesome.com/icons/save?style=regular
   val save: Builder = iconBuilder(s"${PREFIX}save") { (styleClass, targetSvgSize) ⇒
     val params = SVGGroupParams(svgWidth = 448, svgHeight = 512, targetSvgSize = targetSvgSize, targetSize = targetSvgSize, styleClass = styleClass)
@@ -164,17 +156,6 @@ object Icons extends IconBuilders {
     )
   }
 
-  // Alternative tachometer icon.
-  // Icon made by Freepik (http://www.freepik.com) from www.flaticon.com.
-  // Licensed by CC 3.0 BY (http://creativecommons.org/licenses/by/3.0/).
-  // https://www.flaticon.com/free-icon/tachometer_39277
-  //val tachometer1: Builder = iconBuilder(s"${PREFIX}tachometer1") { (styleClass, targetSvgSize) ⇒
-  //  val params = SVGGroupParams(svgSize = 33.637, targetSvgSize = targetSvgSize, styleClass = styleClass)
-  //  SVGGroup(params,
-  //    svgPath("M16.819,3.281C7.546,3.281,0,10.826,0,20.102c0,3.449,1.048,6.773,3.027,9.611c0.281,0.401,0.74,0.643,1.23,0.643h25.124 c0.488,0,0.949-0.24,1.229-0.643c1.981-2.838,3.027-6.162,3.027-9.611C33.638,10.826,26.094,3.281,16.819,3.281z M28.572,27.355 H5.066c-1.354-2.186-2.065-4.678-2.065-7.254c0-7.621,6.199-13.82,13.819-13.82c7.62,0,13.819,6.2,13.819,13.82 C30.638,22.678,29.927,25.17,28.572,27.355z M14.986,9.986c0-1.013,0.821-1.834,1.833-1.834s1.833,0.821,1.833,1.834 c0,1.012-0.821,1.833-1.833,1.833S14.986,10.999,14.986,9.986z M9.319,20.487c0,1.013-0.82,1.833-1.833,1.833 s-1.834-0.82-1.834-1.833s0.821-1.834,1.834-1.834S9.319,19.475,9.319,20.487z M27.986,20.487c0,1.013-0.821,1.833-1.834,1.833 c-1.014,0-1.834-0.82-1.834-1.833s0.82-1.834,1.834-1.834C27.165,18.653,27.986,19.475,27.986,20.487z M22.809,15.443l-3.41,6.378 c1.375,0.862,2.295,2.38,2.295,4.122h-9.75c0-2.54,1.95-4.604,4.431-4.83l3.789-7.085c0.392-0.729,1.3-1.006,2.029-0.615 C22.924,13.803,23.199,14.712,22.809,15.443z")
-  //  )
-  //}
-
   // https://fontawesome.com/icons/undo?style=solid
   val undo: Builder = iconBuilder(s"${PREFIX}undo") { (styleClass, targetSvgSize) ⇒
     val params = SVGGroupParams(svgSize = 512, targetSvgSize = targetSvgSize, styleClass = styleClass)
@@ -184,7 +165,7 @@ object Icons extends IconBuilders {
   }
 
   val icons: Map[String, Builder] = List(bug, checkSquare, cog, download, eraser,
-    exclamationTriangle, minus, play, save, signOut, stop, sync, tachometer, undo).map { builder ⇒
+    exclamationTriangle, minus, save, signOut, stop, sync, tachometer, undo).map { builder ⇒
     builder().params.styleClass.head → builder
   }.toMap
 
