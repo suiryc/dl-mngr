@@ -458,14 +458,21 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
     })
     downloadsTable.addEventHandler(KeyEvent.KEY_PRESSED, (event: KeyEvent) ⇒ {
       if (event.isControlDown) {
-        val most = event.isShiftDown
         event.getCode match {
+          case KeyCode.PAGE_UP ⇒
+            moveDownloads(selectedDownloads, up = true, most = true)
+            event.consume()
+
           case KeyCode.UP ⇒
-            moveDownloads(selectedDownloads, up = true, most = most)
+            moveDownloads(selectedDownloads, up = true, most = event.isShiftDown)
             event.consume()
 
           case KeyCode.DOWN ⇒
-            moveDownloads(selectedDownloads, up = false, most = most)
+            moveDownloads(selectedDownloads, up = false, most = event.isShiftDown)
+            event.consume()
+
+          case KeyCode.PAGE_DOWN ⇒
+            moveDownloads(selectedDownloads, up = false, most = true)
             event.consume()
 
           case _ ⇒
