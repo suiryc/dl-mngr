@@ -461,7 +461,9 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
     state
   }
 
-  def trySegmentRange(state0: State, download: Download, force: Boolean, forced: Boolean, tryCnx: Option[TryCnxData]): (State, Boolean) = {
+  def trySegmentRange(state0: State, download: Download, force: Boolean, forced: Boolean, tryCnx: Option[TryCnxData])
+    : (State, Boolean) =
+  {
     // Notes:
     // Usually the currently active segments are expected to complete all
     // remaining ranges. Some active segments may not have yet started to
@@ -590,7 +592,9 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
     (state, trying)
   }
 
-  def tryAcquireConnection(state: State, download: Download, forced: Boolean, tryCnx: Option[TryCnxData]): Either[State, Option[AcquiredConnection]] = {
+  def tryAcquireConnection(state: State, download: Download, forced: Boolean, tryCnx: Option[TryCnxData])
+    : Either[State, Option[AcquiredConnection]] =
+  {
     state.dlMngr.tryAcquireConnection(
       download,
       force = forced,
@@ -602,7 +606,9 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
     }
   }
 
-  def segmentStart(state: State, range: SegmentRange, acquired: AcquiredConnection, force: Boolean, forced: Boolean, tryCnx: Option[TryCnxData]): State = {
+  def segmentStart(state: State, range: SegmentRange, acquired: AcquiredConnection,
+    force: Boolean, forced: Boolean, tryCnx: Option[TryCnxData]
+  ) : State = {
     val download = state.download
     val uri = download.info.actualUri.get
     download.rateLimiter.addDownload()
@@ -662,7 +668,7 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
         logger.error(s"${download.context(range)} $message", ex)
         download.info.addLog(LogKind.Error, message, Some(ex))
         tryCnx.foreach(_.attemptFailure(ex))
-        segmentDone(state, None, range, acquired, downloaded = false, Some(ex))
+        segmentDone(state, None, range, acquired, SegmentRange.zero, Some(ex))
     }
   }
 
@@ -747,7 +753,7 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
 
   def segmentDone(state: State, consumer: ResponseConsumer, exOpt: Option[Exception]): State = {
     state.segmentConsumers.get(consumer).map { data ⇒
-      val downloaded = consumer.position > data.range.start
+      val downloaded = SegmentRange(data.range.start, consumer.position - 1)
       // Fail segment attempt when applicable.
       for {
         tryCnx ← data.tryCnx
@@ -757,7 +763,9 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
     }.getOrElse(state)
   }
 
-  def segmentDone(state0: State, dataOpt: Option[SegmentHandlerData], range: SegmentRange, acquired: AcquiredConnection, downloaded: Boolean, exOpt0: Option[Exception]): State = {
+  def segmentDone(state0: State, dataOpt: Option[SegmentHandlerData], range: SegmentRange, acquired: AcquiredConnection,
+    downloaded: SegmentRange, exOpt0: Option[Exception]
+  ): State = {
     var state = state0
     val download = state.download
     state.dlMngr.releaseConnection(acquired)
@@ -777,7 +785,7 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
 
     state = handleWriteError(state, exOpt1)
     exOpt.foreach { ex ⇒
-      state = state.addError(ex, downloaded)
+      state = state.addError(ex, downloaded.isDefined)
     }
     val status = if (aborted) {
       "aborted"
@@ -786,10 +794,11 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
     } else {
       "finished"
     }
+    val downloadedRange = if (downloaded.isDefined) s" downloaded=$downloaded" else ""
     val message0 = s"Segment $status"
     val message = s"${download.context(range)} $message0${
       exOpt.map(v ⇒ s" ex=<$v>").getOrElse("")
-    }; remaining segments=${state.getSegments}"
+    }$downloadedRange; remaining segments=${state.getSegments}"
     exOpt match {
       case Some(ex) ⇒
         logger.error(message, ex)
@@ -797,7 +806,7 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
 
       case None ⇒
         logger.info(message)
-        state.download.info.addLog(LogKind.Debug, s"$message0 range=$range")
+        state.download.info.addLog(LogKind.Debug, s"$message0 range=$range$downloadedRange")
     }
 
     // Upon issue, and if range was not started, try to give it back to its
