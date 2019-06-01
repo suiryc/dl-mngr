@@ -29,6 +29,14 @@
   -fx-background-insets: 0, 0 0 1 0;
 }
 
+/* When highlighting is requested, actually hide (through opacity) other rows. */
+.table-view.highlight > .virtual-flow > .clipped-container > .sheet > .table-row-cell {
+  -fx-opacity: 0.25;
+}
+.table-view.highlight > .virtual-flow > .clipped-container > .sheet > .table-row-cell.highlighted {
+  -fx-opacity: inherit;
+}
+
 /* Override progress bar CSS.
  * Use greenish color instead of blueish.
  */

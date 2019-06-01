@@ -38,7 +38,8 @@ import suiryc.scala.javafx.beans.value.RichObservableValue
 import suiryc.scala.javafx.beans.value.RichObservableValue._
 import suiryc.scala.javafx.collections.RichObservableList._
 import suiryc.scala.javafx.concurrent.JFXSystem
-import suiryc.scala.javafx.scene.{Graphics, Styles}
+import suiryc.scala.javafx.css.Styleables
+import suiryc.scala.javafx.scene.{Graphics, Nodes, Styles}
 import suiryc.scala.javafx.scene.control.{Dialogs, Panes, TableCellEx, TableViews}
 import suiryc.scala.javafx.scene.control.skin.SplitPaneSkinEx
 import suiryc.scala.javafx.stage.{PathChoosers, StageLocationPersistentView, Stages}
@@ -497,6 +498,7 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
         refreshAllDlProgress()
       }
     }
+    TableViews.trackRows(downloadsTable, downloadRowUpdated)
 
     logsTable.getSelectionModel.setSelectionMode(SelectionMode.MULTIPLE)
     // Handle 'Ctrl-c' to copy log(s).
@@ -645,6 +647,43 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
     }
   }
 
+  private val USERDATA_HIGHLIGHTED_SITE = "highlighted-site"
+  private val STYLE_HIGHLIGHT = "highlight"
+  private val STYLE_HIGHLIGHTED = "highlighted"
+
+  private def downloadRowUpdated(row: TableRow[UUID], highlightSite: Option[String]): Unit = {
+    val highlight = for {
+      site ← highlightSite
+      data ← Option(row.getItem).flatMap(getDownloadData)
+    } yield data.download.siteSettings.site == site
+    Styleables.toggleStyleClass(row, STYLE_HIGHLIGHTED, set = highlight.contains(true))
+  }
+
+  private def downloadRowUpdated(row: TableRow[UUID], @unused oldValue: UUID, @unused newValue: UUID): Unit = {
+    val highlightSite = Nodes.getUserDataOpt[String](downloadsTable, USERDATA_HIGHLIGHTED_SITE)
+    downloadRowUpdated(row, highlightSite)
+  }
+
+  private def setSiteHighlight(highlightSite: Option[String]): Unit = {
+    if (highlightSite != Nodes.getUserDataOpt[String](downloadsTable, USERDATA_HIGHLIGHTED_SITE)) {
+      highlightSite match {
+        case Some(site) ⇒
+          Nodes.setUserData(downloadsTable, USERDATA_HIGHLIGHTED_SITE, site)
+          // Note: prepare entries before enabling highlighting
+          TableViews.getRows(downloadsTable).foreach { row ⇒
+            downloadRowUpdated(row, highlightSite)
+          }
+          Styleables.toggleStyleClass(downloadsTable, STYLE_HIGHLIGHT, set = true)
+
+        case None ⇒
+          Styleables.toggleStyleClass(downloadsTable, STYLE_HIGHLIGHT, set = false)
+          Nodes.removeUserData(downloadsTable, USERDATA_HIGHLIGHTED_SITE)
+          // Note: no need to refresh rows when highlighting is off
+      }
+    }
+    // else: no change
+  }
+
   private def refreshDlProperties(): Unit = {
     cancelSubscription(Option(dlPropertiesTab.getUserData))
 
@@ -652,6 +691,10 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
       case Some(data) ⇒
         val download = data.download
         val info = download.info
+
+        // Setup DL site highlighting
+        dlSiteLink.setOnMouseEntered { _ ⇒ setSiteHighlight(Some(download.siteSettings.site)) }
+        dlSiteLink.setOnMouseExited { _ ⇒ setSiteHighlight(None) }
 
         List(dlServerLink, dlSiteLink, dlURIDebugButton, dlFileSelectButton).foreach { button ⇒
           button.setDisable(false)
@@ -744,6 +787,11 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
         dlPropertiesTab.setUserData(propertiesCancellable)
 
       case None ⇒
+        // Reset DL site highlighting
+        setSiteHighlight(None)
+        dlSiteLink.setOnMouseEntered(null)
+        dlSiteLink.setOnMouseExited(null)
+
         dlURIDebugButton.setOnAction(null)
         dlURIField.setOnMouseClicked(null)
         dlFileSelectButton.setOnAction(null)
