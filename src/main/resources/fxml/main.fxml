@@ -13,6 +13,7 @@
 <?import javafx.scene.control.ScrollPane?>
 <?import javafx.scene.control.Separator?>
 <?import javafx.scene.control.SeparatorMenuItem?>
+<?import javafx.scene.control.Spinner?>
 <?import javafx.scene.control.SplitPane?>
 <?import javafx.scene.control.Tab?>
 <?import javafx.scene.control.TabPane?>
@@ -123,13 +124,39 @@
                                                 <Font name="System Bold" size="12.0" />
                                              </font>
                                           </Label>
-                                          <Hyperlink fx:id="dlServerLink" disable="true" onAction="#onDlServerSettings" GridPane.columnIndex="1" GridPane.columnSpan="2" GridPane.rowIndex="1" />
+                                          <HBox alignment="CENTER_LEFT" GridPane.columnIndex="1" GridPane.columnSpan="2" GridPane.rowIndex="1">
+                                             <children>
+                                                <Hyperlink fx:id="dlServerLink" disable="true" onAction="#onDlServerSettings" />
+                                                <Label text="%Max server connections:">
+                                                   <HBox.margin>
+                                                      <Insets left="10.0" right="5.0" />
+                                                   </HBox.margin>
+                                                </Label>
+                                                <Spinner fx:id="dlServerMaxCnxField" prefWidth="65.0" />
+                                             </children>
+                                          </HBox>
                                           <Label text="%Site:" GridPane.rowIndex="2">
                                              <font>
                                                 <Font name="System Bold" size="12.0" />
                                              </font>
                                           </Label>
-                                          <Hyperlink fx:id="dlSiteLink" disable="true" onAction="#onDlSiteSettings" GridPane.columnIndex="1" GridPane.columnSpan="2" GridPane.rowIndex="2" />
+                                          <HBox alignment="CENTER_LEFT" GridPane.columnIndex="1" GridPane.columnSpan="2" GridPane.rowIndex="2">
+                                             <children>
+                                                <Hyperlink fx:id="dlSiteLink" disable="true" onAction="#onDlSiteSettings" />
+                                                <Label text="%Max connections:">
+                                                   <HBox.margin>
+                                                      <Insets left="10.0" right="5.0" />
+                                                   </HBox.margin>
+                                                </Label>
+                                                <Spinner fx:id="dlSiteMaxCnxField" prefWidth="65.0" />
+                                                <Label text="%Max segments:">
+                                                   <HBox.margin>
+                                                      <Insets left="10.0" right="5.0" />
+                                                   </HBox.margin>
+                                                </Label>
+                                                <Spinner fx:id="dlSiteMaxSegmentsField" prefWidth="65.0" />
+                                             </children>
+                                          </HBox>
                                           <Label text="Referrer:" GridPane.rowIndex="3">
                                              <font>
                                                 <Font name="System Bold" size="12.0" />

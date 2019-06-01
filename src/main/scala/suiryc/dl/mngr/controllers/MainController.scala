@@ -12,6 +12,7 @@ import java.util.UUID
 import javafx.beans.property.{SimpleBooleanProperty, SimpleLongProperty, SimpleObjectProperty, SimpleStringProperty}
 import javafx.event.ActionEvent
 import javafx.fxml.{FXML, FXMLLoader}
+import javafx.scene.control.SpinnerValueFactory.IntegerSpinnerValueFactory
 import javafx.scene.{Node, Parent, Scene}
 import javafx.scene.control._
 import javafx.scene.input._
@@ -99,7 +100,16 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
   protected var dlServerLink: Hyperlink = _
 
   @FXML
+  protected var dlServerMaxCnxField: Spinner[Integer] = _
+
+  @FXML
   protected var dlSiteLink: Hyperlink = _
+
+  @FXML
+  protected var dlSiteMaxCnxField: Spinner[Integer] = _
+
+  @FXML
+  protected var dlSiteMaxSegmentsField: Spinner[Integer] = _
 
   @FXML
   protected var dlReferrerField: TextField = _
@@ -691,15 +701,43 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
       case Some(data) ⇒
         val download = data.download
         val info = download.info
+        val siteSettings = download.siteSettings
+        val dlMngr = getState.dlMngr
 
         // Setup DL site highlighting
-        dlSiteLink.setOnMouseEntered { _ ⇒ setSiteHighlight(Some(download.siteSettings.site)) }
+        dlSiteLink.setOnMouseEntered { _ ⇒ setSiteHighlight(Some(siteSettings.site)) }
         dlSiteLink.setOnMouseExited { _ ⇒ setSiteHighlight(None) }
 
-        List(dlServerLink, dlSiteLink, dlURIDebugButton, dlFileSelectButton).foreach { button ⇒
+        List(dlServerLink, dlServerMaxCnxField,
+          dlSiteLink, dlSiteMaxCnxField, dlSiteMaxSegmentsField,
+          dlURIDebugButton, dlFileSelectButton).foreach { button ⇒
           button.setDisable(false)
         }
-        dlSiteLink.setText(download.siteSettings.site)
+        // Show (and allow changing) limits: server cnx, site cnx, site DL segments.
+        dlServerMaxCnxField.setValueFactory(new IntegerSpinnerValueFactory(1, Int.MaxValue))
+        dlServerMaxCnxField.getValueFactory.setValue(Main.settings.cnxServerMax.get)
+        dlServerMaxCnxField.getValueFactory.valueProperty.listen { (_, oldValue, newValue) ⇒
+          // Change value, and try new cnx if applicable.
+          Main.settings.cnxServerMax.set(newValue)
+          if (newValue > oldValue) dlMngr.tryConnection()
+        }
+        dlSiteLink.setText(siteSettings.site)
+        dlSiteMaxCnxField.setValueFactory(new IntegerSpinnerValueFactory(1, Int.MaxValue))
+        dlSiteMaxCnxField.getValueFactory.setValue(siteSettings.getCnxMax)
+        dlSiteMaxCnxField.getValueFactory.valueProperty.listen { (_, oldValue, newValue) ⇒
+          // Change value, and try new cnx if applicable.
+          siteSettings.cnxMax.set(newValue)
+          if (newValue > oldValue) dlMngr.tryConnection()
+        }
+        dlSiteMaxSegmentsField.setValueFactory(new IntegerSpinnerValueFactory(1, Int.MaxValue))
+        dlSiteMaxSegmentsField.getValueFactory.setValue(siteSettings.getSegmentsMax)
+        dlSiteMaxSegmentsField.getValueFactory.valueProperty.listen { (_, oldValue, newValue) ⇒
+          // Change value, and try new cnx if applicable.
+          siteSettings.segmentsMax.set(newValue)
+          // Also refresh downloads: segments limit changed.
+          dlMngr.refreshDownloads()
+          if (newValue > oldValue) dlMngr.tryConnection()
+        }
         dlReferrerField.setText(download.referrer.map(_.toString).orNull)
         dlCookieField.setText(download.cookie.orNull)
         dlUserAgentField.setText(download.userAgent.orNull)
@@ -733,7 +771,6 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
           dlPropertiesScrollPane.layout()
         }
         dlURIDebugButton.setOnAction { _ ⇒
-          val dlMngr = getState.dlMngr
           val request = dlMngr.newRequest(
             uri = info.actualUri.get,
             head = true,
@@ -798,13 +835,17 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
         List(dlFolderField, dlFileField).foreach { field ⇒
           field.setTooltip(null)
         }
-        List(dlServerLink, dlSiteLink, dlURIDebugButton, dlFileSelectButton).foreach { button ⇒
+        List(dlServerLink, dlServerMaxCnxField,
+          dlSiteLink, dlSiteMaxCnxField, dlSiteMaxSegmentsField,
+          dlURIDebugButton, dlFileSelectButton).foreach { button ⇒
           button.setDisable(true)
         }
         List(dlServerLink, dlSiteLink, dlSizeLabel, dlLastModifiedLabel).foreach { field ⇒
           field.setText(null)
         }
-        List(dlURIField, dlReferrerField, dlCookieField, dlUserAgentField,
+        List(dlURIField, dlServerMaxCnxField.getEditor,
+          dlSiteMaxCnxField.getEditor, dlSiteMaxSegmentsField.getEditor,
+          dlReferrerField, dlCookieField, dlUserAgentField,
           dlFolderField, dlFileField).foreach { field ⇒
           field.setText(null)
         }
@@ -1339,13 +1380,10 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
       // If sites or limits were changed, refresh downloads: in particular the
       // maximum number of segments will be recomputed, and the current
       // connections associated to the correct site.
+      // Also refresh properties: selected download site may have changed, as
+      // well as site limits.
       if (result.sitesChanged || result.cnxLimitChanged) {
         dlMngr.refreshDownloads()
-      }
-
-      // If sites were changed, refresh properties (selected download site may
-      // have changed).
-      if (result.sitesChanged) {
         refreshDlProperties()
       }
 
