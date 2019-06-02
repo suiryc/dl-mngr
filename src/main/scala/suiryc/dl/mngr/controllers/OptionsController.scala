@@ -11,6 +11,7 @@ import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 import suiryc.dl.mngr.util.Icons
 import suiryc.dl.mngr.{I18N, Main, Settings}
+import suiryc.scala.concurrent.duration.Durations
 import suiryc.scala.javafx.beans.binding.BindingsEx
 import suiryc.scala.javafx.beans.value.RichObservableValue._
 import suiryc.scala.javafx.concurrent.JFXSystem
@@ -18,7 +19,7 @@ import suiryc.scala.javafx.scene.{Graphics, Styles}
 import suiryc.scala.javafx.scene.control.{CellWithSeparator, Dialogs, I18NLocaleCell}
 import suiryc.scala.javafx.stage.Stages.StageLocation
 import suiryc.scala.javafx.stage.{PathChoosers, StageLocationPersistentView, Stages}
-import suiryc.scala.misc.{Units, Util}
+import suiryc.scala.misc.Units
 import suiryc.scala.settings._
 import suiryc.scala.unused
 import suiryc.scala.util.I18NLocale
@@ -527,7 +528,7 @@ class OptionsController extends StageLocationPersistentView(OptionsController.st
     snap.setOnRefreshDraft {
       val raw = field.getText
       snap.setRawDraft(raw)
-      getDuration(raw).getOrElse(-1.millis)
+      Durations.parseFinite(raw).getOrElse(-1.millis)
     }
     def draftToField(): Unit = field.setText(snap.rawDraft.get.unwrapped.toString)
     snap.rawDraft.listen(draftToField())
@@ -543,11 +544,11 @@ class OptionsController extends StageLocationPersistentView(OptionsController.st
     val minSegmentSizeOk = getBytes(minSegmentSizeField.getText).getOrElse(-1L) > 0
     val writeBufferSizeOk = getBytes(writeBufferSizeField.getText).getOrElse(-1L) > 0
     val maxErrorsOk = getInt(maxErrorsField.getText).getOrElse(-1) > 0
-    val attemptDelayOk = getDuration(attemptDelayField.getText).getOrElse(-1.millis).length >= 0
-    val cnxRequestTimeoutOk = getDuration(cnxRequestTimeoutField.getText).getOrElse(-1.millis).length >= 0
-    val cnxTimeoutOk = getDuration(cnxTimeoutField.getText).getOrElse(-1.millis).length >= 0
-    val socketTimeoutOk = getDuration(socketTimeoutField.getText).getOrElse(-1.millis).length >= 0
-    val idleTimeoutOk = getDuration(idleTimeoutField.getText).getOrElse(-1.millis).length >= 0
+    val attemptDelayOk = Durations.parseFinite(attemptDelayField.getText).getOrElse(-1.millis).length >= 0
+    val cnxRequestTimeoutOk = Durations.parseFinite(cnxRequestTimeoutField.getText).getOrElse(-1.millis).length >= 0
+    val cnxTimeoutOk = Durations.parseFinite(cnxTimeoutField.getText).getOrElse(-1.millis).length >= 0
+    val socketTimeoutOk = Durations.parseFinite(socketTimeoutField.getText).getOrElse(-1.millis).length >= 0
+    val idleTimeoutOk = Durations.parseFinite(idleTimeoutField.getText).getOrElse(-1.millis).length >= 0
     val bufferMinSizeOk = getBytes(bufferMinSizeField.getText).getOrElse(-1L) > 0
     val bufferMaxSizeOk = getBytes(bufferMaxSizeField.getText).getOrElse(-1L) >= 0
 
@@ -635,17 +636,6 @@ class OptionsController extends StageLocationPersistentView(OptionsController.st
   private def getBytes(s: String): Option[Long] = {
     Option(s).flatMap { v ⇒
       try { Some(Units.storage.fromHumanReadable(v)) } catch { case _: Exception ⇒ None }
-    }
-  }
-
-  private def getDuration(s: String): Option[FiniteDuration] = {
-    Option(s).flatMap { v ⇒
-      try {
-        Util.parseDuration(v) match {
-          case d: FiniteDuration ⇒ Some(d)
-          case _ ⇒ None
-        }
-      } catch { case _: Exception ⇒ None }
     }
   }
 
