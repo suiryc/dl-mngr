@@ -41,7 +41,7 @@ import suiryc.scala.javafx.collections.RichObservableList._
 import suiryc.scala.javafx.concurrent.JFXSystem
 import suiryc.scala.javafx.css.Styleables
 import suiryc.scala.javafx.scene.{Graphics, Nodes, Styles}
-import suiryc.scala.javafx.scene.control.{Dialogs, Panes, TableCellEx, TableViews}
+import suiryc.scala.javafx.scene.control.{Dialogs, Panes, Spinners, TableCellEx, TableViews}
 import suiryc.scala.javafx.scene.control.skin.SplitPaneSkinEx
 import suiryc.scala.javafx.stage.{PathChoosers, StageLocationPersistentView, Stages}
 import suiryc.scala.javafx.stage.Stages.StageLocation
@@ -525,7 +525,10 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
         refreshDlProperties()
       }
     }
-    ()
+
+    Spinners.handleEvents(dlServerMaxCnxField)
+    Spinners.handleEvents(dlSiteMaxCnxField)
+    Spinners.handleEvents(dlSiteMaxSegmentsField)
   }
 
   private def computeTextWidth(s: String): Double = {
@@ -714,7 +717,14 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
           button.setDisable(false)
         }
         // Show (and allow changing) limits: server cnx, site cnx, site DL segments.
-        dlServerMaxCnxField.setValueFactory(new IntegerSpinnerValueFactory(1, Int.MaxValue))
+        // Note: reset editor text to make sure it does not remain empty. When
+        // no DL is selected, we empty the text without changing the value: if
+        // it is and remains 1, then the text would not be refreshed because the
+        // value would actually not be changed in the spinner.
+        List(dlServerMaxCnxField, dlSiteMaxCnxField, dlSiteMaxSegmentsField).foreach { field ⇒
+          field.setValueFactory(new IntegerSpinnerValueFactory(1, Int.MaxValue))
+          field.getEditor.setText(field.getValueFactory.getConverter.toString(field.getValue))
+        }
         dlServerMaxCnxField.getValueFactory.setValue(Main.settings.cnxServerMax.get)
         dlServerMaxCnxField.getValueFactory.valueProperty.listen { (_, oldValue, newValue) ⇒
           // Change value, and try new cnx if applicable.
@@ -722,14 +732,12 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
           if (newValue > oldValue) dlMngr.tryConnection()
         }
         dlSiteLink.setText(siteSettings.site)
-        dlSiteMaxCnxField.setValueFactory(new IntegerSpinnerValueFactory(1, Int.MaxValue))
         dlSiteMaxCnxField.getValueFactory.setValue(siteSettings.getCnxMax)
         dlSiteMaxCnxField.getValueFactory.valueProperty.listen { (_, oldValue, newValue) ⇒
           // Change value, and try new cnx if applicable.
           siteSettings.cnxMax.set(newValue)
           if (newValue > oldValue) dlMngr.tryConnection()
         }
-        dlSiteMaxSegmentsField.setValueFactory(new IntegerSpinnerValueFactory(1, Int.MaxValue))
         dlSiteMaxSegmentsField.getValueFactory.setValue(siteSettings.getSegmentsMax)
         dlSiteMaxSegmentsField.getValueFactory.valueProperty.listen { (_, oldValue, newValue) ⇒
           // Change value, and try new cnx if applicable.
@@ -843,8 +851,14 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
         List(dlServerLink, dlSiteLink, dlSizeLabel, dlLastModifiedLabel).foreach { field ⇒
           field.setText(null)
         }
-        List(dlURIField, dlServerMaxCnxField.getEditor,
-          dlSiteMaxCnxField.getEditor, dlSiteMaxSegmentsField.getEditor,
+        // Belt and suspenders: even though the spinners are now disabled, we
+        // also reset the value factory because we listen to value changes and
+        // we want to be sure they won't be changed anymore.
+        List(dlServerMaxCnxField, dlSiteMaxCnxField, dlSiteMaxSegmentsField).foreach { field ⇒
+          field.setValueFactory(null)
+          field.getEditor.setText(null)
+        }
+        List(dlURIField,
           dlReferrerField, dlCookieField, dlUserAgentField,
           dlFolderField, dlFileField).foreach { field ⇒
           field.setText(null)

@@ -72,7 +72,7 @@ object DownloadManager {
     //    ready is x2 or x3 ...
     /** HTTP connection manager. */
     lazy private val connManager = {
-      val bufferReadMax = Main.settings.bufferReadMax.get
+      val bufferReadMax = Main.settings.bufferReadMax.opt.getOrElse(0L)
       val bufSize = if (bufferReadMax > 0) {
         math.max(Main.settings.bufferReadMin.get, bufferReadMax)
       } else {

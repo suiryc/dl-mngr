@@ -8,6 +8,7 @@
 <?import javafx.scene.control.Label?>
 <?import javafx.scene.control.ListView?>
 <?import javafx.scene.control.Separator?>
+<?import javafx.scene.control.Spinner?>
 <?import javafx.scene.control.Tab?>
 <?import javafx.scene.control.TabPane?>
 <?import javafx.scene.control.TextField?>
@@ -65,15 +66,15 @@
                   <CheckBox fx:id="removeCompletedField" mnemonicParsing="false" text="%Remove completed" GridPane.columnSpan="2" GridPane.rowIndex="5" />
                   <Separator GridPane.columnSpan="2" GridPane.rowIndex="6" />
                   <Label text="%Downloads max:" GridPane.rowIndex="7" />
-                  <TextField fx:id="maxDownloadsField" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" GridPane.columnIndex="1" GridPane.rowIndex="7" />
+                  <Spinner fx:id="maxDownloadsField" editable="true" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" GridPane.columnIndex="1" GridPane.rowIndex="7" />
                   <Label text="%Max connections:" GridPane.rowIndex="8" />
-                  <TextField fx:id="maxCnxField" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" GridPane.columnIndex="1" GridPane.rowIndex="8" />
+                  <Spinner fx:id="maxCnxField" editable="true" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" GridPane.columnIndex="1" GridPane.rowIndex="8" />
                   <Label text="%Max server connections:" GridPane.rowIndex="9" />
-                  <TextField fx:id="maxServerCnxField" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" GridPane.columnIndex="1" GridPane.rowIndex="9" />
+                  <Spinner fx:id="maxServerCnxField" editable="true" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" GridPane.columnIndex="1" GridPane.rowIndex="9" />
                   <Label text="%Max segments:" GridPane.rowIndex="10" />
-                  <TextField fx:id="maxSegmentsField" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" GridPane.columnIndex="1" GridPane.rowIndex="10" />
+                  <Spinner fx:id="maxSegmentsField" editable="true" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" GridPane.columnIndex="1" GridPane.rowIndex="10" />
                   <Label text="%Min segment size:" GridPane.rowIndex="11" />
-                  <TextField fx:id="minSegmentSizeField" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" GridPane.columnIndex="1" GridPane.rowIndex="11" />
+                  <Spinner fx:id="minSegmentSizeField" editable="true" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" GridPane.columnIndex="1" GridPane.rowIndex="11" />
                   <Separator GridPane.columnSpan="2" GridPane.rowIndex="12" />
                   <HBox spacing="10.0" GridPane.columnSpan="2" GridPane.rowIndex="13">
                      <children>
@@ -82,7 +83,7 @@
                      </children>
                   </HBox>
                   <Label text="%Write buffer size:" GridPane.rowIndex="14" />
-                  <TextField fx:id="writeBufferSizeField" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" GridPane.columnIndex="1" GridPane.rowIndex="14" />
+                  <Spinner fx:id="writeBufferSizeField" editable="true" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" GridPane.columnIndex="1" GridPane.rowIndex="14" />
                </children>
                <padding>
                   <Insets bottom="15.0" left="15.0" right="15.0" top="15.0" />
@@ -120,23 +121,23 @@
                   <CheckBox fx:id="sslErrorAskField" allowIndeterminate="true" mnemonicParsing="false" text="%Ask on SSL error" GridPane.columnSpan="2" GridPane.rowIndex="2" />
                   <Separator prefWidth="200.0" GridPane.columnSpan="2" GridPane.rowIndex="3" />
                   <Label text="%Max errors:" GridPane.rowIndex="4" />
-                  <TextField fx:id="maxErrorsField" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" GridPane.columnIndex="1" GridPane.rowIndex="4" />
+                  <Spinner fx:id="maxErrorsField" editable="true" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" GridPane.columnIndex="1" GridPane.rowIndex="4" />
                   <Label text="%Attempt delay:" GridPane.rowIndex="5" />
-                  <TextField fx:id="attemptDelayField" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" GridPane.columnIndex="1" GridPane.rowIndex="5" />
+                  <Spinner fx:id="attemptDelayField" editable="true" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" GridPane.columnIndex="1" GridPane.rowIndex="5" />
                   <Separator prefWidth="200.0" GridPane.columnSpan="2" GridPane.rowIndex="6" />
                   <Label text="%Connection request timeout:" GridPane.rowIndex="7" />
-                  <TextField fx:id="cnxRequestTimeoutField" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" GridPane.columnIndex="1" GridPane.rowIndex="7" />
+                  <Spinner fx:id="cnxRequestTimeoutField" editable="true" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" GridPane.columnIndex="1" GridPane.rowIndex="7" />
                   <Label text="%Connection timeout:" GridPane.rowIndex="8" />
-                  <TextField fx:id="cnxTimeoutField" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" GridPane.columnIndex="1" GridPane.rowIndex="8" />
+                  <Spinner fx:id="cnxTimeoutField" editable="true" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" GridPane.columnIndex="1" GridPane.rowIndex="8" />
                   <Label text="%Socket timeout:" GridPane.rowIndex="9" />
-                  <TextField fx:id="socketTimeoutField" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" GridPane.columnIndex="1" GridPane.rowIndex="9" />
+                  <Spinner fx:id="socketTimeoutField" editable="true" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" GridPane.columnIndex="1" GridPane.rowIndex="9" />
                   <Label text="%Idle timeout:" GridPane.rowIndex="10" />
-                  <TextField fx:id="idleTimeoutField" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" GridPane.columnIndex="1" GridPane.rowIndex="10" />
+                  <Spinner fx:id="idleTimeoutField" editable="true" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" GridPane.columnIndex="1" GridPane.rowIndex="10" />
                   <Separator prefWidth="200.0" GridPane.columnSpan="2" GridPane.rowIndex="11" />
                   <Label text="%Buffer min size:" GridPane.rowIndex="12" />
-                  <TextField fx:id="bufferMinSizeField" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" GridPane.columnIndex="1" GridPane.rowIndex="12" />
+                  <Spinner fx:id="bufferMinSizeField" editable="true" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" GridPane.columnIndex="1" GridPane.rowIndex="12" />
                   <Label text="%Buffer max size:" GridPane.rowIndex="13" />
-                  <TextField fx:id="bufferMaxSizeField" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" GridPane.columnIndex="1" GridPane.rowIndex="13" />
+                  <Spinner fx:id="bufferMaxSizeField" editable="true" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" GridPane.columnIndex="1" GridPane.rowIndex="13" />
                </children>
                <padding>
                   <Insets bottom="15.0" left="15.0" right="15.0" top="15.0" />
@@ -173,9 +174,9 @@
                         <CheckBox fx:id="siteSslTrustField" mnemonicParsing="false" text="%confirmation.ssl-trust" />
                         <CheckBox fx:id="siteSslErrorAskField" allowIndeterminate="true" mnemonicParsing="false" text="%Ask on SSL error" />
                         <Label text="%Max connections:" />
-                        <TextField fx:id="siteMaxCnxField" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" />
+                        <Spinner fx:id="siteMaxCnxField" editable="true" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" />
                         <Label text="%Max segments:" />
-                        <TextField fx:id="siteMaxSegmentsField" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" />
+                        <Spinner fx:id="siteMaxSegmentsField" editable="true" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" />
                      </children>
                      <HBox.margin>
                         <Insets bottom="10.0" left="10.0" right="10.0" top="10.0" />

@@ -16,7 +16,7 @@ import suiryc.scala.javafx.beans.binding.BindingsEx
 import suiryc.scala.javafx.beans.value.RichObservableValue._
 import suiryc.scala.javafx.concurrent.JFXSystem
 import suiryc.scala.javafx.scene.{Graphics, Styles}
-import suiryc.scala.javafx.scene.control.{CellWithSeparator, Dialogs, I18NLocaleCell}
+import suiryc.scala.javafx.scene.control.{ByteSizeSpinnerValueFactory, CellWithSeparator, Dialogs, FiniteDurationSpinnerValueFactory, I18NLocaleCell, IntSpinnerValueFactory, Spinners}
 import suiryc.scala.javafx.stage.Stages.StageLocation
 import suiryc.scala.javafx.stage.{PathChoosers, StageLocationPersistentView, Stages}
 import suiryc.scala.misc.Units
@@ -48,19 +48,19 @@ class OptionsController extends StageLocationPersistentView(OptionsController.st
   protected var removeCompletedField: CheckBox = _
 
   @FXML
-  protected var maxDownloadsField: TextField = _
+  protected var maxDownloadsField: Spinner[Option[Int]] = _
 
   @FXML
-  protected var maxCnxField: TextField = _
+  protected var maxCnxField: Spinner[Option[Int]] = _
 
   @FXML
-  protected var maxServerCnxField: TextField = _
+  protected var maxServerCnxField: Spinner[Option[Int]] = _
 
   @FXML
-  protected var maxSegmentsField: TextField = _
+  protected var maxSegmentsField: Spinner[Option[Int]] = _
 
   @FXML
-  protected var minSegmentSizeField: TextField = _
+  protected var minSegmentSizeField: Spinner[Option[Long]] = _
 
   @FXML
   protected var preallocateField: CheckBox = _
@@ -69,7 +69,7 @@ class OptionsController extends StageLocationPersistentView(OptionsController.st
   protected var preallocateZeroField: CheckBox = _
 
   @FXML
-  protected var writeBufferSizeField: TextField = _
+  protected var writeBufferSizeField: Spinner[Option[Long]] = _
 
   @FXML
   protected var proxyField: TextField = _
@@ -81,28 +81,28 @@ class OptionsController extends StageLocationPersistentView(OptionsController.st
   protected var sslErrorAskField: CheckBox = _
 
   @FXML
-  protected var maxErrorsField: TextField = _
+  protected var maxErrorsField: Spinner[Option[Int]] = _
 
   @FXML
-  protected var attemptDelayField: TextField = _
+  protected var attemptDelayField: Spinner[Option[FiniteDuration]] = _
 
   @FXML
-  protected var cnxRequestTimeoutField: TextField = _
+  protected var cnxRequestTimeoutField: Spinner[Option[FiniteDuration]] = _
 
   @FXML
-  protected var cnxTimeoutField: TextField = _
+  protected var cnxTimeoutField: Spinner[Option[FiniteDuration]] = _
 
   @FXML
-  protected var socketTimeoutField: TextField = _
+  protected var socketTimeoutField: Spinner[Option[FiniteDuration]] = _
 
   @FXML
-  protected var idleTimeoutField: TextField = _
+  protected var idleTimeoutField: Spinner[Option[FiniteDuration]] = _
 
   @FXML
-  protected var bufferMinSizeField: TextField = _
+  protected var bufferMinSizeField: Spinner[Option[Long]] = _
 
   @FXML
-  protected var bufferMaxSizeField: TextField = _
+  protected var bufferMaxSizeField: Spinner[Option[Long]] = _
 
   @FXML
   protected var sitesTab: Tab = _
@@ -123,10 +123,10 @@ class OptionsController extends StageLocationPersistentView(OptionsController.st
   protected var siteSslErrorAskField: CheckBox = _
 
   @FXML
-  protected var siteMaxCnxField: TextField = _
+  protected var siteMaxCnxField: Spinner[Option[Int]] = _
 
   @FXML
-  protected var siteMaxSegmentsField: TextField = _
+  protected var siteMaxSegmentsField: Spinner[Option[Int]] = _
 
   protected var stage: Stage = _
 
@@ -223,7 +223,7 @@ class OptionsController extends StageLocationPersistentView(OptionsController.st
       , durationSettingSnapshot(idleTimeoutField, Main.settings.idleTimeout)
       , bytesSettingSnapshot(bufferMinSizeField, Main.settings.bufferReadMin)
       , {
-        val snap = bytesSettingSnapshot(bufferMaxSizeField, Main.settings.bufferReadMax)
+        val snap = bytesSettingSnapshot(bufferMaxSizeField, Main.settings.bufferReadMax, mandatory = false)
         snap.setOnChange { _ ⇒
           cnxBufferChanged = true
         }
@@ -310,16 +310,18 @@ class OptionsController extends StageLocationPersistentView(OptionsController.st
     val dependencies = List(
       languageChoice.getSelectionModel.selectedItemProperty, debugField.selectedProperty,
       downloadFolderField.textProperty, fileExtensionField.textProperty, removeCompletedField.selectedProperty,
-      maxDownloadsField.textProperty, maxCnxField.textProperty, maxServerCnxField.textProperty, maxSegmentsField.textProperty, minSegmentSizeField.textProperty,
-      preallocateField.selectedProperty, preallocateZeroField.selectedProperty, writeBufferSizeField.textProperty,
+      maxDownloadsField.getEditor.textProperty, maxCnxField.getEditor.textProperty,
+      maxServerCnxField.getEditor.textProperty, maxSegmentsField.getEditor.textProperty, minSegmentSizeField.getEditor.textProperty,
+      preallocateField.selectedProperty, preallocateZeroField.selectedProperty, writeBufferSizeField.getEditor.textProperty,
       proxyField.textProperty, sslTrustField.selectedProperty, sslTrustField.indeterminateProperty,
       sslErrorAskField.selectedProperty, sslErrorAskField.indeterminateProperty,
-      maxErrorsField.textProperty, attemptDelayField.textProperty,
-      cnxRequestTimeoutField.textProperty, cnxTimeoutField.textProperty, socketTimeoutField.textProperty, idleTimeoutField.textProperty,
-      bufferMinSizeField.textProperty, bufferMaxSizeField.textProperty,
+      maxErrorsField.getEditor.textProperty, attemptDelayField.getEditor.textProperty,
+      cnxRequestTimeoutField.getEditor.textProperty, cnxTimeoutField.getEditor.textProperty,
+      socketTimeoutField.getEditor.textProperty, idleTimeoutField.getEditor.textProperty,
+      bufferMinSizeField.getEditor.textProperty, bufferMaxSizeField.getEditor.textProperty,
       siteNameField.textProperty, siteSslTrustField.selectedProperty, siteSslTrustField.indeterminateProperty,
       siteSslErrorAskField.selectedProperty, siteSslErrorAskField.indeterminateProperty,
-      siteMaxCnxField.textProperty, siteMaxSegmentsField.textProperty,
+      siteMaxCnxField.getEditor.textProperty, siteMaxSegmentsField.getEditor.textProperty,
       sitesField.getSelectionModel.selectedItemProperty
     )
     new BindingsEx.Builder().add(buttonOk.disableProperty) {
@@ -405,39 +407,51 @@ class OptionsController extends StageLocationPersistentView(OptionsController.st
     // to the first one).
     // Before any change, unbind the fields (noop if not bound).
     def unbind(dst: CheckBox, src: CheckBox): Unit = {
-      dst.selectedProperty.unbindBidirectional(src.selectedProperty())
-      dst.indeterminateProperty.unbindBidirectional(src.indeterminateProperty())
+      dst.selectedProperty.unbindBidirectional(src.selectedProperty)
+      dst.indeterminateProperty.unbindBidirectional(src.indeterminateProperty)
     }
     def bind(dst: CheckBox, src: CheckBox): Unit = {
-      dst.selectedProperty.bindBidirectional(src.selectedProperty())
-      dst.indeterminateProperty.bindBidirectional(src.indeterminateProperty())
+      dst.selectedProperty.bindBidirectional(src.selectedProperty)
+      dst.indeterminateProperty.bindBidirectional(src.indeterminateProperty)
     }
     unbind(siteSslTrustField, sslTrustField)
     unbind(siteSslErrorAskField, sslErrorAskField)
-    siteMaxSegmentsField.textProperty.unbindBidirectional(maxSegmentsField.textProperty())
+    // Notes:
+    // Spinner value may not be committed yet: happens if we select another
+    // site right after editing the editor text. So do it now, before
+    // unbinding so that the value is propagated when applicable.
+    siteMaxCnxField.commitValue()
+    siteMaxSegmentsField.commitValue()
+    siteMaxSegmentsField.getValueFactory.valueProperty.unbindBidirectional(maxSegmentsField.getValueFactory.valueProperty)
     Option(sitesField.getSelectionModel.getSelectedItem).flatten match {
       case Some(item) ⇒
         // Notes:
         // We need to get the current draft value (which may have been changed
         // - refreshed - previously) instead of the setting value (draft not
         // yet applied).
-        siteMaxCnxField.setText(item.cnxMax.getDraftValue(refreshed = false).map(_.toString).orNull)
+        // We also need to (re)setup the spinners because 'mandatory' depends
+        // on whether we are dealing with the default site or not.
+        setupSpinner(siteMaxCnxField, Some(item.settings))
+        setupSpinner(siteMaxSegmentsField, Some(item.settings))
+        siteMaxCnxField.getValueFactory.setValue(item.cnxMax.getDraftValue(refreshed = false))
         if (item.isDefault) {
           bind(siteSslTrustField, sslTrustField)
           bind(siteSslErrorAskField, sslErrorAskField)
-          siteMaxSegmentsField.textProperty.bindBidirectional(maxSegmentsField.textProperty())
+          siteMaxSegmentsField.getValueFactory.valueProperty.bindBidirectional(maxSegmentsField.getValueFactory.valueProperty)
         } else {
           optToField(item.sslTrust.getDraftValue(refreshed = false), siteSslTrustField)
           optToField(item.sslErrorAsk.getDraftValue(refreshed = false), siteSslErrorAskField)
-          siteMaxSegmentsField.setText(item.segmentsMax.getDraftValue(refreshed = false).map(_.toString).orNull)
+          siteMaxSegmentsField.getValueFactory.setValue(item.segmentsMax.getDraftValue(refreshed = false))
         }
         siteNameField.setText(item.site)
         siteNameField.setDisable(item.isDefault)
         siteRemoveButton.setDisable(item.isDefault)
 
       case None ⇒
-        siteMaxCnxField.setText(null)
-        siteMaxSegmentsField.setText(null)
+        setupSpinner(siteMaxCnxField, mandatory = false)
+        siteMaxCnxField.getValueFactory.setValue(None)
+        setupSpinner(siteMaxSegmentsField, mandatory = false)
+        siteMaxSegmentsField.getValueFactory.setValue(None)
         siteNameField.setText(null)
         siteNameField.setDisable(false)
         siteRemoveButton.setDisable(true)
@@ -485,72 +499,102 @@ class OptionsController extends StageLocationPersistentView(OptionsController.st
     snap
   }
 
-  private def intSettingSnapshot(field: TextField, setting: ConfigEntry[Int],
+  private def setupSpinner(field: Spinner[Option[Int]], mandatory: Boolean): Unit = {
+    Option(field.getValueFactory) match {
+      case Some(valueFactory: IntSpinnerValueFactory) ⇒
+        valueFactory.setMandatory(mandatory)
+
+      case _ ⇒
+        Spinners.handleEvents(field)
+        field.setValueFactory(new IntSpinnerValueFactory(field, min = 1, mandatory = mandatory))
+    }
+  }
+
+  private def setupSpinner(field: Spinner[Option[Int]], siteSettings: Option[Settings#SiteSettings]): Unit = {
+    val mandatory = siteSettings.isEmpty || siteSettings.exists(_.isDefault)
+    setupSpinner(field, mandatory)
+  }
+
+  private def intSettingSnapshot(field: Spinner[Option[Int]], setting: ConfigEntry[Int],
     siteSettings: Option[Settings#SiteSettings] = None,
     isCnxLimit: Boolean = false): ConfigOptEntrySnapshot[Int] =
   {
+    setupSpinner(field, siteSettings)
+
     @inline
     def isSelected: Boolean = siteSettings.forall(isSiteSelected)
     val snap = SettingSnapshot.opt(setting)
     snap.setOnRefreshDraft {
+      // Note: 'field.getValue' is only updated when spinner value is committed,
+      // so we need to parse the text ourself too.
       // Here we wish to use None when either:
       //  - value is not an integer: invalid value
       //  - value is empty:
       //   -> for non-default sites this is allowed (to remove the config entry)
       //   -> for default site, this is an invalid value
       //   -> for other settings, this is also an invalid value
-      if (isSelected) getInt(field.getText)
+      if (isSelected) getInt(field.getEditor.getText)
       else snap.getDraftValue(refreshed = false)
     }
     if (isCnxLimit) tryConnectionOnChange(snap)
-    def draftToField(): Unit = if (isSelected) field.setText(snap.draft.get.map(_.toString).orNull)
+    def draftToField(): Unit = if (isSelected) field.getValueFactory.setValue(snap.draft.get)
     snap.draft.listen(draftToField())
     draftToField()
     snap
   }
 
-  private def bytesSettingSnapshot(field: TextField, setting: ConfigEntry[Long], isCnxLimit: Boolean = false): SettingSnapshot[Long] = {
-    val snap = SettingSnapshot(setting)
+  private def bytesSettingSnapshot(field: Spinner[Option[Long]], setting: ConfigEntry[Long],
+    isCnxLimit: Boolean = false, mandatory: Boolean = true): ConfigOptEntrySnapshot[Long] =
+  {
+    Spinners.handleEvents(field)
+    val min = if (mandatory) 1L else 0L
+    field.setValueFactory(new ByteSizeSpinnerValueFactory(field, min = min, mandatory = mandatory))
+
+    val snap = SettingSnapshot.opt(setting)
     snap.setOnRefreshDraft {
-      val raw = field.getText
-      snap.setRawDraft(raw)
-      getBytes(raw).getOrElse(-1)
+      val raw = Option(field.getEditor.getText).filter(_.trim.nonEmpty)
+      snap.setRawDraft(raw.orNull)
+      raw.flatMap(v ⇒ getBytes(v))
     }
     if (isCnxLimit) tryConnectionOnChange(snap)
-    def draftToField(): Unit = field.setText(snap.rawDraft.get.unwrapped.toString)
+    def draftToField(): Unit = field.getEditor.setText(Option(snap.rawDraft.get).map(_.unwrapped.toString).getOrElse(""))
     snap.rawDraft.listen(draftToField())
     draftToField()
     snap
   }
 
-  private def durationSettingSnapshot(field: TextField, setting: ConfigEntry[FiniteDuration]): SettingSnapshot[FiniteDuration] = {
+  private def durationSettingSnapshot(field: Spinner[Option[FiniteDuration]], setting: ConfigEntry[FiniteDuration]): SettingSnapshot[FiniteDuration] =
+  {
+    Spinners.handleEvents(field)
+    field.setValueFactory(new FiniteDurationSpinnerValueFactory(field))
+
     val snap = SettingSnapshot(setting)
     snap.setOnRefreshDraft {
-      val raw = field.getText
+      val raw = field.getEditor.getText
       snap.setRawDraft(raw)
       Durations.parseFinite(raw).getOrElse(-1.millis)
     }
-    def draftToField(): Unit = field.setText(snap.rawDraft.get.unwrapped.toString)
+    def draftToField(): Unit = field.getEditor.setText(Option(snap.rawDraft.get).map(_.unwrapped.toString).getOrElse(""))
     snap.rawDraft.listen(draftToField())
     draftToField()
     snap
   }
 
   private def checkForm(): Boolean = {
-    val maxDownloadsOk = getInt(maxDownloadsField.getText).getOrElse(-1) > 0
-    val maxCnxOk = getInt(maxCnxField.getText).getOrElse(-1) > 0
-    val maxServerCnxOk = getInt(maxServerCnxField.getText).getOrElse(-1) > 0
-    val maxSegmentsOk = getInt(maxSegmentsField.getText).getOrElse(-1) > 0
-    val minSegmentSizeOk = getBytes(minSegmentSizeField.getText).getOrElse(-1L) > 0
-    val writeBufferSizeOk = getBytes(writeBufferSizeField.getText).getOrElse(-1L) > 0
-    val maxErrorsOk = getInt(maxErrorsField.getText).getOrElse(-1) > 0
-    val attemptDelayOk = Durations.parseFinite(attemptDelayField.getText).getOrElse(-1.millis).length >= 0
-    val cnxRequestTimeoutOk = Durations.parseFinite(cnxRequestTimeoutField.getText).getOrElse(-1.millis).length >= 0
-    val cnxTimeoutOk = Durations.parseFinite(cnxTimeoutField.getText).getOrElse(-1.millis).length >= 0
-    val socketTimeoutOk = Durations.parseFinite(socketTimeoutField.getText).getOrElse(-1.millis).length >= 0
-    val idleTimeoutOk = Durations.parseFinite(idleTimeoutField.getText).getOrElse(-1.millis).length >= 0
-    val bufferMinSizeOk = getBytes(bufferMinSizeField.getText).getOrElse(-1L) > 0
-    val bufferMaxSizeOk = getBytes(bufferMaxSizeField.getText).getOrElse(-1L) >= 0
+    val maxDownloadsOk = getInt(maxDownloadsField.getEditor.getText).getOrElse(-1) > 0
+    val maxCnxOk = getInt(maxCnxField.getEditor.getText).getOrElse(-1) > 0
+    val maxServerCnxOk = getInt(maxServerCnxField.getEditor.getText).getOrElse(-1) > 0
+    val maxSegmentsOk = getInt(maxSegmentsField.getEditor.getText).getOrElse(-1) > 0
+    val minSegmentSizeOk = getBytes(minSegmentSizeField.getEditor.getText).getOrElse(-1L) > 0
+    val writeBufferSizeOk = getBytes(writeBufferSizeField.getEditor.getText).getOrElse(-1L) > 0
+    val maxErrorsOk = getInt(maxErrorsField.getEditor.getText).getOrElse(-1) > 0
+    val attemptDelayOk = Durations.parseFinite(attemptDelayField.getEditor.getText).getOrElse(-1.millis).length >= 0
+    val cnxRequestTimeoutOk = Durations.parseFinite(cnxRequestTimeoutField.getEditor.getText).getOrElse(-1.millis).length >= 0
+    val cnxTimeoutOk = Durations.parseFinite(cnxTimeoutField.getEditor.getText).getOrElse(-1.millis).length >= 0
+    val socketTimeoutOk = Durations.parseFinite(socketTimeoutField.getEditor.getText).getOrElse(-1.millis).length >= 0
+    val idleTimeoutOk = Durations.parseFinite(idleTimeoutField.getEditor.getText).getOrElse(-1.millis).length >= 0
+    val bufferMinSizeOk = getBytes(bufferMinSizeField.getEditor.getText).getOrElse(-1L) > 0
+    val bufferMaxSizeOk = getBytes(bufferMaxSizeField.getEditor.getText, mandatory = false).getOrElse(-1L) >= 0
 
     val isDefaultSite = getSelectedSite.exists(_.isDefault)
     val siteNameOk = getSiteName.exists { site ⇒
@@ -558,12 +602,12 @@ class OptionsController extends StageLocationPersistentView(OptionsController.st
         !sitesSnapshots.getSnapshots.map(_.site).toSet.contains(site)
     }
     // We allow emptying non-default site values
-    val siteMaxCnxOk = getInt(siteMaxCnxField.getText).getOrElse {
-      if (isDefaultSite || !isEmpty(siteMaxCnxField.getText)) -1
+    val siteMaxCnxOk = getInt(siteMaxCnxField.getEditor.getText).getOrElse {
+      if (isDefaultSite || !isEmpty(siteMaxCnxField.getEditor.getText)) -1
       else 1
     } > 0
-    val siteMaxSegmentsOk = getInt(siteMaxSegmentsField.getText).getOrElse {
-      if (isDefaultSite || !isEmpty(siteMaxSegmentsField.getText)) -1
+    val siteMaxSegmentsOk = getInt(siteMaxSegmentsField.getEditor.getText).getOrElse {
+      if (isDefaultSite || !isEmpty(siteMaxSegmentsField.getEditor.getText)) -1
       else 1
     } > 0
 
@@ -633,8 +677,10 @@ class OptionsController extends StageLocationPersistentView(OptionsController.st
     }
   }
 
-  private def getBytes(s: String): Option[Long] = {
-    Option(s).flatMap { v ⇒
+  private def getBytes(s: String, mandatory: Boolean = true): Option[Long] = {
+    Option(s).filter(_.trim.nonEmpty).orElse {
+      if (mandatory) None else Some("0")
+    }.flatMap { v ⇒
       try { Some(Units.storage.fromHumanReadable(v)) } catch { case _: Exception ⇒ None }
     }
   }
@@ -665,14 +711,14 @@ class OptionsController extends StageLocationPersistentView(OptionsController.st
       snap.draft.set(fieldToOpt(field))
     }
 
-    def refreshDraftInt(field: TextField, snap: ConfigOptEntrySnapshot[Int]): Unit = {
+    def refreshDraftInt(field: Spinner[Option[Int]], snap: ConfigOptEntrySnapshot[Int]): Unit = {
       // We are called to refresh the draft value because the selection moved
       // from our site to another.
       // We only allow positive values.
       // If value is invalid, we keep the current draft value. The only
       // exception being non-default site value that can be emptied, in which
       // case we can use None (to 'reset' entry).
-      val text = field.getText
+      val text = field.getEditor.getText
       snap.draft.set {
         getInt(text).filter(_ > 0).orElse {
           if (!isDefault && isEmpty(text)) None
@@ -756,6 +802,13 @@ class OptionsController extends StageLocationPersistentView(OptionsController.st
     private var removed: Set[SiteSettingsSnapshot] = Set.empty
 
     def addSite(siteOpt: Option[String]): Unit = {
+      // First clear selection.
+      // This is needed because when we setup the Spinners (upon creating a new
+      // SiteSettingsSnapshot), the text field will automatically be set to an
+      // initial value: code will behave as if we are changing the values of the
+      // currently selected site, which is not what we want).
+      sitesField.getSelectionModel.clearSelection()
+
       // Create a new snapshot for this site
       @scala.annotation.tailrec
       def getName(idx: Long): String = {
