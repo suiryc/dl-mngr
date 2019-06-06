@@ -107,7 +107,8 @@ object FileDownloader {
     segmentConsumers: Map[ResponseConsumer, SegmentHandlerData] = Map.empty,
     tryCnx: Option[TryCnxData] = None,
     trySegment: Option[Cancelable] = None,
-    maxSegments: Option[Int] = None
+    maxSegments: Option[Int] = None,
+    forceable: Int = 0
   ) {
 
     updateMaxSegments()
@@ -145,17 +146,25 @@ object FileDownloader {
       this
     }
 
-    def canForceSegment: Boolean = {
-      // We can force a new segment if all conditions are fulfilled:
-      //  - a maximum number of segments was specifically set on this download
-      //  - it is above the nominal (site-related) value: the difference is the
-      //    number of forced connections that are allowed for this download
-      //  - there are currently less than allowed forced connections
-      maxSegments.exists { max ⇒
-        val allowed = max - download.maxSegments
-        segmentConsumers.values.count(_.forced) < allowed
-      }
-    }
+    // Notes on forced connections:
+    // A new connection can be manually forced. When it happens, we remember
+    // it so that for this download we may force again a new connection when
+    // a current one ends.
+    // When a forced connection ends, we increment a 'forceable' counter (unless
+    // the connection was manually aborted, or there were too many errors).
+    // When we check whether a new connection can start, we force one if the
+    // 'forceable' counter is positive (and we decrement it).
+    // If we have too many errors, the counter is resetted to 0 to prevent
+    // automatically forcing new connections.
+    //
+    // If the number of segments exceeds the nominal (site-related) limit, we
+    // remember the new limit. If we manually remove a connection, we also
+    // reduce our limit (relatively to the number of running segments).
+    //
+    // This ensures a minimal handling of forced connections to go beyond the
+    // connections/segments limits, whether to force starting a download or
+    // increase the current number of running segments.
+    def updateForceable(f: Int ⇒ Int): State = copy(forceable = f(forceable))
 
     private def updatedConsumers(state: State): Unit = {
       download.info.segments.setValue(state.segmentConsumers.size)
@@ -396,7 +405,11 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
     // automatically because the number of max segments was raised manually
     // (previous manually forced connection).
     // When forcing, don't count this connection relatively to limits.
-    val forced = force || state.canForceSegment
+    val forced = force || {
+      val can = state.forceable > 0
+      if (can) state = state.updateForceable(_ - 1)
+      can
+    }
     // We can only start a new segment if ranges are accepted and we did not yet
     // reached max number of segments (and a TrySegment is not currently
     // scheduled).
@@ -606,9 +619,10 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
     }
   }
 
-  def segmentStart(state: State, range: SegmentRange, acquired: AcquiredConnection,
+  def segmentStart(state0: State, range: SegmentRange, acquired: AcquiredConnection,
     force: Boolean, forced: Boolean, tryCnx: Option[TryCnxData]
   ) : State = {
+    var state = state0
     val download = state.download
     val uri = download.info.actualUri.get
     download.rateLimiter.addDownload()
@@ -657,19 +671,20 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
         request = request,
         responseConsumer = responseConsumer
       )
-      val state1 = state.addConsumer(responseConsumer, data)
+      state = state.addConsumer(responseConsumer, data)
       // If we forced segment to start, cancel any pending attempt and reset
       // errors.
-      if (force) state1.cancelTrySegment.resetErrors
-      else state1
+      if (force) state = state.cancelTrySegment.resetErrors
     } catch {
       case ex: Exception ⇒
         val message = s"Failed to start segment range=$range download: ${ex.getMessage}"
         logger.error(s"${download.context(range)} $message", ex)
         download.info.addLog(LogKind.Error, message, Some(ex))
         tryCnx.foreach(_.attemptFailure(ex))
-        segmentDone(state, None, range, acquired, SegmentRange.zero, Some(ex))
+        state = segmentDone(state, None, range, forced = forced, acquired, SegmentRange.zero, Some(ex))
     }
+
+    state
   }
 
   def segmentStarted(state0: State, consumer: ResponseConsumer, response: HttpResponse): State = {
@@ -759,12 +774,12 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
         tryCnx ← data.tryCnx
         ex ← exOpt
       } tryCnx.attemptFailure(ex)
-      segmentDone(state.removeConsumer(consumer), Some(data), data.range, data.acquired, downloaded, exOpt)
+      segmentDone(state.removeConsumer(consumer), Some(data), data.range, forced = data.forced, data.acquired, downloaded, exOpt)
     }.getOrElse(state)
   }
 
-  def segmentDone(state0: State, dataOpt: Option[SegmentHandlerData], range: SegmentRange, acquired: AcquiredConnection,
-    downloaded: SegmentRange, exOpt0: Option[Exception]
+  def segmentDone(state0: State, dataOpt: Option[SegmentHandlerData], range: SegmentRange, forced: Boolean,
+    acquired: AcquiredConnection, downloaded: SegmentRange, exOpt0: Option[Exception]
   ): State = {
     var state = state0
     val download = state.download
@@ -782,6 +797,9 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
     } else {
       None
     }
+
+    // Remember when we can force another connection.
+    if (forced && !aborted && !state.hasTooManyErrors) state = state.updateForceable(_ + 1)
 
     state = handleWriteError(state, exOpt1)
     exOpt.foreach { ex ⇒
@@ -942,8 +960,11 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
 
   def tooManyErrors(state0: State, exOpt: Option[DownloadException]): State = {
     // Too many issues.
-    val download = state0.download
-    exOpt.map { ex ⇒
+    var state = state0
+    val download = state.download
+    exOpt.foreach { ex ⇒
+      // We won't automatically force other connections.
+      state = state.updateForceable(_ ⇒ 0)
       if (ex.rangeFailed) {
         // If the range validator changed (file on server was changed since we
         // started ?), notify caller through promise, and let it decide whether
@@ -953,58 +974,51 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
         if (ex.rangeValidator != download.info.rangeValidator) {
           val message = s"Too many errors; range validator changed from=<${download.info.rangeValidator}> to=<${ex.rangeValidator}>"
           logger.warn(s"${download.context} $message")
-          state0.download.info.addLog(LogKind.Warning, message)
-          stop(state0, ex, abort = true)
+          state.download.info.addLog(LogKind.Warning, message)
+          state = stop(state, ex, abort = true)
         } else {
           download.acceptRanges(accept = false)
           // maxSegments will automatically be 1 now
-          state0.updateMaxSegments()
+          state.updateMaxSegments()
           val message = "Too many errors; assume server does not accept ranges"
           logger.warn(s"${download.context} $message")
-          state0.download.info.addLog(LogKind.Warning, message)
+          state.download.info.addLog(LogKind.Warning, message)
           // Trigger stopping if that was the last consumer
-          if (state0.segmentConsumers.isEmpty) {
-            stop(state0, ex, abort = false)
-          } else {
-            state0
-          }
+          if (state.segmentConsumers.isEmpty) state = stop(state, ex, abort = false)
         }
       } else {
         // If there is no concurrent segment, we cannot consider we reached a
         // limit on how many segments we can open in parallel.
-        val (state1, canStop) = if (!ex.started && state0.segmentConsumers.nonEmpty) {
+        val canStop = if (!ex.started && state.segmentConsumers.nonEmpty) {
           // Request failed.
           // Assume we cannot create more segments than what we currently have.
-          val maxSegments = state0.getSegments
+          val maxSegments = state.getSegments
           val message = s"Too many errors; set maxSegments=<$maxSegments>"
           logger.warn(s"${download.context} $message")
-          state0.download.info.addLog(LogKind.Warning, message)
+          state.download.info.addLog(LogKind.Warning, message)
           // Now we don't consider our cnx error as a true error. Since we will
           // now respect the deduced segments limit, reset any previous cnx
           // error and obviously don't stop the download.
-          (state0.resetCnxErrors.setMaxSegments(maxSegments), false)
+          state = state.resetCnxErrors.setMaxSegments(maxSegments)
+          false
         } else {
           // Segment had an issue after successfully starting.
           val message = "Too many errors"
           logger.warn(s"${download.context} $message")
-          state0.download.info.addLog(LogKind.Warning, message)
+          state.download.info.addLog(LogKind.Warning, message)
           // Trigger download stopping: we won't automatically try new
           // connections, so we will need to properly consider the download
           // stopped once the last segment is done.
-          (state0, true)
+          true
         }
         // Trigger stopping when applicable
-        if (canStop) {
-          stop(state1, ex, abort = false)
-        } else {
-          state1
-        }
+        if (canStop) state = stop(state, ex, abort = false)
       }
-    }.getOrElse {
-      // No Exception: this segment finished without issue.
-      // Note: stopping was already triggered when applicable.
-      state0
     }
+    // else: no Exception; this segment finished without issue.
+    // Note: stopping was already triggered when applicable.
+
+    state
   }
 
   def stopSegment(state0: State): State = {
