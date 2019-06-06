@@ -1,6 +1,7 @@
 package suiryc.dl.mngr.controllers
 
 import akka.actor.{Actor, ActorRef, Props}
+import com.sun.javafx.scene.control.behavior.CellBehaviorBase
 import com.sun.javafx.tk.Toolkit
 import com.typesafe.scalalogging.StrictLogging
 import java.io.{PrintWriter, StringWriter}
@@ -1723,6 +1724,11 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
       val selectedItems = selectedDownloads.toSet
 
       val items = downloadsTable.getItems
+      // Remember current anchor (which is expected to be set since to move rows
+      // they must have been selected, which sets an anchor).
+      val anchored = Option(CellBehaviorBase.getAnchor[TablePosition[UUID, Any]](downloadsTable, null)).map { pos ⇒
+        items.get(pos.getRow)
+      }
 
       // Scroll when necessary: we want to keep the selected items (at least the
       // 'leading' one - first or last depending if we move up or down) visible.
@@ -1779,7 +1785,18 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
       // returned by one-item getters.
       (selectedItems - selectedItem).foreach(downloadsTable.getSelectionModel.select)
       downloadsTable.getSelectionModel.select(selectedItem)
-      ()
+
+      // Restore the selection anchor when applicable. If we don't, since we
+      // changed the rows, using shift to extend selection may select more or
+      // less than expected (from the original anchor to the new focused row).
+      anchored.foreach { id ⇒
+        val items = downloadsTable.getItems
+        downloadsTable.getSelectionModel.getSelectedCells.asScala.find { pos ⇒
+          items.get(pos.getRow) == id
+        }.foreach { pos ⇒
+          CellBehaviorBase.setAnchor(downloadsTable, pos, false)
+        }
+      }
     }
 
   }
