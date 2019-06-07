@@ -27,6 +27,23 @@ object Http extends StrictLogging {
   private val CONTENT_RANGE_REGEXP = """\s*bytes\s+([\d]+)-([\d]+)/([*\d]+)\s*""".r
 
   /**
+   * Gets URI for host.
+   *
+   * If string starts with a scheme, it is parsed as an URI.
+   * Otherwise we assume it points to the hostname (optional port) and we use
+   * the HTTP scheme by default.
+   */
+  def getHostURI(s: String): URI = {
+    if (s.toLowerCase.matches("""^[-a-zA-Z_0-9]+://.*""")) {
+      // This is an URL
+      URI.create(s)
+    } else {
+      // Assume we only have the host, and use HTTP scheme by default.
+      URI.create(s"http://$s")
+    }
+  }
+
+  /**
    * Gets URI from string.
    *
    * String is cleaned when necessary.

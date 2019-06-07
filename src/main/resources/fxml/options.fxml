@@ -115,8 +115,8 @@
                   <RowConstraints minHeight="-Infinity" vgrow="NEVER" />
                </rowConstraints>
                <children>
-                  <Label text="%Proxy:" />
-                  <TextField fx:id="proxyField" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" GridPane.columnIndex="1" />
+                  <CheckBox fx:id="proxyEnabledField" mnemonicParsing="false" text="%Proxy:" />
+                  <TextField fx:id="proxyField" maxHeight="-Infinity" maxWidth="1.7976931348623157E308" minHeight="-Infinity" minWidth="-Infinity" GridPane.columnIndex="1" GridPane.hgrow="ALWAYS" />
                   <CheckBox fx:id="sslTrustField" mnemonicParsing="false" text="%confirmation.ssl-trust" GridPane.columnSpan="2" GridPane.rowIndex="1" />
                   <CheckBox fx:id="sslErrorAskField" allowIndeterminate="true" mnemonicParsing="false" text="%Ask on SSL error" GridPane.columnSpan="2" GridPane.rowIndex="2" />
                   <Separator prefWidth="200.0" GridPane.columnSpan="2" GridPane.rowIndex="3" />

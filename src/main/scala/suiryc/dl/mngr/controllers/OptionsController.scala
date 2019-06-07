@@ -9,7 +9,8 @@ import javafx.scene.control._
 import javafx.stage.{DirectoryChooser, Stage, Window}
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
-import suiryc.dl.mngr.util.Icons
+import scala.util.Try
+import suiryc.dl.mngr.util.{Http, Icons}
 import suiryc.dl.mngr.{I18N, Main, Settings}
 import suiryc.scala.concurrent.duration.Durations
 import suiryc.scala.javafx.beans.binding.BindingsEx
@@ -70,6 +71,9 @@ class OptionsController extends StageLocationPersistentView(OptionsController.st
 
   @FXML
   protected var writeBufferSizeField: Spinner[Option[Long]] = _
+
+  @FXML
+  protected var proxyEnabledField: CheckBox = _
 
   @FXML
   protected var proxyField: TextField = _
@@ -202,6 +206,7 @@ class OptionsController extends StageLocationPersistentView(OptionsController.st
       , booleanSettingSnapshot(preallocateField, Main.settings.preallocateEnabled)
       , booleanSettingSnapshot(preallocateZeroField, Main.settings.preallocateZero)
       , bytesSettingSnapshot(writeBufferSizeField, Main.settings.bufferWriteFlushSize)
+      , booleanSettingSnapshot(proxyEnabledField, Main.settings.proxyEnabled)
       , {
         val setting = Main.settings.proxy
         val snap = SettingSnapshot.opt(setting).withDefault {
@@ -313,7 +318,7 @@ class OptionsController extends StageLocationPersistentView(OptionsController.st
       maxDownloadsField.getEditor.textProperty, maxCnxField.getEditor.textProperty,
       maxServerCnxField.getEditor.textProperty, maxSegmentsField.getEditor.textProperty, minSegmentSizeField.getEditor.textProperty,
       preallocateField.selectedProperty, preallocateZeroField.selectedProperty, writeBufferSizeField.getEditor.textProperty,
-      proxyField.textProperty, sslTrustField.selectedProperty, sslTrustField.indeterminateProperty,
+      proxyEnabledField.selectedProperty, proxyField.textProperty, sslTrustField.selectedProperty, sslTrustField.indeterminateProperty,
       sslErrorAskField.selectedProperty, sslErrorAskField.indeterminateProperty,
       maxErrorsField.getEditor.textProperty, attemptDelayField.getEditor.textProperty,
       cnxRequestTimeoutField.getEditor.textProperty, cnxTimeoutField.getEditor.textProperty,
@@ -587,6 +592,12 @@ class OptionsController extends StageLocationPersistentView(OptionsController.st
     val maxSegmentsOk = getInt(maxSegmentsField.getEditor.getText).getOrElse(-1) > 0
     val minSegmentSizeOk = getBytes(minSegmentSizeField.getEditor.getText).getOrElse(-1L) > 0
     val writeBufferSizeOk = getBytes(writeBufferSizeField.getEditor.getText).getOrElse(-1L) > 0
+    val proxyOk = !proxyEnabledField.isSelected || {
+      // URL should contain the necessary information unless empty.
+      Option(proxyField.getText).map(_.trim).filterNot(_.isEmpty).forall { proxy ⇒
+        Try(Option(Http.getHostURI(proxy).getAuthority)).toOption.flatten.exists(_.trim.nonEmpty)
+      }
+    }
     val maxErrorsOk = getInt(maxErrorsField.getEditor.getText).getOrElse(-1) > 0
     val attemptDelayOk = Durations.parseFinite(attemptDelayField.getEditor.getText).getOrElse(-1.millis).length >= 0
     val cnxRequestTimeoutOk = Durations.parseFinite(cnxRequestTimeoutField.getEditor.getText).getOrElse(-1.millis).length >= 0
@@ -617,6 +628,7 @@ class OptionsController extends StageLocationPersistentView(OptionsController.st
     Styles.toggleError(maxSegmentsField, !maxSegmentsOk, Strings.positiveValueExpected)
     Styles.toggleError(minSegmentSizeField, !minSegmentSizeOk, Strings.validSizeExpected)
     Styles.toggleError(writeBufferSizeField, !writeBufferSizeOk, Strings.validSizeExpected)
+    Styles.toggleError(proxyField, !proxyOk, Strings.validURLExpected)
     Styles.toggleError(maxErrorsField, !maxErrorsOk, Strings.positiveValueExpected)
     Styles.toggleError(attemptDelayField, !attemptDelayOk, Strings.validDurationExpected)
     Styles.toggleError(cnxRequestTimeoutField, !cnxRequestTimeoutOk, Strings.validDurationExpected)
@@ -630,7 +642,7 @@ class OptionsController extends StageLocationPersistentView(OptionsController.st
     Styles.toggleError(siteMaxSegmentsField, !siteMaxSegmentsOk, Strings.positiveValueExpected)
 
     maxDownloadsOk && maxCnxOk && maxServerCnxOk &&
-      maxSegmentsOk && minSegmentSizeOk && writeBufferSizeOk &&
+      maxSegmentsOk && minSegmentSizeOk && writeBufferSizeOk && proxyOk &&
       maxErrorsOk && attemptDelayOk && cnxRequestTimeoutOk && cnxTimeoutOk && socketTimeoutOk && idleTimeoutOk &&
       bufferMinSizeOk && bufferMaxSizeOk &&
       siteNameOk && siteMaxCnxOk && siteMaxSegmentsOk

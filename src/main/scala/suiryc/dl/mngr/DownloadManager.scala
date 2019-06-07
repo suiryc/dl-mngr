@@ -492,11 +492,13 @@ class DownloadManager extends StrictLogging {
       .setConnectionRequestTimeout(Main.settings.connectionRequestTimeout.get.toMillis.toInt)
       .setConnectTimeout(Main.settings.connectTimeout.get.toMillis.toInt)
       .setSocketTimeout(Main.settings.socketTimeout.get.toMillis.toInt)
-    Main.settings.proxy.opt.map(_.trim).filterNot(_.isEmpty).foreach { proxy0 ⇒
-      // Cleanup URI
-      val proxyUri = URI.create(proxy0)
-      val proxy = s"${proxyUri.getScheme}://${proxyUri.getAuthority}"
-      rcb.setProxy(HttpHost.create(proxy))
+    if (Main.settings.proxyEnabled.get) {
+      Main.settings.proxy.opt.map(_.trim).filterNot(_.isEmpty).foreach { proxy0 ⇒
+        // Cleanup URI
+        val proxyUri = Http.getHostURI(proxy0)
+        val proxy = s"${proxyUri.getScheme}://${proxyUri.getAuthority}"
+        rcb.setProxy(HttpHost.create(proxy))
+      }
     }
     request.setConfig(rcb.build)
     request

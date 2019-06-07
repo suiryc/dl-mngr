@@ -53,6 +53,7 @@ object Settings {
   private val KEY_TRUST = "trust"
   private val KEY_VALUE = "value"
   private val KEY_UNIT = "unit"
+  private val KEY_URL = "url"
   private val KEY_WRITE = "write"
   private val KEY_ZERO = "zero"
 
@@ -120,8 +121,10 @@ class Settings(path: Path) {
   val rateLimitUnit: ConfigEntry[String] =
     ConfigEntry.from[String](settings, prefix ++ Seq(KEY_DOWNLOADS, KEY_RATE_LIMIT, KEY_UNIT))
 
+  val proxyEnabled: ConfigEntry[Boolean] =
+    ConfigEntry.from(settings, prefix ++ Seq(KEY_DOWNLOADS, KEY_PROXY, KEY_ENABLED))
   val proxy: ConfigEntry[String] =
-    ConfigEntry.from(settings, prefix ++ Seq(KEY_DOWNLOADS, KEY_PROXY))
+    ConfigEntry.from(settings, prefix ++ Seq(KEY_DOWNLOADS, KEY_PROXY, KEY_URL))
 
   val connectionRequestTimeout: ConfigEntry[FiniteDuration] =
     ConfigEntry.from(settings, prefix ++ Seq(KEY_DOWNLOADS, KEY_TIMEOUT, KEY_CONNECTION_REQUEST))
