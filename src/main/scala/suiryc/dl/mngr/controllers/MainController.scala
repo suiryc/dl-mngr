@@ -2,7 +2,6 @@ package suiryc.dl.mngr.controllers
 
 import akka.actor.{Actor, ActorRef, Props}
 import com.sun.javafx.scene.control.behavior.CellBehaviorBase
-import com.sun.javafx.tk.Toolkit
 import com.typesafe.scalalogging.StrictLogging
 import java.io.{PrintWriter, StringWriter}
 import java.net.URI
@@ -44,6 +43,7 @@ import suiryc.scala.javafx.css.Styleables
 import suiryc.scala.javafx.scene.{Graphics, Nodes, Styles}
 import suiryc.scala.javafx.scene.control.{Dialogs, Panes, Spinners, TableCellEx, TableViews}
 import suiryc.scala.javafx.scene.control.skin.SplitPaneSkinEx
+import suiryc.scala.javafx.scene.text.Fonts
 import suiryc.scala.javafx.stage.{PathChoosers, StageLocationPersistentView, Stages}
 import suiryc.scala.javafx.stage.Stages.StageLocation
 import suiryc.scala.settings.ConfigEntry
@@ -532,11 +532,7 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
     Spinners.handleEvents(dlSiteMaxSegmentsField)
   }
 
-  private def computeTextWidth(s: String): Double = {
-    s.map { c ⇒
-      Toolkit.getToolkit.getFontLoader.getFontMetrics(Font.getDefault).getCharWidth(c).toDouble
-    }.sum
-  }
+  private def computeTextWidth(s: String): Double = Fonts.textWidth(Font.getDefault, s)
 
   private def cancelSubscription(v: Option[Any]): Unit = {
     v match {
