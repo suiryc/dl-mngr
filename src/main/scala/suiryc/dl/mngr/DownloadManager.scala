@@ -492,6 +492,8 @@ class DownloadManager extends StrictLogging {
       .setConnectionRequestTimeout(Main.settings.connectionRequestTimeout.get.toMillis.toInt)
       .setConnectTimeout(Main.settings.connectTimeout.get.toMillis.toInt)
       .setSocketTimeout(Main.settings.socketTimeout.get.toMillis.toInt)
+    // We could prevent URI normalization if needed
+    //  .setNormalizeUri(false)
     if (Main.settings.proxyEnabled.get) {
       Main.settings.proxy.opt.map(_.trim).filterNot(_.isEmpty).foreach { proxy0 ⇒
         // Cleanup URI
