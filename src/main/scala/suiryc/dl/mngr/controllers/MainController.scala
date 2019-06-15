@@ -1234,7 +1234,16 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
   }
 
   def onCloseRequest(event: WindowEvent): Unit = {
-    actor ! OnExit
+    try {
+      actor ! OnExit
+    } catch {
+      case ex: NoClassDefFoundError ⇒
+        // Usually happens when jar has been replaced(on Windows at least).
+        // There is nothing much to do except exit.
+        System.err.println("Exiting because classes are missing (JAR may have been overwritten)!")
+        ex.printStackTrace()
+        sys.exit(1)
+    }
     // Note: consume the event, the actor is responsible for shutting down
     event.consume()
   }
