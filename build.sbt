@@ -154,9 +154,11 @@ install := {
     Path("C:\\") / "Progs" / "dl-mngr"
   }
   sLog.value.info(s"Copying files to: $targetFolder")
-  List(jar, projectFolder / "src" / "main" / "scripts" / "dl-mngr.py").foreach { src ⇒
+  val options = CopyOptions().withPreserveLastModified(true)
+  IO.copyFile(jar, targetFolder / "dl-mngr.jar", options)
+  List(projectFolder / "src" / "main" / "scripts" / "dl-mngr.py").foreach { src ⇒
     val targetPath = targetFolder / src.getName
-    IO.copyFile(src, targetPath.asFile)
+    IO.copyFile(src, targetPath.asFile, options)
   }
 
   val projectResources = projectFolder / "resources"
@@ -165,16 +167,19 @@ install := {
     val userShare = Path(RichFile.userHome) / ".local" / "share"
     IO.copyFile(
       projectResources / "dl-mngr.desktop",
-      userShare / "applications" / "dl-mngr.desktop"
+      userShare / "applications" / "dl-mngr.desktop",
+      options
     )
     IO.copyFile(
       projectResources / "dl-mngr.svg",
-      userShare / "icons" / "dl-mngr.svg"
+      userShare / "icons" / "dl-mngr.svg",
+      options
     )
   } else {
     IO.copyFile(
       projectResources / "dl-mngr.png",
-      targetFolder / "dl-mngr.png"
+      targetFolder / "dl-mngr.png",
+      options
     )
   }
 }

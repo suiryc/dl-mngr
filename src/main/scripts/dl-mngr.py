@@ -60,7 +60,7 @@ if sys.platform.startswith('win'):
   #loop = asyncio.ProactorEventLoop()
   #asyncio.set_event_loop(loop)
 
-classpath = os.pathsep.join([dirScript, os.path.join(dirScript, 'dl-mngr-assembly-0.0.1-SNAPSHOT.jar')])
+classpath = os.pathsep.join([dirScript, os.path.join(dirScript, 'dl-mngr.jar'), os.path.join(dirScript, 'lib', '*')])
 cmd = [javaExe, '-Xms16M', '-Xmx64M', '-XX:MaxRAM=64M', '-cp', classpath, 'suiryc.dl.mngr.Main'] + args.arguments
 
 # In simple cases 'Popen' and 'communicate' is the way to go. But it waits for
