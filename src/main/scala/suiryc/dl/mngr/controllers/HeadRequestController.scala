@@ -19,6 +19,7 @@ import suiryc.dl.mngr.{DownloadManager, I18N, Main}
 import suiryc.dl.mngr.util.{Http, Icons}
 import suiryc.scala.io.PathsEx
 import suiryc.scala.javafx.concurrent.JFXSystem
+import suiryc.scala.javafx.scene.Graphics
 import suiryc.scala.javafx.scene.control.Dialogs
 import suiryc.scala.javafx.stage.Stages
 import suiryc.scala.misc.Units
@@ -194,6 +195,15 @@ object HeadRequestController {
   def buildDialog(owner: Window, dlMngr: DownloadManager, request: HttpRequestBase): Dialog[Option[DownloadHints]] = {
     val dialog = new Dialog[Option[DownloadHints]]()
     Stages.initOwner(dialog, owner)
+    Stages.getStage(dialog).getIcons.clear()
+    List(256.0, 128.0, 64.0, 32.0, 16.0).foreach { size ⇒
+      val icon = Icons.bug(targetSvgSize = size)
+      // We want to apply CSS, but for it to work properly there must be a
+      // "root" element (which holds some JavaFX CSS variables).
+      icon.pane.getStyleClass.add("root")
+      icon.pane.getStylesheets.add(getClass.getResource("/css/main.css").toExternalForm)
+      Stages.getStage(dialog).getIcons.add(Graphics.buildImage(icon.pane))
+    }
     dialog.setTitle(Strings.properties)
     dialog.getDialogPane.getButtonTypes.addAll(ButtonType.CLOSE, ButtonType.APPLY)
 
