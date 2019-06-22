@@ -34,7 +34,6 @@ import suiryc.dl.mngr.util.{Http, Icons}
 import suiryc.scala.RichOption._
 import suiryc.scala.concurrent.{Cancellable, RichFuture}
 import suiryc.scala.javafx.beans.binding.BindingsEx
-import suiryc.scala.javafx.beans.property.ConfigEntryProperty
 import suiryc.scala.javafx.beans.value.RichObservableValue
 import suiryc.scala.javafx.beans.value.RichObservableValue._
 import suiryc.scala.javafx.collections.RichObservableList._
@@ -1481,33 +1480,7 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
         val unfinished = removable.filterNot(safe.contains)
         if (unfinished.nonEmpty) {
           val confirmation = if (!force) {
-            // Build simple dialog to confirm removal
-            val buttonRemove = new ButtonType(Strings.remove)
-            val dialog = new Dialog[Option[Boolean]]()
-            Stages.initOwner(dialog, stage)
-            dialog.getDialogPane.getButtonTypes.addAll(buttonRemove, ButtonType.CANCEL)
-            Dialogs.setDefaultButton(dialog, buttonRemove)
-            val loader = new FXMLLoader(getClass.getResource("/fxml/remove-unfinished.fxml"), I18N.getResources)
-            dialog.getDialogPane.setContent(loader.load[Node]())
-
-            // Insert list of downloads in message field
-            val messageField = dialog.getDialogPane.lookup("#messageField").asInstanceOf[Label]
-            messageField.setText(s"${messageField.getText}\n${unfinished.map(_.download.downloadFile.getWorkingPath.getFileName).mkString("\n")}")
-
-            // Track (and persist) whether to remove from disk too
-            val removeFromDiskField = dialog.getDialogPane.lookup("#removeFromDiskField").asInstanceOf[CheckBox]
-            removeFromDiskField.setSelected(removeUnfinishedFromDisk.get)
-            BindingsEx.bind(removeUnfinishedFromDisk, removeFromDiskField.selectedProperty) {
-              removeFromDiskField.isSelected
-            }
-
-            // Determine the dialog result
-            dialog.setResultConverter {
-              case `buttonRemove` ⇒ Some(removeFromDiskField.isSelected)
-              case _ ⇒ None
-            }
-
-            // Show and wait confirmation
+            val dialog = RemoveUnfinishedController.buildDialog(stage, unfinished)
             dialog.showAndWait().flatten
           } else {
             Some(true)
@@ -1945,11 +1918,6 @@ object MainController {
 
   private val logsColumnsPref: ConfigEntry[String] = ConfigEntry.from[String](Main.settings.settings,
     Settings.prefix ++ Seq(Settings.KEY_STAGE, settingsKeyPrefix, "logs", "columns"))
-
-  private val removeUnfinishedFromDisk = ConfigEntryProperty {
-    ConfigEntry.from[Boolean](Main.settings.settings,
-      Settings.prefix ++ Seq(Settings.KEY_STAGE, "remove-unfinished", "remove-from-disk"))
-  }
 
   def build(state: State): Unit = {
     val stage = state.stage
