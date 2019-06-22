@@ -39,8 +39,13 @@ lazy val dlMngr = project.in(file(".")).
       version,
       git.gitHeadCommit,
       scalaVersion,
-      sbtVersion
+      sbtVersion,
+      BuildInfoKey.action("buildTime") {
+        System.currentTimeMillis
+      },
+      libraryDependencies
     ),
+    // Note: 'buildInfoOptions += BuildInfoOption.BuildTime' adds the UTC build time
     buildInfoPackage := "suiryc.dl.mngr",
     buildInfoObject := "Info",
     buildInfoUsePackageAsPath := true,

@@ -10,6 +10,7 @@ object I18N extends suiryc.scala.util.I18N("i18n.dl-mngr") with I18NWithConfigEn
 
   object Strings {
     def getState(state: DownloadState.Value): String = getString(s"state.$state")
+    def about: String = getString("About")
     def addDownload: String = getString("Add download")
     def cliIssue: String = getString("error.cli-issue")
     def defaults: String = getString("Defaults")

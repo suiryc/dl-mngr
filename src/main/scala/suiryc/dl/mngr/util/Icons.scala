@@ -165,7 +165,7 @@ object Icons extends IconBuilders {
   }
 
   val icons: Map[String, Builder] = List(bug, checkSquare, cog, download, eraser,
-    exclamationTriangle, minus, save, signOut, stop, sync, tachometer, undo).map { builder ⇒
+    exclamationTriangle, infoCircle, minus, save, signOut, stop, sync, tachometer, undo).map { builder ⇒
     builder().params.styleClass.head → builder
   }.toMap
 

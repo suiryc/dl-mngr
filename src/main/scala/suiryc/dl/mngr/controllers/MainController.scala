@@ -1252,6 +1252,10 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
     actor ! OnOptions()
   }
 
+  def onAbout(@unused event: ActionEvent): Unit = {
+    actor ! OnAbout
+  }
+
   def onExit(@unused event: ActionEvent): Unit = {
     actor ! OnExit
   }
@@ -1333,6 +1337,7 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
 
     def receive0(state: State): Receive = {
       case OnOptions(display)              ⇒ onOptions(state, display)
+      case OnAbout                         ⇒ onAbout(state)
       case OnExit                          ⇒ onExit(state)
       case OnDownloadsAdd(dlInfo, promise) ⇒ onDownloadsAdd(state, dlInfo, promise)
       case OnDownloadsRemoveCompleted      ⇒ onDownloadsRemoveCompleted(state)
@@ -1428,6 +1433,13 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
         MainController.build(state)
         ()
       }
+    }
+
+    def onAbout(state: State): Unit = {
+      val dialog = AboutController.buildDialog(state.stage)
+      dialog.initModality(Modality.WINDOW_MODAL)
+      dialog.setResizable(true)
+      dialog.show()
     }
 
     def onDownloadsAdd(state: State, dlInfo: NewDownloadInfo, promise: Promise[Unit]): Unit = {
@@ -1903,6 +1915,7 @@ object MainController {
   }
 
   case class OnOptions(display: OptionsController.Display = OptionsController.Display())
+  case object OnAbout
   case object OnExit
   case class OnDownloadsAdd(dlInfo: NewDownloadInfo, promise: Promise[Unit])
   case object OnDownloadsRemoveCompleted
