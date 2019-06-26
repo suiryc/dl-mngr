@@ -159,6 +159,12 @@ def installFiles(logger: Logger, projectFolder: File, files: Seq[(File, File)]):
   logger.info(s"Copying files to: $installFolder")
   val options = CopyOptions().withPreserveLastModified(true)
   IO.copy(files, options)
+  // Remove previous (legacy) files
+  val purgeFiles = Option((installFolder / "lib").listFiles).map(_.toSet).getOrElse(Set.empty) -- files.map(_._2)
+  if (purgeFiles.nonEmpty) {
+    logger.info(s"Cleaning legacy libs: ${purgeFiles.map(_.getName).toList.sorted.mkString(", ")}")
+    IO.delete(purgeFiles)
+  }
 
   List(projectFolder / "src" / "main" / "scripts" / "dl-mngr.py").foreach { src ⇒
     val targetPath = installFolder / src.getName
