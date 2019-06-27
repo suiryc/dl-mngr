@@ -103,7 +103,7 @@ class DownloadInfo {
     downloaded.set(0)
   }
 
-  def withLogs[A](f: ObservableList[LogEntry] ⇒ A): A = logs.synchronized {
+  def withLogs[A](f: ObservableList[LogEntry] => A): A = logs.synchronized {
     f(logs)
   }
 
@@ -246,7 +246,7 @@ case class Download(
 
   def updateLastReason(opt: Option[String]): Unit = {
     if (opt != lastReason) {
-      opt.foreach { reason ⇒
+      opt.foreach { reason =>
         info.addLog(LogKind.Info, reason)
       }
     }

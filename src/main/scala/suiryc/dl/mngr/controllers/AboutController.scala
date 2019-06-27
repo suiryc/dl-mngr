@@ -44,7 +44,7 @@ class AboutController {
     val buildTime = LocalDateTime.ofInstant(Instant.ofEpochMilli(Info.buildTime), ZoneId.systemDefault)
     buildTimeLabel.setText(buildTime.format(timeFormatter))
 
-    val dependencies = Info.libraryDependencies.flatMap { dep ⇒
+    val dependencies = Info.libraryDependencies.flatMap { dep =>
       val split = dep.split(':').reverse
       val version = split.head
       // Ignore dependencies used in 'test' setup.
@@ -55,12 +55,12 @@ class AboutController {
       }
     }.sortBy(_.name)
     val dependencyNameColumn = dependenciesTable.getColumns.get(0).asInstanceOf[TableColumn[Dependency, String]]
-    dependencyNameColumn.setCellValueFactory { data ⇒
+    dependencyNameColumn.setCellValueFactory { data =>
       new SimpleStringProperty(Option(data.getValue).map(_.name).orNull)
     }
     dependencyNameColumn.setMinWidth(dependencies.map(_.name).map(computeTextWidth).max + 10)
     val dependencyVersionColumn = dependenciesTable.getColumns.get(1).asInstanceOf[TableColumn[Dependency, String]]
-    dependencyVersionColumn.setCellValueFactory { data ⇒
+    dependencyVersionColumn.setCellValueFactory { data =>
       new SimpleStringProperty(Option(data.getValue).map(_.version).orNull)
     }
     dependencyVersionColumn.setMinWidth(dependencies.map(_.version).map(computeTextWidth).max + 10)
@@ -84,7 +84,7 @@ object AboutController {
     val dialog = new Dialog[Unit]()
     Stages.initOwner(dialog, owner)
     Stages.getStage(dialog).getIcons.clear()
-    List(256.0, 128.0, 64.0, 32.0, 16.0).foreach { size ⇒
+    List(256.0, 128.0, 64.0, 32.0, 16.0).foreach { size =>
       val icon = Icons.infoCircle(targetSvgSize = size)
       // We want to apply CSS, but for it to work properly there must be a
       // "root" element (which holds some JavaFX CSS variables).

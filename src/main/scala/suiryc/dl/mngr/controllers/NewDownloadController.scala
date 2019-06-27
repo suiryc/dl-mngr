@@ -85,24 +85,24 @@ class NewDownloadController extends StageLocationPersistentView(NewDownloadContr
     folderField.setText(Main.settings.downloadsPath.get.toString)
 
     dlInfo.uri match {
-      case Some(uri) ⇒
+      case Some(uri) =>
         uriField.setText(uri)
 
-      case None ⇒
+      case None =>
         // Get URI from clipboard when applicable.
         val clipboard = Clipboard.getSystemClipboard
         Option(clipboard.getUrl).map(_.trim).filterNot(_.isEmpty).orElse {
           Option(clipboard.getString).map(_.trim).filterNot(_.isEmpty)
-        }.flatMap { s ⇒
+        }.flatMap { s =>
           try {
-            Some(Http.getURI(s)).filter { v ⇒
+            Some(Http.getURI(s)).filter { v =>
               (v.getScheme != null) && (v.getPath != null)
             }
           } catch {
-            case _: Exception ⇒
+            case _: Exception =>
               None
           }
-        }.foreach { uri ⇒
+        }.foreach { uri =>
           uriField.setText(uri.toString)
         }
     }
@@ -116,13 +116,13 @@ class NewDownloadController extends StageLocationPersistentView(NewDownloadContr
     if (comment.nonEmpty) commentField.setText(comment)
     // Take into account given file(name)
     dlInfo.file.map(Paths.get(_)) match {
-      case Some(path) ⇒
+      case Some(path) =>
         // If this is an absolute path, use the parent folder
         if (path.isAbsolute) folderField.setText(path.getParent.toString)
         // In any case, use the filename
         updateFilename(Some(path.getFileName.toString))
 
-      case None ⇒
+      case None =>
         updateFilename(None)
     }
 
@@ -136,7 +136,7 @@ class NewDownloadController extends StageLocationPersistentView(NewDownloadContr
       insertFirstField.isSelected
     }
 
-    buttonOk.addEventFilter(ActionEvent.ACTION, (event: ActionEvent) ⇒ {
+    buttonOk.addEventFilter(ActionEvent.ACTION, (event: ActionEvent) => {
       result = checkForm(auto = false)
       if (result.isEmpty) event.consume()
     })
@@ -163,9 +163,9 @@ class NewDownloadController extends StageLocationPersistentView(NewDownloadContr
     val referrer = getReferrer
     val cookie = getCookie
     val userAgent = getUserAgent
-    getURI.flatMap { uri ⇒
+    getURI.flatMap { uri =>
       dlMngr.findDownload(uri) match {
-        case Some(download) ⇒
+        case Some(download) =>
           // This download (URI) already exists
           val r = if (auto) {
             // In automatic mode, do nothing
@@ -180,7 +180,7 @@ class NewDownloadController extends StageLocationPersistentView(NewDownloadContr
               defaultRestart = false
             )
           }
-          r.map { resolution ⇒
+          r.map { resolution =>
             Result(
               download = download,
               restart = resolution == ConflictResolution.Restart,
@@ -189,7 +189,7 @@ class NewDownloadController extends StageLocationPersistentView(NewDownloadContr
             )
           }
 
-        case None ⇒
+        case None =>
           // First check for special characters to replace in filename
           val path0 = Paths.get(getPathRaw(sanitize = true))
           val pathRaw0 = getPathRaw(sanitize = false)
@@ -241,7 +241,7 @@ class NewDownloadController extends StageLocationPersistentView(NewDownloadContr
                 contentText = Some(s"$path0\n$path")
               )
             }
-            r.map { resolution ⇒
+            r.map { resolution =>
               // Upon restarting, delete existing files
               if (resolution == ConflictResolution.Restart) {
                 path.toFile.delete()
@@ -285,7 +285,7 @@ class NewDownloadController extends StageLocationPersistentView(NewDownloadContr
   def onUriDebug(@unused event: ActionEvent): Unit = {
     import suiryc.scala.RichOption._
 
-    getURI.foreach { uri ⇒
+    getURI.foreach { uri =>
       val request = dlMngr.newRequest(
         uri = uri,
         head = true,
@@ -301,8 +301,8 @@ class NewDownloadController extends StageLocationPersistentView(NewDownloadContr
       val dialog = HeadRequestController.buildDialog(stage, dlMngr, request)
       dialog.initModality(Modality.WINDOW_MODAL)
       dialog.setResizable(true)
-      dialog.showAndWait().flatten.foreach { hints ⇒
-        hints.uri.foreach { uri ⇒
+      dialog.showAndWait().flatten.foreach { hints =>
+        hints.uri.foreach { uri =>
           uriField.setText(uri.toString)
         }
         if (hints.size.isDefined) dlInfo = dlInfo.copy(sizeHint = hints.size)
@@ -323,7 +323,7 @@ class NewDownloadController extends StageLocationPersistentView(NewDownloadContr
       new FileChooser.ExtensionFilter("*.*", "*.*")
     )
     PathChoosers.setInitialPath(fileChooser, getPath.toFile)
-    Option(fileChooser.showSaveDialog(stage)).foreach { selectedFile ⇒
+    Option(fileChooser.showSaveDialog(stage)).foreach { selectedFile =>
       folderField.setText(selectedFile.getParent)
       filenameField.setText(selectedFile.getName)
     }
@@ -354,10 +354,10 @@ class NewDownloadController extends StageLocationPersistentView(NewDownloadContr
       buttons = buttons,
       defaultButton = defaultButton
     ).flatMap {
-      case `buttonRestart` ⇒ Some(ConflictResolution.Restart)
-      case `buttonResume` ⇒ Some(ConflictResolution.Resume)
-      case `buttonRename` ⇒ Some(ConflictResolution.Rename)
-      case _ ⇒ None
+      case `buttonRestart` => Some(ConflictResolution.Restart)
+      case `buttonResume` => Some(ConflictResolution.Resume)
+      case `buttonRename` => Some(ConflictResolution.Rename)
+      case _ => None
     }
   }
 
@@ -367,7 +367,7 @@ class NewDownloadController extends StageLocationPersistentView(NewDownloadContr
     try {
       getText(s).map(Http.getURI)
     } catch {
-      case ex: Exception ⇒
+      case ex: Exception =>
         Dialogs.error(
           owner = Option(stage),
           title = None,
@@ -401,7 +401,7 @@ class NewDownloadController extends StageLocationPersistentView(NewDownloadContr
   def getPath: Path = Paths.get(getPathRaw(sanitize = true))
 
   def updateFilename(file: Option[String]): Unit = {
-    file.orElse(getURI.map(Http.getFilename)).foreach { file ⇒
+    file.orElse(getURI.map(Http.getFilename)).foreach { file =>
       val value = PathsEx.sanitizeFilename(file)
       filenameField.setText(value)
       filenameField.textField.positionCaret(value.length)
@@ -417,7 +417,7 @@ class NewDownloadController extends StageLocationPersistentView(NewDownloadContr
       } else {
         val (base, ext) = path.toFile.baseAndExt
         val extOpt = Some(ext).filterNot(_.isEmpty)
-        path.resolveSibling(s"$base ($n)${extOpt.map(v ⇒ s".$v").getOrElse("")}")
+        path.resolveSibling(s"$base ($n)${extOpt.map(v => s".$v").getOrElse("")}")
       }
       if (Files.exists(probe) || Main.settings.getTemporaryFile(probe).exists(Files.exists(_))) loop(n + 1)
       else probe
@@ -504,7 +504,7 @@ object NewDownloadController {
       Dialogs.addPersistence(dialog, controller)
 
       // Bring to front once shown
-      dialog.showingProperty.listen2 { (cancellable, v) ⇒
+      dialog.showingProperty.listen2 { (cancellable, v) =>
         if (v) {
           cancellable.cancel()
           val stage = Stages.getStage(dialog)
@@ -531,7 +531,7 @@ object NewDownloadController {
   def resultConverter(mainController: MainController, controller: NewDownloadController)(@unused buttonType: ButtonType): Option[Download] = {
     // Note: controller result is only set upon "OK" (or in automatic mode),
     // which is why we don't check which button was hit.
-    controller.result.map { result ⇒
+    controller.result.map { result =>
       val dlMngr = controller.dlMngr
       val download = result.download.getOrElse {
         dlMngr.addDownload(

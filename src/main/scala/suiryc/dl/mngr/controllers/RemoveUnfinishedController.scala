@@ -44,8 +44,8 @@ object RemoveUnfinishedController {
 
     // Determine the dialog result
     dialog.setResultConverter {
-      case `buttonRemove` ⇒ Some(removeFromDiskField.isSelected)
-      case _ ⇒ None
+      case `buttonRemove` => Some(removeFromDiskField.isSelected)
+      case _ => None
     }
 
     dialog

@@ -2,23 +2,23 @@ import sbt._
 import Keys._
 
 lazy val versions = Map[String, String](
-  "akka"                  → "2.5.23",
-  "bouncycastle"          → "1.62",
-  "config"                → "1.3.4",
-  "dl-mngr"               → "0.0.1-SNAPSHOT",
-  "httpclient"            → "4.5.9",
-  "httpasyncclient"       → "4.1.4",
-  "javafx"                → "12.0.1",
-  "logback"               → "1.2.3",
-  "monix"                 → "3.0.0-RC3",
-  "netty"                 → "4.1.36.Final",
-  "scala"                 → "2.12.8",
-  "scala-logging"         → "3.9.2",
-  "scalatest"             → "3.0.8",
-  "scopt"                 → "3.7.1",
-  "slf4j"                 → "1.7.26",
-  "spray-json"            → "1.3.5",
-  "suiryc-scala"          → "0.0.4-SNAPSHOT"
+  "akka"                  -> "2.5.23",
+  "bouncycastle"          -> "1.62",
+  "config"                -> "1.3.4",
+  "dl-mngr"               -> "0.0.1-SNAPSHOT",
+  "httpclient"            -> "4.5.9",
+  "httpasyncclient"       -> "4.1.4",
+  "javafx"                -> "12.0.1",
+  "logback"               -> "1.2.3",
+  "monix"                 -> "3.0.0-RC3",
+  "netty"                 -> "4.1.36.Final",
+  "scala"                 -> "2.12.8",
+  "scala-logging"         -> "3.9.2",
+  "scalatest"             -> "3.0.8",
+  "scopt"                 -> "3.7.1",
+  "slf4j"                 -> "1.7.26",
+  "spray-json"            -> "1.3.5",
+  "suiryc-scala"          -> "0.0.4-SNAPSHOT"
 )
 
 
@@ -111,23 +111,23 @@ def remap(mappings: Seq[(File, String)]): Seq[(File, String)] = {
   val matchPath = "package"
   // Get all files to package, and determine the actual destination path
   val toPackage = mappings.filter {
-    case (_, dst) ⇒ (dst != matchPath) && Path(dst).asPath.startsWith(matchPath)
+    case (_, dst) => (dst != matchPath) && Path(dst).asPath.startsWith(matchPath)
   }.map {
-    case (src, dst) ⇒
+    case (src, dst) =>
       val dstPath = Path(dst).asPath
-      src → dstPath.getParent.resolveSibling(dstPath.getFileName).toString
+      src -> dstPath.getParent.resolveSibling(dstPath.getFileName).toString
   }
   val toPackageSrc = toPackage.map(_._1).toSet
   val toPackageDst = toPackage.map(_._2).toSet
   // Replace mappings that we are explicitly packaging
   mappings.filter {
-    case (src, dst) ⇒ !toPackageSrc.contains(src) && !toPackageDst.contains(dst) && !exclude.contains(dst)
+    case (src, dst) => !toPackageSrc.contains(src) && !toPackageDst.contains(dst) && !exclude.contains(dst)
   } ++ toPackage
 }
 
 // Replace mappings for fat jar generation
 assembledMappings in assembly ~= { mappings =>
-  mappings.map { m ⇒
+  mappings.map { m =>
     if (m.sourcePackage.isEmpty) m.copy(mappings = remap(m.mappings).toVector)
     else m
   }
@@ -135,7 +135,7 @@ assembledMappings in assembly ~= { mappings =>
 
 assemblyMergeStrategy in assembly := {
   case "module-info.class" => MergeStrategy.discard
-  case x if x.startsWith("application.conf") ⇒ MergeStrategy.discard
+  case x if x.startsWith("application.conf") => MergeStrategy.discard
   case x => (assemblyMergeStrategy in assembly).value.apply(x)
 }
 
@@ -166,7 +166,7 @@ def installFiles(logger: Logger, projectFolder: File, files: Seq[(File, File)]):
     IO.delete(purgeFiles)
   }
 
-  List(projectFolder / "src" / "main" / "scripts" / "dl-mngr.py").foreach { src ⇒
+  List(projectFolder / "src" / "main" / "scripts" / "dl-mngr.py").foreach { src =>
     val targetPath = installFolder / src.getName
     IO.copyFile(src, targetPath.asFile, options)
   }

@@ -127,13 +127,13 @@ object DownloadManager {
         try {
           connManager.shutdown()
         } catch {
-          case ex: Exception ⇒
+          case ex: Exception =>
             logger.error(s"Failed to shutdown HTTP connection manager: ${ex.getMessage}", ex)
         }
         try {
           client.close()
         } catch {
-          case ex: Exception ⇒
+          case ex: Exception =>
             logger.error(s"Failed to close HTTP client: ${ex.getMessage}", ex)
         }
       }
@@ -147,13 +147,13 @@ object DownloadManager {
       try {
         super.createLocationURI(location)
       } catch {
-        case ex: Exception ⇒
+        case ex: Exception =>
           // Sometimes the location may have invalid characters.
           // Use our own method in this case.
           try {
             Http.getURI(location)
           } catch {
-            case _: Exception ⇒
+            case _: Exception =>
               // Throw the original error if we also fail.
               throw ex
           }
@@ -286,7 +286,7 @@ class DownloadManager extends StrictLogging {
 
   def reorderDownloads(ordered: List[UUID]): Unit = this.synchronized {
     // Create a map to access downloads more easily
-    val known = dlEntries.map { dlEntry ⇒ dlEntry.download.id → dlEntry }.toMap
+    val known = dlEntries.map { dlEntry => dlEntry.download.id -> dlEntry }.toMap
     // Belt and suspenders: determine if 'ordered' is missing known downloads
     // May happen with race conditions: download created here but not yet added
     // in UI while reordering happened.
@@ -294,7 +294,7 @@ class DownloadManager extends StrictLogging {
     val rest = dlEntries.map(_.download.id).filterNot(orderedSet.contains)
 
     def reorder(l: List[UUID]): List[DownloadEntry] = {
-      l.foldLeft(List.empty[DownloadEntry]) { (acc, id) ⇒
+      l.foldLeft(List.empty[DownloadEntry]) { (acc, id) =>
         acc ::: known.get(id).toList
       }
     }
@@ -347,7 +347,7 @@ class DownloadManager extends StrictLogging {
   }
 
   def findDownload(uri: URI): Option[Download] = {
-    dlEntries.find { dlEntry ⇒
+    dlEntries.find { dlEntry =>
       // Check both original and actual URIs
       (dlEntry.download.uri == uri) || (dlEntry.download.info.actualUri.get == uri)
     }.map(_.download)
@@ -362,7 +362,7 @@ class DownloadManager extends StrictLogging {
       dlEntry.dler ! FileDownloader.DownloadStop
       // If stopping was done, this is a success (not a 'real' failure).
       dlEntry.done.future.recover {
-        case ex: DownloadException if ex.stopped ⇒ ()
+        case ex: DownloadException if ex.stopped => ()
       }
     } else {
       Future.successful(())
@@ -371,7 +371,7 @@ class DownloadManager extends StrictLogging {
 
   def resumeDownload(id: UUID, reusedOpt: Option[Boolean], restart: Boolean, tryCnx: Boolean = true): Unit = {
     if (!stopping) {
-      getDownloadEntry(id).foreach { dlEntry ⇒
+      getDownloadEntry(id).foreach { dlEntry =>
         if (dlEntry.download.canResume(restart)) {
           val download = updateDownloadEntry(dlEntry.resume(reusedOpt, restart)).download
           download.info.state.setValue(DownloadState.Pending)
@@ -385,7 +385,7 @@ class DownloadManager extends StrictLogging {
 
   def addDownloadConnection(id: UUID): Unit = {
     if (!stopping) {
-      getDownloadEntry(id).foreach { dlEntry ⇒
+      getDownloadEntry(id).foreach { dlEntry =>
         val add = if (dlEntry.download.canResume) {
           resumeDownload(id, reusedOpt = None, restart = false, tryCnx = false)
           true
@@ -397,7 +397,7 @@ class DownloadManager extends StrictLogging {
 
   def removeDownloadConnection(id: UUID): Unit = {
     if (!stopping) {
-      getDownloadEntry(id).foreach { dlEntry ⇒
+      getDownloadEntry(id).foreach { dlEntry =>
         if (dlEntry.download.isRunning) {
           dlEntry.dler ! FileDownloader.RemoveConnection
         }
@@ -406,7 +406,7 @@ class DownloadManager extends StrictLogging {
   }
 
   def removeDownload(id: UUID): Unit = this.synchronized {
-    getDownloadEntry(id).foreach { dlEntry ⇒
+    getDownloadEntry(id).foreach { dlEntry =>
       if (dlEntry.download.isActive) {
         throw new Exception("Cannot remove download which is active")
       }
@@ -417,11 +417,11 @@ class DownloadManager extends StrictLogging {
   private def downloadDone(id: UUID, result: Try[Unit]): Unit = this.synchronized {
     // We should find the entry.
     getDownloadEntry(id) match {
-      case Some(dlEntry) ⇒
+      case Some(dlEntry) =>
         val download = dlEntry.download
         val failureOpt = result.failed.toOption.map {
-          case ex: DownloadException ⇒ ex
-          case ex: Exception ⇒ DownloadException(message = ex.getMessage, cause = ex)
+          case ex: DownloadException => ex
+          case ex: Exception => DownloadException(message = ex.getMessage, cause = ex)
         }
         // Belt and suspenders:
         // If the failure is due to the download being resumed/restarted,
@@ -433,11 +433,11 @@ class DownloadManager extends StrictLogging {
           download.info.addLog(LogKind.Error, "Download was not done before being resumed/restarted")
         } else {
           val state = failureOpt match {
-            case Some(ex) ⇒
+            case Some(ex) =>
               if (ex.stopped) DownloadState.Stopped
               else DownloadState.Failure
 
-            case None ⇒
+            case None =>
               DownloadState.Success
           }
           download.info.state.setValue(state)
@@ -452,13 +452,13 @@ class DownloadManager extends StrictLogging {
           if (!stopping) saveState()
         }
 
-      case None ⇒
+      case None =>
         logger.error(s"Could not properly end missing download entry id=<$id>. Result: $result")
     }
   }
 
   def refreshDownloads(): Unit = {
-    dlEntries.foreach { dlEntry ⇒
+    dlEntries.foreach { dlEntry =>
       dlEntry.dler ! FileDownloader.Refresh
     }
   }
@@ -472,21 +472,21 @@ class DownloadManager extends StrictLogging {
       new HttpGet(uri)
     }
 
-    referrer.foreach { referrer ⇒
+    referrer.foreach { referrer =>
       request.addHeader(HttpHeaders.REFERER, referrer.toASCIIString)
     }
-    cookie.foreach { cookie ⇒
+    cookie.foreach { cookie =>
       // Standard way would be to parse the cookie, create a cookie store and
       // attach it to the client or at least the request context. On the other
       // hand, it is easier and faster to set the header as requested.
       request.addHeader("Cookie", cookie)
     }
-    userAgent.foreach { userAgent ⇒
+    userAgent.foreach { userAgent =>
       request.addHeader(HttpHeaders.USER_AGENT, userAgent)
     }
     if (range.isDefined) {
       request.addHeader(HttpHeaders.RANGE, s"bytes=${range.start}-${if (range.isInfinite) "" else range.end}")
-      rangeValidator.foreach(v ⇒ request.addHeader(HttpHeaders.IF_RANGE, v))
+      rangeValidator.foreach(v => request.addHeader(HttpHeaders.IF_RANGE, v))
     }
     val rcb = RequestConfig.custom
       .setConnectionRequestTimeout(Main.settings.connectionRequestTimeout.get.toMillis.toInt)
@@ -495,7 +495,7 @@ class DownloadManager extends StrictLogging {
     // We could prevent URI normalization if needed
     //  .setNormalizeUri(false)
     if (Main.settings.proxyEnabled.get) {
-      Main.settings.proxy.opt.map(_.trim).filterNot(_.isEmpty).foreach { proxy0 ⇒
+      Main.settings.proxy.opt.map(_.trim).filterNot(_.isEmpty).foreach { proxy0 =>
         // Cleanup URI
         val proxyUri = Http.getHostURI(proxy0)
         val proxy = s"${proxyUri.getScheme}://${proxyUri.getAuthority}"
@@ -514,7 +514,7 @@ class DownloadManager extends StrictLogging {
         val promise = Promise[Unit]()
         if (sid.contains(head.download.id) || !head.download.isActive) promise.trySuccess(())
         else head.dler ! FileDownloader.TryConnection(promise)
-        promise.future.onComplete { _ ⇒
+        promise.future.onComplete { _ =>
           loop(tail)
         }
       }
@@ -526,7 +526,7 @@ class DownloadManager extends StrictLogging {
   private def followDownload(download: Download): Unit = {
     // Note: we use the download id because the actual download maye have been
     // updated since we started following it.
-    download.info.promise.future.onComplete(r ⇒ downloadDone(download.id, r))
+    download.info.promise.future.onComplete(r => downloadDone(download.id, r))
   }
 
   // Beware that caller must have an up-to-date download to update
@@ -545,7 +545,7 @@ class DownloadManager extends StrictLogging {
       }
     }
 
-    val updated = dlEntries.foldLeft(Updated()) { (updated, dlEntry0) ⇒
+    val updated = dlEntries.foldLeft(Updated()) { (updated, dlEntry0) =>
       updated.add(dlEntry0)
     }
     dlEntries = updated.complete()
@@ -554,7 +554,7 @@ class DownloadManager extends StrictLogging {
 
   def stop(): Future[Unit] = this.synchronized {
     stopping = true
-    dlEntries.foreach { dlEntry ⇒
+    dlEntries.foreach { dlEntry =>
       dlEntry.download.info.wasActive = dlEntry.download.isActive
       stopDownload(dlEntry)
     }
@@ -587,7 +587,7 @@ class DownloadManager extends StrictLogging {
     import spray.json._
     import JsonImplicits._
     val downloadsJson = downloads.toJson
-    val stateJson = JsObject("downloads" → downloadsJson)
+    val stateJson = JsObject("downloads" -> downloadsJson)
     val state = stateJson.prettyPrint
 
     // Save state
@@ -602,7 +602,7 @@ class DownloadManager extends StrictLogging {
     import JsonImplicits._
 
     def restoreState(downloadsBackupInfo: List[DownloadBackupInfo]): Unit = {
-      downloadsBackupInfo.foreach { downloadBackupInfo ⇒
+      downloadsBackupInfo.foreach { downloadBackupInfo =>
         val downloadFile = DownloadFile.reuse(downloadBackupInfo.path, downloadBackupInfo.temporaryPath)
         val download = Download(
           id = downloadBackupInfo.id,
@@ -615,7 +615,7 @@ class DownloadManager extends StrictLogging {
         ).setUri(downloadBackupInfo.uri)
         val info = download.info
         if (downloadBackupInfo.done) info.state.set(DownloadState.Success)
-        val remainingRanges = downloadBackupInfo.size.flatMap { size ⇒
+        val remainingRanges = downloadBackupInfo.size.flatMap { size =>
           info.size.set(size)
           if (size >= 0) {
             val remainingRanges = new SegmentRanges(size)
@@ -640,7 +640,7 @@ class DownloadManager extends StrictLogging {
       try {
         Some(value.convertTo[DownloadBackupInfo])
       } catch {
-        case ex: Exception ⇒
+        case ex: Exception =>
           Main.controller.displayError(
             title = None,
             contentText = Some(s"${I18N.Strings.readIssue}\n$path"),
@@ -662,7 +662,7 @@ class DownloadManager extends StrictLogging {
           restoreState(restored.flatten)
           (true, restored.exists(_.isEmpty))
         } catch {
-          case ex: Exception ⇒
+          case ex: Exception =>
             Main.controller.displayError(
               title = None,
               contentText = Some(s"${I18N.Strings.readIssue}\n$path"),
@@ -703,7 +703,7 @@ class DownloadManager extends StrictLogging {
     try {
       Right(_tryAcquireConnection(download, force, count, active))
     } catch {
-      case ex0: Exception ⇒
+      case ex0: Exception =>
         val exMsg =
           if (ex0.isInstanceOf[DownloadException]) ex0.getMessage
           else s"(${ex0.getClass.getSimpleName}) ${ex0.getMessage}"
@@ -767,7 +767,7 @@ class DownloadManager extends StrictLogging {
       else None
     }
 
-    reasonOpt.foreach { reason ⇒
+    reasonOpt.foreach { reason =>
       if (!active) download.info.state.setValue(DownloadState.Pending)
       download.updateLastReason(Some(s"Limit reached: $reason"))
     }
@@ -778,8 +778,8 @@ class DownloadManager extends StrictLogging {
       // Don't count connection when requested.
       if (count) {
         cnxTotal += 1
-        cnxPerSite += (acquired.site → (perSite + 1))
-        cnxPerServer += (acquired.host → perServer.acquireConnection)
+        cnxPerSite += (acquired.site -> (perSite + 1))
+        cnxPerServer += (acquired.host -> perServer.acquireConnection)
       }
       // Note: don't reset last reason. What really matters are 'new' reasons
       // that we could not acquire a connection.
@@ -799,10 +799,10 @@ class DownloadManager extends StrictLogging {
       val perSite = cnxPerSite(acquired.site)
 
       if (cnxTotal > 0) cnxTotal -= 1
-      if (perSite > 1) cnxPerSite += (acquired.site → (perSite - 1))
+      if (perSite > 1) cnxPerSite += (acquired.site -> (perSite - 1))
       else cnxPerSite -= acquired.site
-      cnxPerServer.get(acquired.host).foreach { perServer ⇒
-        cnxPerServer += (acquired.host → perServer.releaseConnection)
+      cnxPerServer.get(acquired.host).foreach { perServer =>
+        cnxPerServer += (acquired.host -> perServer.releaseConnection)
       }
     }
   }
@@ -810,16 +810,16 @@ class DownloadManager extends StrictLogging {
   def trustSslSiteConnection(site: String, trust: Boolean): Unit = this.synchronized {
     // Apply trusting to known concerned servers.
     cnxPerServer = cnxPerServer.map {
-      case (host, group) ⇒
+      case (host, group) =>
         val updated =
           if (Main.settings.getServerSite(host).site != site) group
           else group.trustSsl(trust)
-        host → updated
+        host -> updated
     }
   }
 
   def trustSslServerConnection(host: String, trust: Boolean): Unit = this.synchronized {
-    cnxPerServer += (host → cnxPerServer.getOrElse(host, ServerConnections(Main.settings.getServerSite(host))).trustSsl(trust))
+    cnxPerServer += (host -> cnxPerServer.getOrElse(host, ServerConnections(Main.settings.getServerSite(host))).trustSsl(trust))
   }
 
   def getServerConnections(site: String, host: String): ServerConnections = this.synchronized {
@@ -828,7 +828,7 @@ class DownloadManager extends StrictLogging {
 
   def refreshServerConnections(): Unit = this.synchronized {
     cnxPerServer = cnxPerServer.map {
-      case (host, group) ⇒ host → group.updateSsl(Main.settings.getServerSite(host))
+      case (host, group) => host -> group.updateSsl(Main.settings.getServerSite(host))
     }
   }
 
@@ -839,7 +839,7 @@ class DownloadManager extends StrictLogging {
     // When ssl settings did not change (and there is no active connection)
     // there is no need to keep anything.
     cnxPerServer = cnxPerServer.filter {
-      case (_, group) ⇒
+      case (_, group) =>
         (group.cnxCount > 0) ||
           (group.sslChanged && (group.lastActive >= System.currentTimeMillis - 6.hours.toMillis))
     }
@@ -859,7 +859,7 @@ case class AcquiredConnection(
 object DownloadsJanitor {
 
   case class Janitor(clients: List[DownloadManager.LazyClient])
-  private case class Trigger(f: () ⇒ Unit)
+  private case class Trigger(f: () => Unit)
   case object Start
   case object Stop
 
@@ -878,10 +878,10 @@ class DownloadsJanitor(dlMngr: DownloadManager) extends Actor with StrictLogging
   private var cleanupMngrCancellable: Option[Cancelable] = None
 
   override def receive: Receive = {
-    case Janitor(other) ⇒ janitor(other)
-    case Trigger(f) ⇒ trigger(f)
-    case Start ⇒ start()
-    case Stop ⇒ stop()
+    case Janitor(other) => janitor(other)
+    case Trigger(f) => trigger(f)
+    case Start => start()
+    case Stop => stop()
   }
 
   def janitor(other: List[DownloadManager.LazyClient]): Unit = {
@@ -897,11 +897,11 @@ class DownloadsJanitor(dlMngr: DownloadManager) extends Actor with StrictLogging
     scheduleCleanupMngr()
   }
 
-  def trigger(f: () ⇒ Unit): Unit = {
+  def trigger(f: () => Unit): Unit = {
     try {
       f()
     } catch {
-      case _: Exception ⇒
+      case _: Exception =>
     }
   }
 
@@ -910,7 +910,7 @@ class DownloadsJanitor(dlMngr: DownloadManager) extends Actor with StrictLogging
     try {
       dlMngr.saveState()
     } catch {
-      case ex: Exception ⇒
+      case ex: Exception =>
         Main.controller.displayError(
           title = None,
           contentText = Some(s"${I18N.Strings.writeIssue}\n${Main.statePath}"),
@@ -923,7 +923,7 @@ class DownloadsJanitor(dlMngr: DownloadManager) extends Actor with StrictLogging
 
   def scheduleBackup(): Unit = {
     if (backupCancellable.isEmpty) {
-      backupCancellable = Some(Main.scheduler.scheduleOnce(Main.settings.autosaveDelay.get)(self ! Trigger(() ⇒ backup())))
+      backupCancellable = Some(Main.scheduler.scheduleOnce(Main.settings.autosaveDelay.get)(self ! Trigger(() => backup())))
     }
   }
 
@@ -949,7 +949,7 @@ class DownloadsJanitor(dlMngr: DownloadManager) extends Actor with StrictLogging
   def cleanupClient(): Unit = {
     cleanupClientCancellable = None
     // Cleanup all cnx managers
-    oldClients.foreach { client ⇒
+    oldClients.foreach { client =>
       val connManager = client.getConnectionManager
       cleanupClient(connManager)
       // Check if we are done with this old resource
@@ -982,7 +982,7 @@ class DownloadsJanitor(dlMngr: DownloadManager) extends Actor with StrictLogging
     ).max
     // Note: we may also simply schedule every second ...
     if (cleanupClientCancellable.isEmpty) {
-      cleanupClientCancellable = Some(Main.scheduler.scheduleOnce(next)(self ! Trigger(() ⇒ cleanupClient())))
+      cleanupClientCancellable = Some(Main.scheduler.scheduleOnce(next)(self ! Trigger(() => cleanupClient())))
     }
   }
 
@@ -994,7 +994,7 @@ class DownloadsJanitor(dlMngr: DownloadManager) extends Actor with StrictLogging
 
   def scheduleCleanupMngr(): Unit = {
     if (cleanupMngrCancellable.isEmpty) {
-      cleanupMngrCancellable = Some(Main.scheduler.scheduleOnce(1.hour)(self ! Trigger(() ⇒ cleanupMngr())))
+      cleanupMngrCancellable = Some(Main.scheduler.scheduleOnce(1.hour)(self ! Trigger(() => cleanupMngr())))
     }
   }
 

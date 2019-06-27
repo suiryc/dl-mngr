@@ -10,7 +10,7 @@ import io.netty.handler.codec.http.websocketx.{TextWebSocketFrame, WebSocketFram
 import io.netty.handler.codec.http.websocketx.extensions.compression.WebSocketServerCompressionHandler
 import io.netty.handler.codec.http.{HttpObjectAggregator, HttpServerCodec}
 import io.netty.handler.logging.LoggingHandler
-import io.netty.util.concurrent.{Future ⇒ nettyFuture}
+import io.netty.util.concurrent.{Future => nettyFuture}
 import java.net.InetSocketAddress
 import scala.concurrent.{CancellationException, Future, Promise}
 import spray.json._
@@ -48,10 +48,10 @@ object WSServer extends StrictLogging {
    */
   def start(): Future[Int] = this.synchronized {
     instance match {
-      case Some(inst) ⇒
+      case Some(inst) =>
         inst.port
 
-      case None ⇒
+      case None =>
         // Create a new instance.
         // See: https://netty.io/wiki/user-guide-for-4.x.html
         stopping = false
@@ -72,12 +72,12 @@ object WSServer extends StrictLogging {
         // not blocked).
         val bind = b.bind(0)
 
-        val port = asScala(bind).map { channel ⇒
+        val port = asScala(bind).map { channel =>
           // Belt and suspenders: if the channel is closed, make sure that
           // associated resources are released too.
           // It should only happen when we stop the server: we don't expect the
           // channel to close on its own.
-          asScala(channel.closeFuture).onComplete { _ ⇒
+          asScala(channel.closeFuture).onComplete { _ =>
             if (!stopping) logger.error("WebSocket channel was unexpectedly closed")
             stop()
           }
@@ -97,12 +97,12 @@ object WSServer extends StrictLogging {
    */
   def stop(): Future[_] = this.synchronized {
     instance match {
-      case Some(inst) ⇒
+      case Some(inst) =>
         stopping = true
         instance = None
         asScala(inst.group.shutdownGracefully())
 
-      case None ⇒
+      case None =>
         Future.successful(())
     }
   }
@@ -110,7 +110,7 @@ object WSServer extends StrictLogging {
   // Converts a netty Future into a scala Future.
   private def asScala[A](nettyFuture: nettyFuture[A]): Future[A] = {
     val promise = Promise[A]()
-    nettyFuture.addListener((future: nettyFuture[A]) ⇒ {
+    nettyFuture.addListener((future: nettyFuture[A]) => {
       if (future.isSuccess) promise.success(future.getNow)
       else if (future.isCancelled) promise.failure(new CancellationException)
       else promise.failure(future.cause)
@@ -121,7 +121,7 @@ object WSServer extends StrictLogging {
   // Converts a netty ChannelFuture into a scala Future.
   private def asScala(channelFuture: ChannelFuture): Future[Channel] = {
     val promise = Promise[Channel]()
-    channelFuture.addListener((future: ChannelFuture) ⇒ {
+    channelFuture.addListener((future: ChannelFuture) => {
       if (future.isSuccess) promise.success(future.channel)
       else if (future.isCancelled) promise.failure(new CancellationException)
       else promise.failure(future.cause)
@@ -155,12 +155,12 @@ object WSServer extends StrictLogging {
 
     override protected def channelRead0(ctx: ChannelHandlerContext, frame: WebSocketFrame): Unit = {
       frame match {
-        case frame: TextWebSocketFrame ⇒
-          processMessage(frame.text).foreach { s ⇒
+        case frame: TextWebSocketFrame =>
+          processMessage(frame.text).foreach { s =>
             ctx.channel.writeAndFlush(new TextWebSocketFrame(s))
           }
 
-        case _ ⇒
+        case _ =>
           throw new UnsupportedOperationException(s"Unsupported frame type: ${frame.getClass.getName}")
       }
     }
@@ -170,10 +170,10 @@ object WSServer extends StrictLogging {
       val paramsOpt = try {
         Right(msg.parseJson.convertTo[Main.Params])
       } catch {
-        case ex: Exception ⇒ Left(ex)
+        case ex: Exception => Left(ex)
       }
       val fExec = paramsOpt match {
-        case Left(ex) ⇒
+        case Left(ex) =>
           Main.controller.displayError(
             title = None,
             contentText = Some(Strings.cliIssue),
@@ -184,11 +184,11 @@ object WSServer extends StrictLogging {
             Some(s"Failed to parse message: ${ex.getMessage}"))
           )
 
-        case Right(params) ⇒
+        case Right(params) =>
           Main.cmd(params)
       }
       fExec.recover {
-        case ex: Exception ⇒
+        case ex: Exception =>
           Main.controller.displayError(
             title = None,
             contentText = Some(Strings.cliIssue),
@@ -198,7 +198,7 @@ object WSServer extends StrictLogging {
             UniqueInstance.CODE_CMD_ERROR,
             Some(s"Failed to process arguments: ${ex.getMessage}")
           )
-      }.map { r ⇒
+      }.map { r =>
         val result = CommandResult(
           correlationId = paramsOpt.toOption.flatMap(_.correlationId),
           code = r.code,

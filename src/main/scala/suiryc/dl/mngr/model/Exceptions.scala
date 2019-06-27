@@ -26,9 +26,9 @@ case class DownloadException(
     @tailrec
     def loop(ex: Throwable): Boolean = {
       ex match {
-        case null ⇒ false
-        case _: SSLException ⇒ true
-        case _ ⇒ loop(ex.getCause)
+        case null => false
+        case _: SSLException => true
+        case _ => loop(ex.getCause)
       }
     }
     loop(cause)

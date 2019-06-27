@@ -157,7 +157,7 @@ class OptionsController extends StageLocationPersistentView(OptionsController.st
     // Note: we need to tell the combobox how to display both the 'button' area
     // (what is shown as selected) and the content (list of choices).
     languageChoice.setButtonCell(new I18NLocaleCell)
-    languageChoice.setCellFactory(_ ⇒ new I18NLocaleCell)
+    languageChoice.setCellFactory(_ => new I18NLocaleCell)
 
     val locales = I18N.locales.sortBy(_.displayName)
     languageChoice.setItems(FXCollections.observableList(locales.asJava))
@@ -167,7 +167,7 @@ class OptionsController extends StageLocationPersistentView(OptionsController.st
       val setting = I18N.setting
         val snap = SettingSnapshot(setting).setOnRefreshDraft {
           languageChoice.getSelectionModel.getSelectedItem.code
-        }.setOnChange { localeCode ⇒
+        }.setOnChange { localeCode =>
           I18N.setLocale(localeCode)
         }
         def draftToField(): Unit = locales.find(_.code == snap.draft.get).foreach(languageChoice.getSelectionModel.select)
@@ -229,7 +229,7 @@ class OptionsController extends StageLocationPersistentView(OptionsController.st
       , bytesSettingSnapshot(bufferMinSizeField, Main.settings.bufferReadMin)
       , {
         val snap = bytesSettingSnapshot(bufferMaxSizeField, Main.settings.bufferReadMax, mandatory = false)
-        snap.setOnChange { _ ⇒
+        snap.setOnChange { _ =>
           cnxBufferChanged = true
         }
         snap
@@ -257,7 +257,7 @@ class OptionsController extends StageLocationPersistentView(OptionsController.st
     //  - listed first, separated from others
     //  - cannot be removed
     //  - have 'real' default values, that cannot be emptied
-    sitesField.setCellFactory { _ ⇒
+    sitesField.setCellFactory { _ =>
       new ListCell[Option[SiteSettingsSnapshot]] with CellWithSeparator[SiteSettingsSnapshot] {
         override protected def itemText(item: SiteSettingsSnapshot): String = item.site
       }
@@ -266,7 +266,7 @@ class OptionsController extends StageLocationPersistentView(OptionsController.st
     sitesSnapshots.add(snaps)
     snapshot2.add(sitesSnapshots)
 
-    sitesField.getSelectionModel.selectedItemProperty.listen { (_, oldItemOpt, _) ⇒
+    sitesField.getSelectionModel.selectedItemProperty.listen { (_, oldItemOpt, _) =>
       // Refresh draft of previously selected site if any.
       // Note: right now, the selected item has already changed, so we cannot
       // rely on the 'standard' snapshot refreshing value.
@@ -289,14 +289,14 @@ class OptionsController extends StageLocationPersistentView(OptionsController.st
     // 'Reset' and 'Defaults' shall change displayed values instead of closing
     // dialog.
     val buttonReset = dialog.getDialogPane.lookupButton(buttonTypeReset)
-    buttonReset.addEventFilter(ActionEvent.ACTION, (event: ActionEvent) ⇒ {
+    buttonReset.addEventFilter(ActionEvent.ACTION, (event: ActionEvent) => {
       event.consume()
       snapshot1.resetDraft()
       snapshot2.resetDraft()
     })
 
     val buttonDefaults = dialog.getDialogPane.lookupButton(buttonTypeDefaults)
-    buttonDefaults.addEventFilter(ActionEvent.ACTION, (event: ActionEvent) ⇒ {
+    buttonDefaults.addEventFilter(ActionEvent.ACTION, (event: ActionEvent) => {
       event.consume()
       snapshot1.resetDraft(original = false)
       snapshot2.resetDraft(original = false)
@@ -342,28 +342,28 @@ class OptionsController extends StageLocationPersistentView(OptionsController.st
 
   def display(display: Display): Unit = {
     def findSiteEntry(site: String): Option[Option[SiteSettingsSnapshot]] = {
-      sitesField.getItems.asScala.find { item ⇒
+      sitesField.getItems.asScala.find { item =>
         item.exists(_.settings.site == site)
       }
     }
 
-    display.serverSettings.foreach { server ⇒
+    display.serverSettings.foreach { server =>
       sitesTab.getTabPane.getSelectionModel.select(sitesTab)
       findSiteEntry(server) match {
-        case Some(found) ⇒
+        case Some(found) =>
           // A site already exists for this server
           sitesField.getSelectionModel.select(found)
 
-        case None ⇒
+        case None =>
           // Prepare a new site entry for this server
           sitesSnapshots.addSite(Some(server))
       }
     }
-    display.siteSettings.foreach { siteSettings ⇒
+    display.siteSettings.foreach { siteSettings =>
       // 'default' site uses default settings (from the Main tab)
       if (!siteSettings.isDefault) {
         // Select 'Sites' tab and target site if found.
-        findSiteEntry(siteSettings.site).foreach { found ⇒
+        findSiteEntry(siteSettings.site).foreach { found =>
           sitesTab.getTabPane.getSelectionModel.select(sitesTab)
           sitesField.getSelectionModel.select(found)
         }
@@ -380,7 +380,7 @@ class OptionsController extends StageLocationPersistentView(OptionsController.st
     // Unlike in 'initialize', here is the first time the skin is present, so
     // make all children managed.
     val tabPane = sitesTab.getTabPane
-    tabPane.getSkin.asInstanceOf[SkinBase[_]].getChildren.asScala.foreach { child ⇒
+    tabPane.getSkin.asInstanceOf[SkinBase[_]].getChildren.asScala.foreach { child =>
       child.setManaged(true)
     }
 
@@ -390,7 +390,7 @@ class OptionsController extends StageLocationPersistentView(OptionsController.st
   def onDownloadFolderSelect(@unused event: ActionEvent): Unit = {
     val directoryChooser = new DirectoryChooser()
     PathChoosers.setInitialPath(directoryChooser, Option(downloadFolderField.getText).map(Paths.get(_).toFile).orNull)
-    Option(directoryChooser.showDialog(stage)).foreach { selectedFolder ⇒
+    Option(directoryChooser.showDialog(stage)).foreach { selectedFolder =>
       downloadFolderField.setText(selectedFolder.toString)
     }
   }
@@ -400,7 +400,7 @@ class OptionsController extends StageLocationPersistentView(OptionsController.st
   }
 
   def onSiteRemove(@unused event: ActionEvent): Unit = {
-    getSelectedSite.filterNot(_.isDefault).foreach { snap ⇒
+    getSelectedSite.filterNot(_.isDefault).foreach { snap =>
       sitesSnapshots.removeSite(snap)
     }
   }
@@ -429,7 +429,7 @@ class OptionsController extends StageLocationPersistentView(OptionsController.st
     siteMaxSegmentsField.commitValue()
     siteMaxSegmentsField.getValueFactory.valueProperty.unbindBidirectional(maxSegmentsField.getValueFactory.valueProperty)
     Option(sitesField.getSelectionModel.getSelectedItem).flatten match {
-      case Some(item) ⇒
+      case Some(item) =>
         // Notes:
         // We need to get the current draft value (which may have been changed
         // - refreshed - previously) instead of the setting value (draft not
@@ -452,7 +452,7 @@ class OptionsController extends StageLocationPersistentView(OptionsController.st
         siteNameField.setDisable(item.isDefault)
         siteRemoveButton.setDisable(item.isDefault)
 
-      case None ⇒
+      case None =>
         setupSpinner(siteMaxCnxField, mandatory = false)
         siteMaxCnxField.getValueFactory.setValue(None)
         setupSpinner(siteMaxSegmentsField, mandatory = false)
@@ -464,13 +464,13 @@ class OptionsController extends StageLocationPersistentView(OptionsController.st
   }
 
   private def sslTrustOnChange(snap: ConfigOptEntrySnapshot[Boolean]): ConfigOptEntrySnapshot[Boolean] = {
-    snap.setOnChange { _ ⇒
+    snap.setOnChange { _ =>
       sslTrustChanged = true
     }
   }
 
   private def tryConnectionOnChange(snap: SettingSnapshot[_]): Unit = {
-    snap.setOnChange { _ ⇒
+    snap.setOnChange { _ =>
       cnxLimitChanged = true
     }
   }
@@ -506,10 +506,10 @@ class OptionsController extends StageLocationPersistentView(OptionsController.st
 
   private def setupSpinner(field: Spinner[Option[Int]], mandatory: Boolean): Unit = {
     Option(field.getValueFactory) match {
-      case Some(valueFactory: IntSpinnerValueFactory) ⇒
+      case Some(valueFactory: IntSpinnerValueFactory) =>
         valueFactory.setMandatory(mandatory)
 
-      case _ ⇒
+      case _ =>
         Spinners.handleEvents(field)
         field.setValueFactory(new IntSpinnerValueFactory(field, min = 1, mandatory = mandatory))
     }
@@ -559,7 +559,7 @@ class OptionsController extends StageLocationPersistentView(OptionsController.st
     snap.setOnRefreshDraft {
       val raw = Option(field.getEditor.getText).filter(_.trim.nonEmpty)
       snap.setRawDraft(raw.orNull)
-      raw.flatMap(v ⇒ getBytes(v))
+      raw.flatMap(v => getBytes(v))
     }
     if (isCnxLimit) tryConnectionOnChange(snap)
     def draftToField(): Unit = field.getEditor.setText(Option(snap.rawDraft.get).map(_.unwrapped.toString).getOrElse(""))
@@ -594,7 +594,7 @@ class OptionsController extends StageLocationPersistentView(OptionsController.st
     val writeBufferSizeOk = getBytes(writeBufferSizeField.getEditor.getText).getOrElse(-1L) > 0
     val proxyOk = !proxyEnabledField.isSelected || {
       // URL should contain the necessary information unless empty.
-      Option(proxyField.getText).map(_.trim).filterNot(_.isEmpty).forall { proxy ⇒
+      Option(proxyField.getText).map(_.trim).filterNot(_.isEmpty).forall { proxy =>
         Try(Option(Http.getHostURI(proxy).getAuthority)).toOption.flatten.exists(_.trim.nonEmpty)
       }
     }
@@ -608,7 +608,7 @@ class OptionsController extends StageLocationPersistentView(OptionsController.st
     val bufferMaxSizeOk = getBytes(bufferMaxSizeField.getEditor.getText, mandatory = false).getOrElse(-1L) >= 0
 
     val isDefaultSite = getSelectedSite.exists(_.isDefault)
-    val siteNameOk = getSiteName.exists { site ⇒
+    val siteNameOk = getSiteName.exists { site =>
       getSelectedSite.map(_.site).contains(site) ||
         !sitesSnapshots.getSnapshots.map(_.site).toSet.contains(site)
     }
@@ -651,11 +651,11 @@ class OptionsController extends StageLocationPersistentView(OptionsController.st
   private def optToField(v: Option[Boolean], field: CheckBox): Unit = {
     if (field.isAllowIndeterminate) {
       v match {
-        case Some(b) ⇒
+        case Some(b) =>
           field.setIndeterminate(false)
           field.setSelected(b)
 
-        case None ⇒
+        case None =>
           field.setIndeterminate(true)
       }
     } else {
@@ -684,16 +684,16 @@ class OptionsController extends StageLocationPersistentView(OptionsController.st
   }
 
   private def getInt(s: String): Option[Int] = {
-    Option(s).flatMap { v ⇒
-      try { Some(v.toInt) } catch { case _: Exception ⇒ None }
+    Option(s).flatMap { v =>
+      try { Some(v.toInt) } catch { case _: Exception => None }
     }
   }
 
   private def getBytes(s: String, mandatory: Boolean = true): Option[Long] = {
     Option(s).filter(_.trim.nonEmpty).orElse {
       if (mandatory) None else Some("0")
-    }.flatMap { v ⇒
-      try { Some(Units.storage.fromHumanReadable(v)) } catch { case _: Exception ⇒ None }
+    }.flatMap { v =>
+      try { Some(Units.storage.fromHumanReadable(v)) } catch { case _: Exception => None }
     }
   }
 
@@ -760,7 +760,7 @@ class OptionsController extends StageLocationPersistentView(OptionsController.st
 
     private def refreshedSiteName(checkSelected: Boolean): String = {
       if (!checkSelected || isSiteSelected(settings)) {
-        getSiteName.filter { name ⇒
+        getSiteName.filter { name =>
           (site == name) ||
             !sitesSnapshots.getSnapshots.map(_.site).toSet.contains(name)
         }.getOrElse(site)
@@ -777,8 +777,8 @@ class OptionsController extends StageLocationPersistentView(OptionsController.st
     override def applyDraft(): Boolean = {
       def optToValue[A](snap: SettingSnapshot[Option[A]], configEntry: ConfigEntry[A]): Unit = {
         snap.getDraftValue() match {
-          case Some(v) ⇒ configEntry.set(v)
-          case None ⇒ configEntry.reset()
+          case Some(v) => configEntry.set(v)
+          case None => configEntry.reset()
         }
       }
       // Refresh site name if applicable
@@ -836,14 +836,14 @@ class OptionsController extends StageLocationPersistentView(OptionsController.st
       // Build a unique site name to apply.
       snap.site = siteOpt.getOrElse(getName(0))
       sitesField.getItems.get(0) match {
-        case Some(sitesDefault) ⇒
+        case Some(sitesDefault) =>
           // Use current 'default' site snapshot values.
           snap.sslTrust.draft.set(sitesDefault.sslTrust.getDraftValue())
           snap.sslErrorAsk.draft.set(sitesDefault.sslErrorAsk.getDraftValue())
           snap.cnxMax.draft.set(sitesDefault.cnxMax.getDraftValue())
           snap.segmentsMax.draft.set(sitesDefault.segmentsMax.getDraftValue())
 
-        case None ⇒
+        case None =>
           // No 'default' site snapshot (should not happen)
           snap.sslTrust.draft.set(Main.settings.sitesDefault.sslTrust.opt)
           snap.sslErrorAsk.draft.set(Main.settings.sitesDefault.sslErrorAsk.opt)
@@ -885,14 +885,14 @@ class OptionsController extends StageLocationPersistentView(OptionsController.st
       // We need to do this first (for all entries) before (re-)adding remaining
       // sites to take care of all situations - e.g. the edge case of two sites
       // entries being 'swapped' (renamed to each other).
-      removed.foreach { snap ⇒
+      removed.foreach { snap =>
         Main.settings.removeSite(snap.settings)
         sitesChanged = true
       }
       removed = Set.empty
-      snapshots.filter { snap ⇒
+      snapshots.filter { snap =>
         snap.settings.site.nonEmpty && snap.isSiteChanged
-      }.foreach { snap ⇒
+      }.foreach { snap =>
         Main.settings.removeSite(snap.settings.site)
         // Note: here site was renamed, and cnxLimitChanged will be set through
         // super.applyDraft (which also takes care of 'new' sites).
@@ -907,7 +907,7 @@ class OptionsController extends StageLocationPersistentView(OptionsController.st
       add(removed.toSeq)
       removed = Set.empty
       // Reset any site name change
-      snapshots.foreach { snap ⇒
+      snapshots.foreach { snap =>
         snap.site = snap.settings.site
       }
       // Now let generic 'reset' take care of settings
@@ -966,7 +966,7 @@ object OptionsController {
     val dialog = new Dialog[Result]()
     Stages.initOwner(dialog, owner)
     Stages.getStage(dialog).getIcons.clear()
-    List(256.0, 128.0, 64.0, 32.0, 16.0).foreach { size ⇒
+    List(256.0, 128.0, 64.0, 32.0, 16.0).foreach { size =>
       val icon = Icons.cog(targetSvgSize = size)
       // We want to apply CSS, but for it to work properly there must be a
       // "root" element (which holds some JavaFX CSS variables).

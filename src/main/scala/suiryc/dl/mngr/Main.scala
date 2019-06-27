@@ -36,7 +36,7 @@ object Main extends JFXLauncher[MainApp] {
   lazy val settings = new Settings(appPathRelative("application.conf"))
 
   val versionedName: String = s"${suiryc.dl.mngr.Info.name} ${suiryc.dl.mngr.Info.version}" +
-    suiryc.dl.mngr.Info.gitHeadCommit.map(v ⇒ s" ($v)").getOrElse("")
+    suiryc.dl.mngr.Info.gitHeadCommit.map(v => s" ($v)").getOrElse("")
 
   // Streams
   private val streams = SystemStreams()
@@ -51,37 +51,37 @@ object Main extends JFXLauncher[MainApp] {
     def nonEmptyOrNone(s: String): Option[String] = Option(s).filterNot(_.trim.isEmpty)
     head(versionedName)
     help("help")
-    opt[Unit]("auto").action { (_, c) ⇒
+    opt[Unit]("auto").action { (_, c) =>
       c.copy(auto = Some(true))
     }
-    opt[String]("comment").action { (v, c) ⇒
+    opt[String]("comment").action { (v, c) =>
       c.copy(comment = nonEmptyOrNone(v))
     }
-    opt[String]("cookie").action { (v, c) ⇒
+    opt[String]("cookie").action { (v, c) =>
       c.copy(cookie = nonEmptyOrNone(v))
     }
-    opt[String]("file").action { (v, c) ⇒
+    opt[String]("file").action { (v, c) =>
       c.copy(file = nonEmptyOrNone(v))
     }
-    opt[String]("http-referrer").action { (v, c) ⇒
+    opt[String]("http-referrer").action { (v, c) =>
       c.copy(referrer = nonEmptyOrNone(v))
     }
-    opt[Boolean]("io-capture").action { (v, c) ⇒
+    opt[Boolean]("io-capture").action { (v, c) =>
       c.copy(ioCapture = Some(v))
     }
-    opt[Long]("size").action { (v, c) ⇒
+    opt[Long]("size").action { (v, c) =>
       c.copy(size = Some(v))
     }
-    opt[String]("unique-instance-id").action { (v, c) ⇒
+    opt[String]("unique-instance-id").action { (v, c) =>
       c.copy(uniqueInstanceId = Some(v))
     }
-    opt[String]("url").action { (v, c) ⇒
+    opt[String]("url").action { (v, c) =>
       c.copy(url = nonEmptyOrNone(v))
     }
-    opt[String]("user-agent").action { (v, c) ⇒
+    opt[String]("user-agent").action { (v, c) =>
       c.copy(userAgent = nonEmptyOrNone(v))
     }
-    opt[Unit]("version").foreach { _ ⇒
+    opt[Unit]("version").foreach { _ =>
       println(
         s"""$versionedName
            |scalaVersion: ${Info.scalaVersion}
@@ -89,7 +89,7 @@ object Main extends JFXLauncher[MainApp] {
            """.stripMargin)
       sys.exit(0)
     }
-    opt[Unit]("ws").action { (_, c) ⇒
+    opt[Unit]("ws").action { (_, c) =>
       c.copy(ws = Some(true))
     }
   }
@@ -105,7 +105,7 @@ object Main extends JFXLauncher[MainApp] {
     // Note: first parsing is to check arguments are ok (and we are good to
     // start the UI) and get unique instance appId.
     parser.parse(args, Params()) match {
-      case Some(params) ⇒
+      case Some(params) =>
         // Redirect stdout/stderr, so that potential command output result is
         // not mixed with garbage (logs, etc).
         // Note: scala 'Console' stores the current 'in/out/err' value. So
@@ -122,7 +122,7 @@ object Main extends JFXLauncher[MainApp] {
         // Note: we do it if IO were captured, otherwise we assume caller does
         // not need it.
         if (ioCapture) {
-          processed.onComplete { _ ⇒
+          processed.onComplete { _ =>
             // Notes:
             // On Windows it may happen that some streams are 'fake' and cannot be
             // properly closed (invalid file descriptor exception). This is e.g.
@@ -132,7 +132,7 @@ object Main extends JFXLauncher[MainApp] {
             streams.err.flush()
             def close(l: String, c: Closeable): Unit = {
               try { c.close() }
-              catch { case ex: Exception ⇒ println(s"Failed to close $l: $ex") }
+              catch { case ex: Exception => println(s"Failed to close $l: $ex") }
             }
             close("stdin", streams.in)
             close("stdout", streams.out)
@@ -142,7 +142,7 @@ object Main extends JFXLauncher[MainApp] {
         // 'launch' does not return until application is closed
         super.main(args)
 
-      case None ⇒
+      case None =>
         sys.exit(UniqueInstance.CODE_CMD_ERROR)
     }
   }
@@ -180,13 +180,13 @@ object Main extends JFXLauncher[MainApp] {
         Future.successful(())
       }
       val f = for {
-        wsPort ← fWS
-        _ ← fExec
+        wsPort <- fWS
+        _ <- fExec
       } yield {
         CommandResult(UniqueInstance.CODE_SUCCESS, if (wsPort > 0) Some(wsPort.toString) else None)
       }
       f.andThen {
-        case Failure(ex) ⇒
+        case Failure(ex) =>
           // Display the issue in the GUI when possible.
           Option(controller).foreach(_.displayError(
             title = None,

@@ -1,6 +1,6 @@
 package suiryc.dl.mngr.model
 
-import java.util.{LinkedList ⇒ jLinkedList}
+import java.util.{LinkedList => jLinkedList}
 
 /** Segment range. */
 case class SegmentRange(start: Long, end: Long) {

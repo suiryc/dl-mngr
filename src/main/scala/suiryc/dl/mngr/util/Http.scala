@@ -98,24 +98,24 @@ object Http extends StrictLogging {
     // parameters. e.g. 'name*0', 'name*1', ... or 'name*0*', 'name*1*', ...
     // would split a plain or encoded (if there is a trailing '*') value in
     // MIME, but are not defined (and thus not expected) in HTTP.
-    Option(response.getFirstHeader("Content-Disposition")).flatMap { h ⇒
-      h.getElements.toList.flatMap { element ⇒
-        Option(element.getParameterByName("filename*")).toList.map { p ⇒
+    Option(response.getFirstHeader("Content-Disposition")).flatMap { h =>
+      h.getElements.toList.flatMap { element =>
+        Option(element.getParameterByName("filename*")).toList.map { p =>
           decodeString(p.getValue, rfc8187 = true)
-        } ::: Option(element.getParameterByName("filename")).map { p ⇒
+        } ::: Option(element.getParameterByName("filename")).map { p =>
           decodeString(p.getValue, rfc8187 = false)
         }.toList
       }.headOption
     }.orElse {
       val contentType = Option(ContentType.get(response.getEntity))
-      contentType.flatMap { ct ⇒
+      contentType.flatMap { ct =>
         Option(ct.getParameter("name*"))
-      }.map { p ⇒
+      }.map { p =>
         decodeString(p, rfc8187 = true)
       }.orElse {
-        contentType.flatMap { ct ⇒
+        contentType.flatMap { ct =>
           Option(ct.getParameter("name"))
-        }.map { p ⇒
+        }.map { p =>
           decodeString(p, rfc8187 = false)
         }
       }
@@ -146,7 +146,7 @@ object Http extends StrictLogging {
       else try {
         URLDecoder.decode(split(2), split(0))
       } catch {
-        case _: Exception ⇒ cleaned
+        case _: Exception => cleaned
       }
     } else if (cleaned.startsWith("\"")) {
       // Quoted value.
@@ -157,20 +157,20 @@ object Http extends StrictLogging {
         else {
           val c = chars(offset)
           c match {
-            case '\\' ⇒
+            case '\\' =>
               // Escape sequence. Append next character.
               // If the escape was the last character, drop it.
               if (offset + 1 < charsLength) loop(offset + 2, unquoted + chars(offset + 1))
               else unquoted
 
-            case '"' ⇒
+            case '"' =>
               // We only expect the ending quote to be unescaped, in which case
               // we drop it (for the unquoted value done).
               // Otherwise keep any unescaped '"'.
               if (offset + 1 == charsLength) unquoted
               else loop(offset + 1, unquoted + '"')
 
-            case _ ⇒
+            case _ =>
               // Append this character.
               loop(offset + 1, unquoted + c)
           }
@@ -216,21 +216,21 @@ object Http extends StrictLogging {
    * Server must return a valid "Content-Range" header.
    */
   def getContentRange(response: HttpResponse): Option[ContentRange] = {
-    Option(response.getFirstHeader(HttpHeaders.CONTENT_RANGE)).flatMap { h ⇒
+    Option(response.getFirstHeader(HttpHeaders.CONTENT_RANGE)).flatMap { h =>
       try {
         h.getValue match {
-          case CONTENT_RANGE_REGEXP(start, end, total) ⇒
+          case CONTENT_RANGE_REGEXP(start, end, total) =>
             Some(ContentRange(
               start = start.toLong,
               end = end.toLong,
               total = if (total == "*") Long.MaxValue else total.toLong
             ))
 
-          case _ ⇒
+          case _ =>
             None
         }
       } catch {
-        case ex: Exception ⇒
+        case ex: Exception =>
           logger.error(s"Failed to parse HTTP content range=<${h.getValue}>: ${ex.getMessage}", ex)
           None
       }

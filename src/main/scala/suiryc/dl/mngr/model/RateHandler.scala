@@ -1,6 +1,6 @@
 package suiryc.dl.mngr.model
 
-import java.util.{LinkedList ⇒ jLinkedList}
+import java.util.{LinkedList => jLinkedList}
 import scala.concurrent.duration._
 
 object RateHandler {

@@ -176,19 +176,19 @@ class HttpSpec extends WordSpec with Matchers {
   {
     val response = new BasicHttpResponse(HttpVersion.HTTP_1_1, HttpStatus.SC_OK, "Ok")
 
-    contentLength.foreach { value ⇒
+    contentLength.foreach { value =>
       response.addHeader(new BasicHeader(HttpHeaders.CONTENT_LENGTH, value))
     }
-    contentRange.foreach { value ⇒
+    contentRange.foreach { value =>
       response.addHeader(new BasicHeader(HttpHeaders.CONTENT_RANGE, value))
     }
 
     if (ctype) {
       val parameters = List(
         new BasicNameValuePair("key", "value")
-      ) ::: ctypeEncoded.map {value ⇒
+      ) ::: ctypeEncoded.map {value =>
         new BasicNameValuePair("name*", encodeRFC8187(value))
-      }.toList ::: ctypeName.map { value ⇒
+      }.toList ::: ctypeName.map { value =>
         new BasicNameValuePair("name", value)
       }.toList
       val contentType = ContentType.TEXT_PLAIN.withParameters(parameters: _*)
@@ -199,9 +199,9 @@ class HttpSpec extends WordSpec with Matchers {
     if (cdisp) {
       val parameters = List(
         new BasicNameValuePair("key", "value")
-      ) ::: cdispEncoded.map {value ⇒
+      ) ::: cdispEncoded.map {value =>
         new BasicNameValuePair("filename*", encodeRFC8187(value))
-      }.toList ::: cdispName.map { value ⇒
+      }.toList ::: cdispName.map { value =>
         new BasicNameValuePair("filename", value)
       }.toList
       val buf = new CharArrayBuffer(16)

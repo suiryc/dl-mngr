@@ -86,11 +86,11 @@ class HeadRequestController {
     def handleResponse(exOpt: Option[Exception]): Unit = JFXSystem.runLater {
       buttons.foreach(_.setDisable(false))
       responseConsumer.response match {
-        case Some(response) ⇒
+        case Some(response) =>
           val contentLength = Http.getContentLength(response)
           val lastModified = Http.getLastModified(response)
           val acceptRanges = Http.handleBytesRange(response)
-          val filename = Http.getFilename(response).map { filename0 ⇒
+          val filename = Http.getFilename(response).map { filename0 =>
             // Sanitize filename, and inform user if value changed.
             val filename = PathsEx.sanitizeFilename(Http.getFilename(filename0))
             if (filename != filename0) {
@@ -103,7 +103,7 @@ class HeadRequestController {
             }
             filename
           }
-          val hintUri = Option(context.getRedirectLocations).flatMap { redirectLocations ⇒
+          val hintUri = Option(context.getRedirectLocations).flatMap { redirectLocations =>
             if (!redirectLocations.isEmpty) {
               // Keep original URI as tooltip ...
               dlURIField.setTooltip {
@@ -142,9 +142,9 @@ class HeadRequestController {
             filename = filename
           ))
 
-        case None ⇒
+        case None =>
           exOpt match {
-            case Some(ex) ⇒
+            case Some(ex) =>
               // Failure
               Main.controller.displayError(
                 title = None,
@@ -153,7 +153,7 @@ class HeadRequestController {
               )
               dialog.close()
 
-            case None ⇒
+            case None =>
               // We assume the request was cancelled, so don't show anything.
               dialog.close()
           }
@@ -196,7 +196,7 @@ object HeadRequestController {
     val dialog = new Dialog[Option[DownloadHints]]()
     Stages.initOwner(dialog, owner)
     Stages.getStage(dialog).getIcons.clear()
-    List(256.0, 128.0, 64.0, 32.0, 16.0).foreach { size ⇒
+    List(256.0, 128.0, 64.0, 32.0, 16.0).foreach { size =>
       val icon = Icons.bug(targetSvgSize = size)
       // We want to apply CSS, but for it to work properly there must be a
       // "root" element (which holds some JavaFX CSS variables).

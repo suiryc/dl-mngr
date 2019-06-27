@@ -158,13 +158,13 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
   private val columnDownloadSegments = new TableColumn[UUID, String](Strings.segments)
 
   private val downloadsColumns = List(
-    "idx" → columnDownloadIndex,
-    "file" → columnDownloadFile,
-    "size" → columnDownloadSize,
-    "downloaded" → columnDownloadDownloaded,
-    "speed" → columnDownloadSpeed,
-    "eta" → columnDownloadEta,
-    "segments" → columnDownloadSegments
+    "idx" -> columnDownloadIndex,
+    "file" -> columnDownloadFile,
+    "size" -> columnDownloadSize,
+    "downloaded" -> columnDownloadDownloaded,
+    "speed" -> columnDownloadSpeed,
+    "eta" -> columnDownloadEta,
+    "segments" -> columnDownloadSegments
   )
 
   private val columnLogTime = new TableColumn[LogEntry, String](Strings.time)
@@ -172,8 +172,8 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
   private val columnLogMessage = new TableColumn[LogEntry, LogEntry](Strings.message)
 
   private val logsColumns = List(
-    "time" → columnLogTime,
-    "message" → columnLogMessage
+    "time" -> columnLogTime,
+    "message" -> columnLogMessage
   )
 
   lazy protected val stage: Stage = splitPane.getScene.getWindow.asInstanceOf[Stage]
@@ -206,7 +206,7 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
     // each download state, but that would be a bit overkill.
     // Unfortunately, when enabling/disabling items, after a while those items
     // remain greyed out even if enabled ...
-    //downloadsStopAllMenu.getParentMenu.setOnShowing { _ ⇒
+    //downloadsStopAllMenu.getParentMenu.setOnShowing { _ =>
     //  val _data = getDownloadsData
     //  enableMenuStop(downloadsStopAllMenu, _data)
     //  enableMenuResume(downloadsResumeAllMenu, _data)
@@ -218,9 +218,9 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
     // nodes within). rateLimitField and rateLimitUnitField are children of an
     // HBox, and its parent will be set upon first displaying the menu.
     // First wait for this to happen.
-    rateLimitField.getParent.parentProperty.listen { parent ⇒
+    rateLimitField.getParent.parentProperty.listen { parent =>
       // Now filter all mouse events targeted at this parent.
-      parent.addEventFilter(MouseEvent.ANY, (event: MouseEvent) ⇒ {
+      parent.addEventFilter(MouseEvent.ANY, (event: MouseEvent) => {
         if (parent.eq(event.getTarget)) event.consume()
       })
     }
@@ -228,7 +228,7 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
       try {
         Option(rateLimitField.getText).map(_.toLong).filter(_ >= 0L).getOrElse(0L)
       } catch {
-        case _: Exception ⇒ 0L
+        case _: Exception => 0L
       }
     }
     def updateRateLimiter(): Unit = {
@@ -243,10 +243,10 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
       // invalid).
       if (value == 0) rateLimitField.setText("0")
     }
-    rateLimitField.setOnAction { _ ⇒
+    rateLimitField.setOnAction { _ =>
       updateRateLimiter()
     }
-    downloadsMenu.setOnHidden { _ ⇒
+    downloadsMenu.setOnHidden { _ =>
       updateRateLimiter()
     }
     rateLimitField.setMinWidth(computeTextWidth("__9999__"))
@@ -265,13 +265,13 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
     val unit = try {
       rateLimitUnitConverter.fromString(Main.settings.rateLimitUnit.get)
     } catch {
-      case _: Exception ⇒ Units.storage.kibi
+      case _: Exception => Units.storage.kibi
     }
     rateLimitUnitField.getSelectionModel.select(unit)
     updateRateLimiter()
 
     downloadsColumns.foreach(_._2.setSortable(false))
-    columnDownloadIndex.setCellFactory { _ ⇒
+    columnDownloadIndex.setCellFactory { _ =>
       new TableCellEx[UUID, String] {
         override protected def itemText(item: String): String = {
           val index = getIndex
@@ -281,10 +281,10 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
       }
     }
     columnDownloadIndex.setMinWidth(computeTextWidth("_99_"))
-    columnDownloadFile.setCellValueFactory { data ⇒
+    columnDownloadFile.setCellValueFactory { data =>
       new SimpleObjectProperty[UUID](data.getValue)
     }
-    columnDownloadFile.setCellFactory { _ ⇒
+    columnDownloadFile.setCellFactory { _ =>
       new TableCell[UUID, UUID] {
         override def updateItem(item: UUID, empty: Boolean): Unit = {
           super.updateItem(item, empty)
@@ -319,7 +319,7 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
           tooltipProperty.unbind()
           val opt = if (!empty) getDownloadData(item) else None
           opt match {
-            case Some(data) ⇒
+            case Some(data) =>
               graphicProperty.bind(data.stateIcon)
               BindingsEx.bind(textProperty, data.path) {
                 data.path.get.getFileName.toString
@@ -329,7 +329,7 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
               }
               ()
 
-            case None ⇒
+            case None =>
               setGraphic(null)
               setText(null)
               setTooltip(null)
@@ -338,10 +338,10 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
       }
     }
     columnDownloadFile.setMinWidth(computeTextWidth("MMMMMMMMMMMMMMMM") + 24)
-    columnDownloadSize.setCellValueFactory { data ⇒
+    columnDownloadSize.setCellValueFactory { data =>
       new SimpleObjectProperty[UUID](data.getValue)
     }
-    columnDownloadSize.setCellFactory { _ ⇒
+    columnDownloadSize.setCellFactory { _ =>
       new TableCell[UUID, UUID] {
         override def updateItem(item: UUID, empty: Boolean): Unit = {
           super.updateItem(item, empty)
@@ -349,7 +349,7 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
           textProperty.unbind()
           val opt = if (!empty) getDownloadData(item) else None
           opt match {
-            case Some(data) ⇒
+            case Some(data) =>
               BindingsEx.bind(graphicProperty, data.sizeIcon) {
                 data.sizeIcon.get
               }
@@ -357,7 +357,7 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
                 data.size.get
               }
 
-            case None ⇒
+            case None =>
               setGraphic(null)
               setText(null)
           }
@@ -365,10 +365,10 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
       }
     }
     columnDownloadSize.setMinWidth(computeTextWidth("_9999.9_MiB_"))
-    columnDownloadDownloaded.setCellValueFactory { data ⇒
+    columnDownloadDownloaded.setCellValueFactory { data =>
       new SimpleObjectProperty[UUID](data.getValue)
     }
-    columnDownloadDownloaded.setCellFactory { _ ⇒
+    columnDownloadDownloaded.setCellFactory { _ =>
       new TableCellEx[UUID, UUID] {
         getStyleClass.add("table-cell-downloaded")
         override protected def itemText(item: UUID): String = null
@@ -379,21 +379,21 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
     }
     columnDownloadDownloaded.setMinWidth(computeTextWidth("_999.9%_[9999.9_MiB]_"))
 
-    columnDownloadSpeed.setCellValueFactory { data ⇒
+    columnDownloadSpeed.setCellValueFactory { data =>
       getDownloadData(data.getValue).map(_.rate).getOrElse {
         new SimpleStringProperty()
       }
     }
     columnDownloadSpeed.setMinWidth(computeTextWidth("_9999.9_MiB/s_"))
 
-    columnDownloadEta.setCellValueFactory { data ⇒
+    columnDownloadEta.setCellValueFactory { data =>
       getDownloadData(data.getValue).map(_.eta).getOrElse {
         new SimpleStringProperty()
       }
     }
     columnDownloadEta.setMinWidth(computeTextWidth("_99:99:99_"))
 
-    columnDownloadSegments.setCellValueFactory { data ⇒
+    columnDownloadSegments.setCellValueFactory { data =>
       getDownloadData(data.getValue).map(_.segments).getOrElse {
         new SimpleStringProperty()
       }
@@ -401,8 +401,8 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
     columnDownloadSegments.setMinWidth(computeTextWidth("_99/99_"))
 
     logsColumns.foreach(_._2.setSortable(false))
-    columnLogTime.setCellValueFactory { data ⇒
-      Option(data.getValue).map { v ⇒
+    columnLogTime.setCellValueFactory { data =>
+      Option(data.getValue).map { v =>
         new SimpleStringProperty(v.time.format(timeFormatter))
       }.getOrElse {
         new SimpleStringProperty()
@@ -410,24 +410,24 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
     }
     columnLogTime.setMinWidth(computeTextWidth("_9999-99-99_99:99:99.999_"))
 
-    columnLogMessage.setCellValueFactory { data ⇒
+    columnLogMessage.setCellValueFactory { data =>
       new SimpleObjectProperty[LogEntry](data.getValue)
     }
-    columnLogMessage.setCellFactory { _ ⇒
+    columnLogMessage.setCellFactory { _ =>
       new TableCellEx[LogEntry, LogEntry] {
         override protected def itemText(item: LogEntry): String = {
           item.message
         }
         override protected def itemGraphic(item: LogEntry): Node = {
           item.kind match {
-            case LogKind.Error ⇒ Icons.exclamationTriangle().pane
-            case LogKind.Warning ⇒ Icons.exclamationTriangle(styleClass = List("icon-exclamation-triangle-warning")).pane
-            case _ ⇒ Icons.infoCircle().pane
+            case LogKind.Error => Icons.exclamationTriangle().pane
+            case LogKind.Warning => Icons.exclamationTriangle(styleClass = List("icon-exclamation-triangle-warning")).pane
+            case _ => Icons.infoCircle().pane
           }
         }
         override protected def updateItem(item: LogEntry, empty: Boolean): Unit = {
           super.updateItem(item, empty)
-          val tooltip = Option(item).flatMap(_.exOpt).map { ex ⇒
+          val tooltip = Option(item).flatMap(_.exOpt).map { ex =>
             val sw = new StringWriter()
             val pw = new PrintWriter(sw)
             ex.printStackTrace(pw)
@@ -450,50 +450,50 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
     // But only 'KEY_TYPED' will give the actual character when combining
     // multiple keys (e.g. 'Shift'+'=' gives '+'). And only 'KEY_PRESSED' or
     // 'KEY_RELEASED' capture keys that do not produce character (like arrows).
-    downloadsTable.addEventHandler(KeyEvent.KEY_TYPED, (event: KeyEvent) ⇒ {
+    downloadsTable.addEventHandler(KeyEvent.KEY_TYPED, (event: KeyEvent) => {
       event.getCharacter match {
-        case "+" ⇒
-          selectedDownloadsData.filter { data ⇒
+        case "+" =>
+          selectedDownloadsData.filter { data =>
             data.download.isActive || data.download.canResume
-          }.foreach { data ⇒
+          }.foreach { data =>
             getState.dlMngr.addDownloadConnection(data.download.id)
           }
 
-        case "-" ⇒
-          selectedDownloadsData.filter(_.download.isRunning).foreach { data ⇒
+        case "-" =>
+          selectedDownloadsData.filter(_.download.isRunning).foreach { data =>
             getState.dlMngr.removeDownloadConnection(data.download.id)
           }
 
-        case _ ⇒
+        case _ =>
       }
     })
-    downloadsTable.addEventHandler(KeyEvent.KEY_PRESSED, (event: KeyEvent) ⇒ {
+    downloadsTable.addEventHandler(KeyEvent.KEY_PRESSED, (event: KeyEvent) => {
       if (event.isControlDown) {
         event.getCode match {
-          case KeyCode.PAGE_UP ⇒
+          case KeyCode.PAGE_UP =>
             moveDownloads(selectedDownloads, up = true, most = true)
             event.consume()
 
-          case KeyCode.UP ⇒
+          case KeyCode.UP =>
             moveDownloads(selectedDownloads, up = true, most = event.isShiftDown)
             event.consume()
 
-          case KeyCode.DOWN ⇒
+          case KeyCode.DOWN =>
             moveDownloads(selectedDownloads, up = false, most = event.isShiftDown)
             event.consume()
 
-          case KeyCode.PAGE_DOWN ⇒
+          case KeyCode.PAGE_DOWN =>
             moveDownloads(selectedDownloads, up = false, most = true)
             event.consume()
 
-          case _ ⇒
+          case _ =>
         }
       } else if (event.getCode == KeyCode.DELETE) {
         onDownloadsRemove(force = event.isShiftDown)
       }
     })
     // Refresh status bar when changing items.
-    downloadsTable.getItems.listen { change ⇒
+    downloadsTable.getItems.listen { change =>
       // Only DL being added/removed matters here.
       @scala.annotation.tailrec
       def loop(): Boolean = {
@@ -535,14 +535,14 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
 
   private def cancelSubscription(v: Option[Any]): Unit = {
     v match {
-      case Some(cancellable: Cancellable) ⇒ cancellable.cancel()
-      case _ ⇒
+      case Some(cancellable: Cancellable) => cancellable.cancel()
+      case _ =>
     }
   }
 
   private def copyDownloadLogsToClipboard(entries: List[LogEntry]): Unit = {
-    val text = entries.map { entry ⇒
-      val lines = s"${entry.time.format(timeFormatter)} [${entry.kind}] ${entry.message}" :: entry.exOpt.map { ex ⇒
+    val text = entries.map { entry =>
+      val lines = s"${entry.time.format(timeFormatter)} [${entry.kind}] ${entry.message}" :: entry.exOpt.map { ex =>
         val sw = new StringWriter()
         val pw = new PrintWriter(sw)
         ex.printStackTrace(pw)
@@ -564,7 +564,7 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
     columnLogMessage.setMinWidth(computeTextWidth("MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM"))
 
     selectedDownloadData match {
-      case Some(data) ⇒
+      case Some(data) =>
         val info = data.download.info
 
         def getLogs(l: java.util.List[_ <: LogEntry]): List[LogEntry] = {
@@ -590,7 +590,7 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
 
         def updateLogMessageMinWidth(els: List[LogEntry]): Unit = {
           if (els.nonEmpty) {
-            val textWidth = els.map(entry ⇒ computeTextWidth(entry.message)).max
+            val textWidth = els.map(entry => computeTextWidth(entry.message)).max
             // To compute the minimum width, we need the maximum text width and
             // any 'extra' (padding/insets) applied on the TableCell.
             // The commented code below can be used to compute those.
@@ -622,7 +622,7 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
         // while we iterate over added elements: thus only switch to the JavaFX
         // thread when we are done with the change content, so that handling
         // changes is done in the caller thread (which holds a lock).
-        val logsCancellable = info.logs.listen { change ⇒
+        val logsCancellable = info.logs.listen { change =>
           @scala.annotation.tailrec
           def loop(): Unit = {
             if (change.next()) {
@@ -651,7 +651,7 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
         // Remember this subscription
         logsTable.setUserData(logsCancellable)
 
-      case None ⇒
+      case None =>
         logsTable.getItems.clear()
     }
   }
@@ -662,8 +662,8 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
 
   private def downloadRowUpdated(row: TableRow[UUID], highlightSite: Option[String]): Unit = {
     val highlight = for {
-      site ← highlightSite
-      data ← Option(row.getItem).flatMap(getDownloadData)
+      site <- highlightSite
+      data <- Option(row.getItem).flatMap(getDownloadData)
     } yield data.download.siteSettings.site == site
     Styleables.toggleStyleClass(row, STYLE_HIGHLIGHTED, set = highlight.contains(true))
   }
@@ -676,15 +676,15 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
   private def setSiteHighlight(highlightSite: Option[String]): Unit = {
     if (highlightSite != Nodes.getUserDataOpt[String](downloadsTable, USERDATA_HIGHLIGHTED_SITE)) {
       highlightSite match {
-        case Some(site) ⇒
+        case Some(site) =>
           Nodes.setUserData(downloadsTable, USERDATA_HIGHLIGHTED_SITE, site)
           // Note: prepare entries before enabling highlighting
-          TableViews.getRows(downloadsTable).foreach { row ⇒
+          TableViews.getRows(downloadsTable).foreach { row =>
             downloadRowUpdated(row, highlightSite)
           }
           Styleables.toggleStyleClass(downloadsTable, STYLE_HIGHLIGHT, set = true)
 
-        case None ⇒
+        case None =>
           Styleables.toggleStyleClass(downloadsTable, STYLE_HIGHLIGHT, set = false)
           Nodes.removeUserData(downloadsTable, USERDATA_HIGHLIGHTED_SITE)
           // Note: no need to refresh rows when highlighting is off
@@ -697,19 +697,19 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
     cancelSubscription(Option(dlPropertiesTab.getUserData))
 
     selectedDownloadData match {
-      case Some(data) ⇒
+      case Some(data) =>
         val download = data.download
         val info = download.info
         val siteSettings = download.siteSettings
         val dlMngr = getState.dlMngr
 
         // Setup DL site highlighting
-        dlSiteLink.setOnMouseEntered { _ ⇒ setSiteHighlight(Some(siteSettings.site)) }
-        dlSiteLink.setOnMouseExited { _ ⇒ setSiteHighlight(None) }
+        dlSiteLink.setOnMouseEntered { _ => setSiteHighlight(Some(siteSettings.site)) }
+        dlSiteLink.setOnMouseExited { _ => setSiteHighlight(None) }
 
         List(dlServerLink, dlServerMaxCnxField,
           dlSiteLink, dlSiteMaxCnxField, dlSiteMaxSegmentsField,
-          dlURIDebugButton, dlFileSelectButton).foreach { button ⇒
+          dlURIDebugButton, dlFileSelectButton).foreach { button =>
           button.setDisable(false)
         }
         // Show (and allow changing) limits: server cnx, site cnx, site DL segments.
@@ -717,25 +717,25 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
         // no DL is selected, we empty the text without changing the value: if
         // it is and remains 1, then the text would not be refreshed because the
         // value would actually not be changed in the spinner.
-        List(dlServerMaxCnxField, dlSiteMaxCnxField, dlSiteMaxSegmentsField).foreach { field ⇒
+        List(dlServerMaxCnxField, dlSiteMaxCnxField, dlSiteMaxSegmentsField).foreach { field =>
           field.setValueFactory(new IntegerSpinnerValueFactory(1, Int.MaxValue))
           field.getEditor.setText(field.getValueFactory.getConverter.toString(field.getValue))
         }
         dlServerMaxCnxField.getValueFactory.setValue(Main.settings.cnxServerMax.get)
-        dlServerMaxCnxField.getValueFactory.valueProperty.listen { (_, oldValue, newValue) ⇒
+        dlServerMaxCnxField.getValueFactory.valueProperty.listen { (_, oldValue, newValue) =>
           // Change value, and try new cnx if applicable.
           Main.settings.cnxServerMax.set(newValue)
           if (newValue > oldValue) dlMngr.tryConnection()
         }
         dlSiteLink.setText(siteSettings.site)
         dlSiteMaxCnxField.getValueFactory.setValue(siteSettings.getCnxMax)
-        dlSiteMaxCnxField.getValueFactory.valueProperty.listen { (_, oldValue, newValue) ⇒
+        dlSiteMaxCnxField.getValueFactory.valueProperty.listen { (_, oldValue, newValue) =>
           // Change value, and try new cnx if applicable.
           siteSettings.cnxMax.set(newValue)
           if (newValue > oldValue) dlMngr.tryConnection()
         }
         dlSiteMaxSegmentsField.getValueFactory.setValue(siteSettings.getSegmentsMax)
-        dlSiteMaxSegmentsField.getValueFactory.valueProperty.listen { (_, oldValue, newValue) ⇒
+        dlSiteMaxSegmentsField.getValueFactory.valueProperty.listen { (_, oldValue, newValue) =>
           // Change value, and try new cnx if applicable.
           siteSettings.segmentsMax.set(newValue)
           // Also refresh downloads: segments limit changed.
@@ -751,14 +751,14 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
           dlFolderField.setText(info.path.get.getParent.toString)
           dlFileField.setText(info.path.get.getFileName.toString)
           // Display the temporary path in a tooltip.
-          val tooltip = Option(info.temporaryPath.get).map { path ⇒
+          val tooltip = Option(info.temporaryPath.get).map { path =>
             new Tooltip(
               // Don't display the folder if it is the actual target's one.
               if (path.getParent != info.path.get.getParent) path.toString
               else path.getFileName.toString
             )
           }.orNull
-          List(dlFolderField, dlFileField).foreach { field ⇒
+          List(dlFolderField, dlFileField).foreach { field =>
             field.setTooltip(tooltip)
           }
           dlSizeLabel.setText {
@@ -774,7 +774,7 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
           // layout is triggered again (e.g. resizing). Try manual trigger.
           dlPropertiesScrollPane.layout()
         }
-        dlURIDebugButton.setOnAction { _ ⇒
+        dlURIDebugButton.setOnAction { _ =>
           val request = dlMngr.newRequest(
             uri = info.actualUri.get,
             head = true,
@@ -790,31 +790,31 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
           val dialog = HeadRequestController.buildDialog(stage, dlMngr, request)
           dialog.initModality(Modality.WINDOW_MODAL)
           dialog.setResizable(true)
-          dialog.showAndWait().flatten.foreach { hints ⇒
-            hints.uri.foreach { uri ⇒
+          dialog.showAndWait().flatten.foreach { hints =>
+            hints.uri.foreach { uri =>
               info.actualUri.set(uri)
               val message = s"Actual (redirected) uri=<${info.actualUri.get}>"
               logger.info(s"${download.context} $message")
               download.info.addLog(LogKind.Info, message)
             }
             hints.size.foreach(download.setSize)
-            hints.filename.filter(_ != info.path.get.getFileName.toString).foreach { filename ⇒
+            hints.filename.filter(_ != info.path.get.getFileName.toString).foreach { filename =>
               download.renameFile(info.path.get.getParent.resolve(filename))
             }
           }
         }
-        dlURIField.setOnMouseClicked { event ⇒
+        dlURIField.setOnMouseClicked { event =>
           if ((event.getButton == MouseButton.PRIMARY) && event.isControlDown && (event.getClickCount == 1)) {
             changeDlURI(download)
           }
         }
-        dlFileSelectButton.setOnAction { _ ⇒
+        dlFileSelectButton.setOnAction { _ =>
           val fileChooser = new FileChooser()
           fileChooser.getExtensionFilters.addAll(
             new FileChooser.ExtensionFilter("*.*", "*.*")
           )
           PathChoosers.setInitialPath(fileChooser, info.path.get.toFile)
-          Option(fileChooser.showSaveDialog(stage)).foreach { selectedFile ⇒
+          Option(fileChooser.showSaveDialog(stage)).foreach { selectedFile =>
             download.renameFile(selectedFile.toPath)
           }
         }
@@ -827,7 +827,7 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
         // Remember this subscription
         dlPropertiesTab.setUserData(propertiesCancellable)
 
-      case None ⇒
+      case None =>
         // Reset DL site highlighting
         setSiteHighlight(None)
         dlSiteLink.setOnMouseEntered(null)
@@ -836,27 +836,27 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
         dlURIDebugButton.setOnAction(null)
         dlURIField.setOnMouseClicked(null)
         dlFileSelectButton.setOnAction(null)
-        List(dlFolderField, dlFileField).foreach { field ⇒
+        List(dlFolderField, dlFileField).foreach { field =>
           field.setTooltip(null)
         }
         List(dlServerLink, dlServerMaxCnxField,
           dlSiteLink, dlSiteMaxCnxField, dlSiteMaxSegmentsField,
-          dlURIDebugButton, dlFileSelectButton).foreach { button ⇒
+          dlURIDebugButton, dlFileSelectButton).foreach { button =>
           button.setDisable(true)
         }
-        List(dlServerLink, dlSiteLink, dlSizeLabel, dlLastModifiedLabel).foreach { field ⇒
+        List(dlServerLink, dlSiteLink, dlSizeLabel, dlLastModifiedLabel).foreach { field =>
           field.setText(null)
         }
         // Belt and suspenders: even though the spinners are now disabled, we
         // also reset the value factory because we listen to value changes and
         // we want to be sure they won't be changed anymore.
-        List(dlServerMaxCnxField, dlSiteMaxCnxField, dlSiteMaxSegmentsField).foreach { field ⇒
+        List(dlServerMaxCnxField, dlSiteMaxCnxField, dlSiteMaxSegmentsField).foreach { field =>
           field.setValueFactory(null)
           field.getEditor.setText(null)
         }
         List(dlURIField,
           dlReferrerField, dlCookieField, dlUserAgentField,
-          dlFolderField, dlFileField).foreach { field ⇒
+          dlFolderField, dlFileField).foreach { field =>
           field.setText(null)
         }
     }
@@ -885,7 +885,7 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
     def getURI: Option[URI] = try {
       Option(field.getText).filterNot(_.trim.isEmpty).map(Http.getURI)
     } catch {
-      case _: Exception ⇒ None
+      case _: Exception => None
     }
     def checkForm(): Unit = {
       val uri = getURI
@@ -898,8 +898,8 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
     checkForm()
 
     // Allow user to change URI, and apply change when applicable
-    dialog.showAndWait().foreach { _ ⇒
-      getURI.foreach { uri ⇒
+    dialog.showAndWait().foreach { _ =>
+      getURI.foreach { uri =>
         download.setUri(uri)
         val message = s"Changed uri=<$uri>"
         logger.info(s"${download.context} $message")
@@ -908,9 +908,9 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
     }
   }
 
-  private val refreshAllDlRunning: () ⇒ Unit = { () ⇒
+  private val refreshAllDlRunning: () => Unit = { () =>
     val resume = getDownloadsData.foldLeft(DownloadsResume()) {
-      case (acc, data) ⇒ acc.add(data.download.state)
+      case (acc, data) => acc.add(data.download.state)
     }
     allDlRunningLabel.setText {
       if (resume.total == 0) ""
@@ -931,7 +931,7 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
           DownloadState.Running,
           DownloadState.Success,
           DownloadState.Failure
-        ).foldLeft("") { (text, state) ⇒
+        ).foldLeft("") { (text, state) =>
           val count = resume.get(state)
           if (count > 0) s"$text\n${Strings.getState(state)}: $count"
           else text
@@ -941,9 +941,9 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
     }
   }
 
-  private val refreshAllDlProgress: () ⇒ Unit = { () ⇒
+  private val refreshAllDlProgress: () => Unit = { () =>
     val (downloaded, total) = getDownloadsData.foldLeft((0L, 0L)) {
-      case ((downloaded0, total0), data) ⇒
+      case ((downloaded0, total0), data) =>
         val info = data.download.info
         val size =
           if (info.isSizeKnown) info.size.get
@@ -963,7 +963,7 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
     allDlProgressLabel.setText(text)
   }
 
-  private val refreshAllDlSpeed: () ⇒ Unit = { () ⇒
+  private val refreshAllDlSpeed: () => Unit = { () =>
     val rate = Units.storage.toHumanReadable(getDownloadsData.filter(_.download.isRunning).map(_.rateHandler.currentRate).sum)
     val limit = Main.settings.rateLimitValue.get
     val sLimit = if (limit > 0) {
@@ -977,7 +977,7 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
     super.restoreView()
 
     // Restore SplitPane divider positions
-    splitPaneDividerPositions.opt.foreach { dividerPositions ⇒
+    splitPaneDividerPositions.opt.foreach { dividerPositions =>
       Panes.restoreDividerPositions(splitPane, dividerPositions)
     }
 
@@ -994,7 +994,7 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
 
     val state = getState
     state.dlMngr.start()
-    state.dlMngr.getDownloads.foreach { download ⇒
+    state.dlMngr.getDownloads.foreach { download =>
       addDownload(download.id, first = false, select = false)
     }
   }
@@ -1029,7 +1029,7 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
   }
 
   private def setDownloadData(id: UUID, data: DownloadData): Unit = this.synchronized {
-    downloadData += (id → data)
+    downloadData += (id -> data)
   }
 
   private def removeDownloadData(id: UUID): Unit = this.synchronized {
@@ -1057,23 +1057,23 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
 
     val stopDownload = new MenuItem(Strings.stop)
     stopDownload.setGraphic(Icons.stop().pane)
-    stopDownload.setOnAction { _ ⇒
-      selectedDownloadsData.filter(_.download.canStop).foreach { data ⇒
+    stopDownload.setOnAction { _ =>
+      selectedDownloadsData.filter(_.download.canStop).foreach { data =>
         getState.dlMngr.stopDownload(data.download.id)
       }
     }
     val resumeDownload = new MenuItem(Strings.resume)
     resumeDownload.setGraphic(Icons.download().pane)
-    resumeDownload.setOnAction { _ ⇒
-      selectedDownloadsData.filter(_.download.canResume(restart = false)).foreach { data ⇒
+    resumeDownload.setOnAction { _ =>
+      selectedDownloadsData.filter(_.download.canResume(restart = false)).foreach { data =>
         getState.dlMngr.resumeDownload(data.download.id, reusedOpt = None, restart = false, tryCnx = false)
       }
       getState.dlMngr.tryConnection()
     }
     val restartDownload = new MenuItem(Strings.restart)
     restartDownload.setGraphic(Icons.undo().pane)
-    restartDownload.setOnAction { _ ⇒
-      selectedDownloadsData.filter(_.download.canResume(restart = true)).foreach { data ⇒
+    restartDownload.setOnAction { _ =>
+      selectedDownloadsData.filter(_.download.canResume(restart = true)).foreach { data =>
         getState.dlMngr.resumeDownload(data.download.id, reusedOpt = None, restart = true, tryCnx = false)
       }
       getState.dlMngr.tryConnection()
@@ -1094,22 +1094,22 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
 
     val moveFirst = new MenuItem(Strings.moveFirst)
     moveFirst.setGraphic(Icons.angleDoubleUp().pane)
-    moveFirst.setOnAction { _ ⇒
+    moveFirst.setOnAction { _ =>
       moveDownloads(selectedDownloads, up = true, most = true)
     }
     val moveUp = new MenuItem(Strings.moveUp)
     moveUp.setGraphic(Icons.angleUp().pane)
-    moveUp.setOnAction { _ ⇒
+    moveUp.setOnAction { _ =>
       moveDownloads(selectedDownloads, up = true, most = false)
     }
     val moveDown = new MenuItem(Strings.moveDown)
     moveDown.setGraphic(Icons.angleDown().pane)
-    moveDown.setOnAction { _ ⇒
+    moveDown.setOnAction { _ =>
       moveDownloads(selectedDownloads, up = false, most = false)
     }
     val moveLast = new MenuItem(Strings.moveLast)
     moveLast.setGraphic(Icons.angleDoubleDown().pane)
-    moveLast.setOnAction { _ ⇒
+    moveLast.setOnAction { _ =>
       moveDownloads(selectedDownloads, up = false, most = true)
     }
 
@@ -1120,7 +1120,7 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
       new SeparatorMenuItem,
       moveFirst, moveUp, moveDown, moveLast
     )
-    contextMenu.setOnShowing { _ ⇒
+    contextMenu.setOnShowing { _ =>
       val _data = getDownloadsData
       val _selectedIndices = selectedDownloadsIdx
       val _selectedData = selectedDownloadsData
@@ -1148,9 +1148,9 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
   def displayError(title: Option[String], contentText: Option[String], ex: Throwable): Unit = {
     // Note: caller does not log this error, do it here.
     val msg = s"Caught error:${
-      title.map(v ⇒ s" title=<$v>").getOrElse("")
+      title.map(v => s" title=<$v>").getOrElse("")
     }${
-      contentText.map(v ⇒ s" text=<$v>").getOrElse("")
+      contentText.map(v => s" text=<$v>").getOrElse("")
     } ${ex.getMessage}"
     logger.error(msg, ex)
     Dialogs.error(
@@ -1203,20 +1203,20 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
             buttons = buttons,
             defaultButton = defaultButton
           ).getOrElse(ButtonType.CANCEL) match {
-            case `buttonSite` ⇒
+            case `buttonSite` =>
               dlMngr.trustSslSiteConnection(site, trust = true)
               siteSettings.sslTrust.set(true)
               true
 
-            case `buttonServer` ⇒
+            case `buttonServer` =>
               dlMngr.trustSslServerConnection(host, trust = true)
               true
 
-            case `buttonNo` ⇒
+            case `buttonNo` =>
               dlMngr.trustSslServerConnection(host, trust = false)
               false
 
-            case _ ⇒
+            case _ =>
               false
           }
         } else {
@@ -1236,7 +1236,7 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
     try {
       actor ! OnExit
     } catch {
-      case ex: NoClassDefFoundError ⇒
+      case ex: NoClassDefFoundError =>
         // Usually happens when jar has been replaced(on Windows at least).
         // There is nothing much to do except exit.
         System.err.println("Exiting because classes are missing (JAR may have been overwritten)!")
@@ -1265,13 +1265,13 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
   }
 
   def onDownloadsStopAll(@unused event: ActionEvent): Unit = {
-    getDownloadsData.filter(_.download.canStop).foreach { data ⇒
+    getDownloadsData.filter(_.download.canStop).foreach { data =>
       getState.dlMngr.stopDownload(data.download.id)
     }
   }
 
   def onDownloadsResumeAll(@unused event: ActionEvent): Unit = {
-    getDownloadsData.filter(_.download.canResume(restart = false)).foreach { data ⇒
+    getDownloadsData.filter(_.download.canResume(restart = false)).foreach { data =>
       getState.dlMngr.resumeDownload(data.download.id, reusedOpt = None, restart = false, tryCnx = false)
     }
     getState.dlMngr.tryConnection()
@@ -1290,14 +1290,14 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
   }
 
   def onDlServerSettings(@unused event: ActionEvent): Unit = {
-    selectedDownloadData.foreach { data ⇒
+    selectedDownloadData.foreach { data =>
       val host = data.download.info.actualUri.get.getHost
       actor ! OnOptions(OptionsController.Display(serverSettings = Some(host)))
     }
   }
 
   def onDlSiteSettings(@unused event: ActionEvent): Unit = {
-    selectedDownloadData.foreach { data ⇒
+    selectedDownloadData.foreach { data =>
       val siteSettings = data.download.siteSettings
       actor ! OnOptions(OptionsController.Display(siteSettings = Some(siteSettings)))
     }
@@ -1324,7 +1324,7 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
         override def apply(x: Any): Unit = try {
           r.apply(x)
         } catch {
-          case ex: Exception ⇒
+          case ex: Exception =>
             displayError(
               title = Some(state.stage.getTitle),
               contentText = Some(Strings.unexpectedIssue),
@@ -1335,14 +1335,14 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
       }
 
     def receive0(state: State): Receive = {
-      case OnOptions(display)              ⇒ onOptions(state, display)
-      case OnAbout                         ⇒ onAbout(state)
-      case OnExit                          ⇒ onExit(state)
-      case OnDownloadsAdd(dlInfo, promise) ⇒ onDownloadsAdd(state, dlInfo, promise)
-      case OnDownloadsRemoveCompleted      ⇒ onDownloadsRemoveCompleted(state)
-      case OnDownloadsRemove(force)        ⇒ onDownloadsRemove(state, force)
-      case AddDownload(id, first, select)  ⇒ addDownload(state, id, first, select)
-      case MoveDownloads(ids, up, most)    ⇒ moveDownloads(state, ids, up, most)
+      case OnOptions(display)              => onOptions(state, display)
+      case OnAbout                         => onAbout(state)
+      case OnExit                          => onExit(state)
+      case OnDownloadsAdd(dlInfo, promise) => onDownloadsAdd(state, dlInfo, promise)
+      case OnDownloadsRemoveCompleted      => onDownloadsRemoveCompleted(state)
+      case OnDownloadsRemove(force)        => onDownloadsRemove(state, force)
+      case AddDownload(id, first, select)  => addDownload(state, id, first, select)
+      case MoveDownloads(ids, up, most)    => moveDownloads(state, ids, up, most)
     }
 
     def onExit(state: State): Unit = {
@@ -1355,19 +1355,19 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
           buttons = List(ButtonType.OK, ButtonType.CANCEL),
           defaultButton = Some(ButtonType.OK)
         ).getOrElse(ButtonType.CANCEL) match {
-          case ButtonType.OK ⇒ true
-          case _ ⇒ false
+          case ButtonType.OK => true
+          case _ => false
         }
       }
       if (canExit) {
         persistView()
 
-        state.dlMngr.stop().onComplete { _ ⇒
+        state.dlMngr.stop().onComplete { _ =>
           val ok = try {
             state.dlMngr.saveState()
             true
           } catch {
-            case ex: Exception ⇒
+            case ex: Exception =>
               displayError(
                 title = None,
                 contentText = Some(s"${Strings.writeIssue}\n${Main.statePath}"),
@@ -1444,7 +1444,7 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
     def onDownloadsAdd(state: State, dlInfo: NewDownloadInfo, promise: Promise[Unit]): Unit = {
       val dialogOpt = NewDownloadController.buildDialog(MainController.this, state.stage, state.dlMngr, dlInfo)
       // In automatic mode, there is no dialog and download has been added.
-      dialogOpt.foreach { dialog ⇒
+      dialogOpt.foreach { dialog =>
         dialog.initModality(Modality.WINDOW_MODAL)
         dialog.setResizable(true)
         dialog.show()
@@ -1454,7 +1454,7 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
     }
 
     def onDownloadsRemoveCompleted(state: State): Unit = {
-      getDownloadsData.foreach { data ⇒
+      getDownloadsData.foreach { data =>
         if (data.download.isDone) {
           removeDownload(state, data.download.id)
         }
@@ -1464,15 +1464,15 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
     def onDownloadsRemove(state: State, force: Boolean): Unit = {
       val selected = selectedDownloadsData
 
-      def doRemove() {
+      def doRemove(): Unit = {
         // We don't remove 'active' downloads
         val removable = selected.filter(!_.download.isActive)
 
         // We can safely remove if done (success) or not started (failure or not)
-        val safe = removable.filter { data ⇒
+        val safe = removable.filter { data =>
           data.download.isDone || !data.download.isStarted
         }
-        safe.foreach { data ⇒
+        safe.foreach { data =>
           removeDownload(state, data.download.id)
         }
 
@@ -1487,8 +1487,8 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
           }
 
           // Apply action
-          confirmation.foreach { removeFromDisk ⇒
-            unfinished.foreach { data ⇒
+          confirmation.foreach { removeFromDisk =>
+            unfinished.foreach { data =>
               val download = data.download
               // Remove download entry
               removeDownload(state, download.id)
@@ -1524,14 +1524,14 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
           // if it takes too long.
           // Report and don't do anything if there was a failure.
           Future.sequence {
-            active.flatMap { dlEntry ⇒
+            active.flatMap { dlEntry =>
               state.dlMngr.stopDownload(dlEntry.download.id)
             }
-          }.map(_ ⇒ ()).withTimeout(30.seconds).onComplete {
-            case Success(_) ⇒
+          }.map(_ => ()).withTimeout(30.seconds).onComplete {
+            case Success(_) =>
               doRemove()
 
-            case Failure(ex) ⇒
+            case Failure(ex) =>
               displayError(
                 title = None,
                 contentText = None,
@@ -1559,7 +1559,7 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
       import scala.collection.JavaConverters._
       val items = downloadsTable.getItems
       if (!items.asScala.toSet.contains(id)) {
-        state.dlMngr.getDownload(id).foreach { download ⇒
+        state.dlMngr.getDownload(id).foreach { download =>
           val info = download.info
           val data = new DownloadData(download)
           setDownloadData(id, data)
@@ -1570,7 +1570,7 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
 
           def displaySize: String = {
             val size = if (info.isSizeKnown) Option(info.size.get) else download.sizeHint
-            size.filter(_ >= 0).map { size ⇒
+            size.filter(_ >= 0).map { size =>
               Units.storage.toHumanReadable(size)
             }.orNull
           }
@@ -1594,20 +1594,20 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
            .bind(info.size, info.acceptRanges)
 
           BindingsEx.bind(data.downloadedProgress.progressProperty, throttlingFast, jfxThrottler, info.downloaded, info.state) {
-            Option(info.size.get).filter(_ >= 0).map { size ⇒
+            Option(info.size.get).filter(_ >= 0).map { size =>
               // Limit precision to 3 digits (1/10th of percent), so that actual
               // progress is not updated more than 1000 times (which limits CPU
               // usage even if we are called very frequently).
-              if (size > 0) BigDecimal(info.downloaded.getValue.toDouble / size).setScale(3, RoundingMode.DOWN).doubleValue()
+              if (size > 0) BigDecimal(info.downloaded.getValue.toDouble / size).setScale(3, RoundingMode.DOWN).doubleValue
               else 0.0
             }.getOrElse {
               // Note: Usually we would set progress to -1.0 if isSizeDetermined
               // when running. But the "indeterminate state" animation consumes
               // more CPU (and apparently too much under Linux).
               info.state.get match {
-                case DownloadState.Running ⇒ 0.0
-                case DownloadState.Success ⇒ 1.0
-                case _ ⇒ 0.0
+                case DownloadState.Running => 0.0
+                case DownloadState.Success => 1.0
+                case _ => 0.0
               }
             }:Double
           }
@@ -1636,7 +1636,7 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
             }
           }.add(data.eta) {
             if (download.isRunning) {
-              Option(info.size.get).filter(_ > 0).map { size ⇒
+              Option(info.size.get).filter(_ > 0).map { size =>
                 val remaining = size - info.downloaded.get
                 val rate = data.rateValue.get
                 if (rate > 0) {
@@ -1652,21 +1652,21 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
 
           BindingsEx.jfxBind(data.stateIcon, info.state, info.activeSegments) {
             download.state match {
-              case DownloadState.Pending ⇒
+              case DownloadState.Pending =>
                 Icons.hourglass().pane
 
-              case DownloadState.Running ⇒
+              case DownloadState.Running =>
                 val styleClass = if (download.activeSegments == 0) List("icon-download-started") else List("icon-download-running")
                 Icons.download(styleClass = styleClass).pane
 
-              case DownloadState.Success ⇒
+              case DownloadState.Success =>
                 if (Main.settings.removeCompleted.get) removeDownload(state, data.download.id)
                 Icons.checkSquare().pane
 
-              case DownloadState.Stopped ⇒
+              case DownloadState.Stopped =>
                 Icons.stop().pane
 
-              case DownloadState.Failure ⇒
+              case DownloadState.Failure =>
                 Icons.exclamationTriangle().pane
             }
           }
@@ -1716,7 +1716,7 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
       val items = downloadsTable.getItems
       // Remember current anchor (which is expected to be set since to move rows
       // they must have been selected, which sets an anchor).
-      val anchored = Option(CellBehaviorBase.getAnchor[TablePosition[UUID, Any]](downloadsTable, null)).map { pos ⇒
+      val anchored = Option(CellBehaviorBase.getAnchor[TablePosition[UUID, Any]](downloadsTable, null)).map { pos =>
         items.get(pos.getRow)
       }
 
@@ -1753,7 +1753,7 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
         // When moving up, use the first item as base.
         val dst = if (most) 0 else math.max(0, items.indexOf(ids.head) - 1)
         ids.zipWithIndex.foreach {
-          case (id, offset) ⇒ moveDownload(id, dst + offset)
+          case (id, offset) => moveDownload(id, dst + offset)
         }
       } else {
         // When moving down, use the last item as base.
@@ -1763,7 +1763,7 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
         // individually all go to the same position so that at the end the last
         // one is really moved to the target position while others are right
         // before it (and remain in original order).
-        ids.foreach { id ⇒
+        ids.foreach { id =>
           moveDownload(id, dst)
         }
       }
@@ -1779,11 +1779,11 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
       // Restore the selection anchor when applicable. If we don't, since we
       // changed the rows, using shift to extend selection may select more or
       // less than expected (from the original anchor to the new focused row).
-      anchored.foreach { id ⇒
+      anchored.foreach { id =>
         val items = downloadsTable.getItems
-        downloadsTable.getSelectionModel.getSelectedCells.asScala.find { pos ⇒
+        downloadsTable.getSelectionModel.getSelectedCells.asScala.find { pos =>
           items.get(pos.getRow) == id
-        }.foreach { pos ⇒
+        }.foreach { pos =>
           CellBehaviorBase.setAnchor(downloadsTable, pos, false)
         }
       }
@@ -1835,13 +1835,13 @@ object MainController {
     def refreshRateUpdate(state: DownloadState.Value): Unit = this.synchronized {
       val running = state == DownloadState.Running
       rateUpdateCancellable match {
-        case Some(cancellable) ⇒
+        case Some(cancellable) =>
           if (!running) {
             cancellable.cancel()
             rateUpdateCancellable = None
           }
 
-        case None ⇒
+        case None =>
           if (running) {
             rateUpdateCancellable = Some(Main.scheduler.scheduleWithFixedDelay(throttlingSlow, throttlingSlow) {
               // Inverting the current value is a little trick that validates
@@ -1883,7 +1883,7 @@ object MainController {
 
   private case class DownloadsResume(total: Int = 0, states: Map[DownloadState.Value, Int] = Map.empty) {
     def add(state: DownloadState.Value): DownloadsResume =
-      copy(total = total + 1, states = states + (state → (get(state) + 1)))
+      copy(total = total + 1, states = states + (state -> (get(state) + 1)))
     def get(state: DownloadState.Value): Int = states.getOrElse(state, 0)
   }
 
@@ -1924,7 +1924,7 @@ object MainController {
     val first = Option(stage.getScene).isEmpty
     // Set stage icons.
     // The bare minimum is 32x32 (fits well when resized to 16x16).
-    List(256.0, 128.0, 64.0, 32.0, 16.0).foreach { size ⇒
+    List(256.0, 128.0, 64.0, 32.0, 16.0).foreach { size =>
       val icon = Icons.download(targetSvgSize = size)
       // We want to apply CSS, but for it to work properly there must be a
       // "root" element (which holds some JavaFX CSS variables).

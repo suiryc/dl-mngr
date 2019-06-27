@@ -94,7 +94,7 @@ class DownloadFile(private var path: Path) extends LazyLogging {
    * Take into account remaining ranges and pending ones.
    */
   def getDownloadedRanges(info: DownloadInfo): List[SegmentRange] = {
-    info.remainingRanges.map { remainingRanges ⇒
+    info.remainingRanges.map { remainingRanges =>
       // First consider everything was downloaded
       val downloaded = new SegmentRanges(remainingRanges.total)
       // Remove remaining ranges. Note: it is not mandatory to lock (which would
@@ -149,7 +149,7 @@ class DownloadFile(private var path: Path) extends LazyLogging {
       try {
         channel = FileChannel.open(target, options: _*)
       } catch {
-        case _: FileAlreadyExistsException | _: AccessDeniedException ⇒
+        case _: FileAlreadyExistsException | _: AccessDeniedException =>
           // If the file already exists, find the next available name
           val available = PathsEx.getAvailable(target)
           channel = FileChannel.open(available, options: _*)
@@ -290,10 +290,10 @@ class DownloadFile(private var path: Path) extends LazyLogging {
     // NIO is not thread-safe.
     val actual = lock.writeLock.withLock {
       val actual = contentDecoder match {
-        case fcd: FileContentDecoder ⇒
+        case fcd: FileContentDecoder =>
           fcd.transfer(channel, position, count)
 
-        case cd ⇒
+        case cd =>
           channel.transferFrom(new ContentDecoderChannel(cd), position, count)
       }
 
@@ -336,7 +336,7 @@ class DownloadFile(private var path: Path) extends LazyLogging {
         try {
           channel.force(force)
         } catch {
-          case ex: Exception ⇒
+          case ex: Exception =>
             // Pass the failed ranges ('pending') to caller and let it handle it.
             // What is guaranteed is that 'Downloaded' messages for those ranges
             // have been sent already.
@@ -378,7 +378,7 @@ class DownloadFile(private var path: Path) extends LazyLogging {
       } else {
         // The download is not done. Is there a temporary path ?
         temporary match {
-          case Some(tmp) ⇒
+          case Some(tmp) =>
             // There is a temporary path, so we only need to set the target path.
             path = target
             if (target == tmp) {
@@ -390,7 +390,7 @@ class DownloadFile(private var path: Path) extends LazyLogging {
               renewTemporary()
             }
 
-          case None ⇒
+          case None =>
             if ((channel == null) && reused) {
               // We will re-use the path, which is not opened yet. So we only
               // need to rename it now.
@@ -426,7 +426,7 @@ class DownloadFile(private var path: Path) extends LazyLogging {
         Files.move(source, probed)
         probed
       } catch {
-        case ex: Exception ⇒
+        case ex: Exception =>
           if (remainingAttempts == 0) throw ex
           loop(remainingAttempts - 1)
       }
@@ -444,7 +444,7 @@ class DownloadFile(private var path: Path) extends LazyLogging {
       val delete = !done && (canDelete || (channel.size == 0))
       channel.close()
       channel = null
-      lastModified.foreach { date ⇒
+      lastModified.foreach { date =>
         // Change "last modified" time according to the server one.
         // Leave "creation" and "last access" as-is.
         val fileTime = FileTime.from(date.toInstant)
@@ -456,7 +456,7 @@ class DownloadFile(private var path: Path) extends LazyLogging {
         FilesEx.setTimes(getWorkingPath, fileTimes)
       }
       if (done) {
-        temporary.foreach { tempPath ⇒
+        temporary.foreach { tempPath =>
           // We only reuse the file we write to (temporary in this case).
           // If the target file exists, rename ours.
           path = move(tempPath, path)

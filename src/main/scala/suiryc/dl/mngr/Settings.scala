@@ -90,12 +90,12 @@ class Settings(path: Path) {
   // 'sites' entry.
   val sitesDefault: SiteSettings = new SiteSettings(KEY_DEFAULT)
   private var sites: Map[String, SiteSettings] = {
-    settings.config.getConfig(BaseConfig.joinPath(sitesPrefix)).root.keySet.asScala.map { key ⇒
+    settings.config.getConfig(BaseConfig.joinPath(sitesPrefix)).root.keySet.asScala.map { key =>
       key.toLowerCase
-    }.filterNot { key ⇒
+    }.filterNot { key =>
       key == KEY_DEFAULT
-    }.map { key ⇒
-      key → new SiteSettings(key)
+    }.map { key =>
+      key -> new SiteSettings(key)
     }.toMap
   }
 
@@ -173,8 +173,8 @@ class Settings(path: Path) {
       if (els.size > 1) {
         // Check whether this host is known, otherwise go up one level
         sites.get(host) match {
-          case Some(siteSettings) ⇒ siteSettings
-          case None ⇒ loop(els(1))
+          case Some(siteSettings) => siteSettings
+          case None => loop(els(1))
         }
       } else {
         // Fallback to default
@@ -188,7 +188,7 @@ class Settings(path: Path) {
     try {
       getSite(new URI("http", host, null, null))
     } catch {
-      case _: Exception ⇒ sitesDefault
+      case _: Exception => sitesDefault
     }
   }
 
@@ -200,7 +200,7 @@ class Settings(path: Path) {
     } else {
       sites.getOrElse(site, {
         val s = new SiteSettings(site)
-        sites += (site → s)
+        sites += (site -> s)
         s
       })
     }
@@ -220,7 +220,7 @@ class Settings(path: Path) {
   }
 
   def getTemporaryFile(path: Path): Option[Path] = {
-    downloadsExtension.opt.filterNot(_.trim.isEmpty).map { extension ⇒
+    downloadsExtension.opt.filterNot(_.trim.isEmpty).map { extension =>
       path.resolveSibling(s"${path.getFileName.toString}.$extension")
     }
   }
