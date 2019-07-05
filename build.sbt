@@ -11,7 +11,7 @@ lazy val versions = Map[String, String](
   "javafx"                -> "12.0.1",
   "logback"               -> "1.2.3",
   "monix"                 -> "3.0.0-RC3",
-  "netty"                 -> "4.1.36.Final",
+  "netty"                 -> "4.1.37.Final",
   "scala"                 -> "2.12.8",
   "scala-logging"         -> "3.9.2",
   "scalatest"             -> "3.0.8",
