@@ -5,7 +5,7 @@ lazy val versions = Map[String, String](
   "akka"                  -> "2.5.23",
   "bouncycastle"          -> "1.62",
   "config"                -> "1.3.4",
-  "dl-mngr"               -> "0.0.1-SNAPSHOT",
+  "dl-mngr"               -> "1.0-SNAPSHOT",
   "httpclient"            -> "4.5.9",
   "httpasyncclient"       -> "4.1.4",
   "javafx"                -> "12.0.1",
