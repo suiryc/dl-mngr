@@ -36,7 +36,10 @@ class AboutController {
   @FXML
   protected var dependenciesTable: TableView[Dependency] = _
 
-  def initialize(): Unit = {
+  // Reminder: non-private 'initialize' (without parameters) is automatically
+  // called as part of FXML building, so make the function private since we
+  // call it when appropriate already.
+  private def initialize(): Unit = {
     versionLabel.setText(Info.version)
     scalaVersionLabel.setText(Info.scalaVersion)
     sbtVersionLabel.setText(Info.sbtVersion)
