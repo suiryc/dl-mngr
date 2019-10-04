@@ -10,7 +10,7 @@ import java.nio.file._
 import java.util.Date
 import java.util.concurrent.locks.ReentrantReadWriteLock
 import org.apache.http.nio.{ContentDecoder, ContentDecoderChannel, FileContentDecoder}
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 import suiryc.dl.mngr.model.{DownloadException, DownloadInfo, SegmentRange, SegmentRanges}
 import suiryc.scala.concurrent.locks.RichLock._
 import suiryc.scala.io.{FileTimes, FilesEx, PathsEx}
@@ -206,6 +206,7 @@ class DownloadFile(private var path: Path) extends LazyLogging {
           // zeros.
           val bufSize = 1024 * 1024
           val bb = ByteBuffer.wrap(Array.fill(bufSize)(0x00))
+          @scala.annotation.tailrec
           def loop(pos: Long): Unit = {
             if (pos <= targetEnd) {
               // Compute how many zeros we need to write in order to fill the

@@ -152,6 +152,7 @@ object Http extends StrictLogging {
       // Quoted value.
       val chars = cleaned.toCharArray
       val charsLength = chars.length
+      @scala.annotation.tailrec
       def loop(offset: Int, unquoted: String): String = {
         if (offset >= charsLength) unquoted
         else {

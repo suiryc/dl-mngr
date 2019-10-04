@@ -7,8 +7,9 @@ import javafx.fxml.{FXML, FXMLLoader}
 import javafx.scene.Node
 import javafx.scene.control._
 import javafx.stage.{DirectoryChooser, Stage, Window}
-import scala.collection.JavaConverters._
+import scala.annotation.unused
 import scala.concurrent.duration._
+import scala.jdk.CollectionConverters._
 import scala.util.Try
 import suiryc.dl.mngr.util.{Http, Icons}
 import suiryc.dl.mngr.{I18N, Main, Settings}
@@ -22,7 +23,6 @@ import suiryc.scala.javafx.stage.Stages.StageLocation
 import suiryc.scala.javafx.stage.{PathChoosers, StageLocationPersistentView, Stages}
 import suiryc.scala.misc.Units
 import suiryc.scala.settings._
-import suiryc.scala.unused
 import suiryc.scala.util.I18NLocale
 
 class OptionsController extends StageLocationPersistentView(OptionsController.stageLocation) {

@@ -44,7 +44,7 @@ class HeadRequestController {
   private var hints = Option.empty[DownloadHints]
 
   def initialize(dialog: Dialog[_], dlMngr: DownloadManager, request: HttpRequestBase): Unit = {
-    import scala.collection.JavaConverters._
+    import scala.jdk.CollectionConverters._
     val stage = Stages.getStage(dialog)
     // Disable buttons until request is done.
     val buttons = dialog.getDialogPane.getButtonTypes.asScala.map(dialog.getDialogPane.lookupButton)

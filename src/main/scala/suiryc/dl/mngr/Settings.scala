@@ -2,8 +2,8 @@ package suiryc.dl.mngr
 
 import java.net.URI
 import java.nio.file.{Path, Paths}
-import scala.collection.JavaConverters._
 import scala.concurrent.duration.FiniteDuration
+import scala.jdk.CollectionConverters._
 import suiryc.scala.settings.{BaseConfig, ConfigEntry, PortableSettings}
 import suiryc.scala.io.RichFile
 import suiryc.scala.sys.{Command, OS}

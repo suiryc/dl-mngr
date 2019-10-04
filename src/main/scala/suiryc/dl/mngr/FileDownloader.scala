@@ -11,9 +11,9 @@ import org.apache.http.nio.{ContentDecoder, IOControl}
 import org.apache.http.protocol.HttpContext
 import org.apache.http._
 import org.apache.http.client.protocol.HttpClientContext
-import scala.collection.JavaConverters._
 import scala.concurrent.Promise
 import scala.concurrent.duration._
+import scala.jdk.CollectionConverters._
 import scala.util.{Failure, Success}
 import suiryc.dl.mngr.model._
 import suiryc.dl.mngr.util.Http

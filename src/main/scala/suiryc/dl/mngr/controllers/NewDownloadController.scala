@@ -9,6 +9,7 @@ import javafx.scene.Node
 import javafx.scene.control._
 import javafx.scene.input.Clipboard
 import javafx.stage.{FileChooser, Modality, Stage, Window}
+import scala.annotation.unused
 import suiryc.dl.mngr.model.{Download, NewDownloadInfo, SegmentRange}
 import suiryc.dl.mngr.util.{Http, Icons}
 import suiryc.dl.mngr.{DownloadManager, I18N, Main, Settings}
@@ -24,7 +25,6 @@ import suiryc.scala.javafx.stage.Stages.StageLocation
 import suiryc.scala.javafx.stage.{PathChoosers, StageLocationPersistentView, Stages}
 import suiryc.scala.misc.Units
 import suiryc.scala.settings.ConfigEntry
-import suiryc.scala.unused
 
 class NewDownloadController extends StageLocationPersistentView(NewDownloadController.stageLocation) {
 

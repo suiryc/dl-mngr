@@ -21,9 +21,10 @@ import javafx.scene.text.{Font, Text}
 import javafx.stage.{FileChooser, Modality, Stage, WindowEvent}
 import javafx.util.StringConverter
 import monix.execution.Cancelable
-import scala.collection.JavaConverters._
+import scala.annotation.unused
 import scala.concurrent.{Future, Promise}
 import scala.concurrent.duration._
+import scala.jdk.CollectionConverters._
 import scala.math.BigDecimal.RoundingMode
 import scala.util.{Failure, Success}
 import suiryc.dl.mngr.model._
@@ -46,7 +47,6 @@ import suiryc.scala.javafx.scene.text.Fonts
 import suiryc.scala.javafx.stage.{PathChoosers, StageLocationPersistentView, Stages}
 import suiryc.scala.javafx.stage.Stages.StageLocation
 import suiryc.scala.settings.ConfigEntry
-import suiryc.scala.unused
 import suiryc.scala.util.CallsThrottler
 
 
@@ -589,6 +589,8 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
         }
 
         def updateLogMessageMinWidth(els: List[LogEntry]): Unit = {
+          import scala.Ordering.Double.TotalOrdering
+
           if (els.nonEmpty) {
             val textWidth = els.map(entry => computeTextWidth(entry.message)).max
             // To compute the minimum width, we need the maximum text width and
@@ -1556,7 +1558,6 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
     }
 
     def addDownload(state: State, id: UUID, first: Boolean, select: Boolean): Unit = {
-      import scala.collection.JavaConverters._
       val items = downloadsTable.getItems
       if (!items.asScala.toSet.contains(id)) {
         state.dlMngr.getDownload(id).foreach { download =>

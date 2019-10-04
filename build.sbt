@@ -12,7 +12,7 @@ lazy val versions = Map[String, String](
   "logback"               -> "1.2.3",
   "monix"                 -> "3.0.0",
   "netty"                 -> "4.1.42.Final",
-  "scala"                 -> "2.12.10",
+  "scala"                 -> "2.13.1",
   "scala-logging"         -> "3.9.2",
   "scalatest"             -> "3.0.8",
   "scopt"                 -> "3.7.1",
@@ -51,11 +51,10 @@ lazy val dlMngr = project.in(file(".")).
     buildInfoUsePackageAsPath := true,
 
     scalacOptions ++= Seq(
-      "-deprecation",
       "-encoding", "UTF-8",
       "-feature",
       "-unchecked",
-      "-Xfatal-warnings",
+      "-Werror",
       "-Xlint:_",
       "-Ywarn-dead-code",
       "-Ywarn-numeric-widen",

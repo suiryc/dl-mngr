@@ -40,6 +40,8 @@ class AboutController {
   // called as part of FXML building, so make the function private since we
   // call it when appropriate already.
   private def initialize(): Unit = {
+    import scala.Ordering.Double.TotalOrdering
+
     versionLabel.setText(Info.version)
     scalaVersionLabel.setText(Info.scalaVersion)
     sbtVersionLabel.setText(Info.sbtVersion)
@@ -67,7 +69,7 @@ class AboutController {
       new SimpleStringProperty(Option(data.getValue).map(_.version).orNull)
     }
     dependencyVersionColumn.setMinWidth(dependencies.map(_.version).map(computeTextWidth).max + 10)
-    dependenciesTable.getItems.addAll(dependencies:_*)
+    dependenciesTable.getItems.addAll(dependencies.toSeq:_*)
     ()
   }
 
