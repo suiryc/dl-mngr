@@ -10,6 +10,7 @@ import scala.util.Failure
 import suiryc.dl.mngr.I18N.Strings
 import suiryc.dl.mngr.controllers.MainController
 import suiryc.dl.mngr.model.NewDownloadInfo
+import suiryc.scala.Configuration
 import suiryc.scala.akka.CoreSystem
 import suiryc.scala.io.SystemStreams
 import suiryc.scala.javafx.{JFXApplication, JFXLauncher}
@@ -20,6 +21,8 @@ import suiryc.scala.sys.UniqueInstance
 import suiryc.scala.sys.UniqueInstance.CommandResult
 
 object Main extends JFXLauncher[MainApp] {
+
+  Configuration.setDefaultApplication()
 
   // Note: use 'lazy' for fields that indirectly trigger stdout/stderr writing
   // (e.g. through logger, or scala Console println etc), so that we can
