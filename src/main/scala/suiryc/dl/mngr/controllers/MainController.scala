@@ -1400,7 +1400,7 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
 
       // If SSL trusting changed, refresh download manager connections.
       if (result.sslTrustChanged) {
-        dlMngr.refreshServerConnections()
+        dlMngr.refreshConnections()
       }
 
       // If sites or limits were changed, refresh downloads: in particular the

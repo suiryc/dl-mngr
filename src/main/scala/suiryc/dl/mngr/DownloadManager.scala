@@ -179,6 +179,65 @@ object DownloadManager {
     }
   }
 
+  protected trait Connections {
+    /** Last activity. */
+    val lastActive: Long
+    /** Active connections count. */
+    val cnxCount: Long
+    /** Whether SSL settings changed. */
+    val sslChanged: Boolean
+
+    /**
+     * Whether this cnx count must be retained.
+     *
+     * Keep if either:
+     *  - there are active connections
+     *  - ssl settings changed and last activity was less than 6 hours ago
+     * When ssl settings did not change (and there is no active connection)
+     * there is no need to keep anything: janitor can do the cleanup.
+     */
+    def retain: Boolean = {
+      (cnxCount > 0) ||
+        (sslChanged && (lastActive >= System.currentTimeMillis - 6.hours.toMillis))
+    }
+  }
+
+  /** Connections information per site. */
+  case class SiteConnections(
+    /** Last activity. */
+    lastActive: Long,
+    /** Active connections count. */
+    cnxCount: Long,
+    /** Whether SSL settings changed. */
+    sslChanged: Boolean,
+    /** Whether to trust SSL. */
+    sslTrust: Boolean,
+    /** Whether to ask upon SSL error. */
+    sslErrorAsk: Option[Boolean]
+  ) extends Connections {
+    def active: SiteConnections = copy(lastActive = System.currentTimeMillis)
+    def acquireConnection(): SiteConnections = active.copy(cnxCount = cnxCount + 1)
+    def releaseConnection(): SiteConnections = active.copy(cnxCount = math.max(0L, cnxCount - 1))
+    def updateSsl(trust: Boolean, ask: Option[Boolean]): SiteConnections =
+      active.copy(sslTrust = trust, sslErrorAsk = ask)
+    def updateSsl(siteSettings: Main.settings.SiteSettings): SiteConnections =
+      updateSsl(siteSettings.getSslTrust, siteSettings.sslErrorAsk.opt)
+    def trustSsl(trust: Boolean): SiteConnections =
+      updateSsl(trust = trust, ask = Some(false)).copy(sslChanged = true)
+  }
+
+  object SiteConnections {
+    def apply(siteSettings: Main.settings.SiteSettings): SiteConnections = {
+      SiteConnections(
+        lastActive = System.currentTimeMillis,
+        cnxCount = 0,
+        sslChanged = false,
+        sslTrust = siteSettings.getSslTrust,
+        sslErrorAsk = siteSettings.sslErrorAsk.opt
+      )
+    }
+  }
+
   /** Connections information per server. */
   case class ServerConnections(
     /** Last activity. */
@@ -191,7 +250,7 @@ object DownloadManager {
     sslTrust: Boolean,
     /** Whether to asl upon SSL error. */
     sslErrorAsk: Option[Boolean]
-  ) {
+  ) extends Connections {
     def active: ServerConnections = copy(lastActive = System.currentTimeMillis)
     def acquireConnection(): ServerConnections = active.copy(cnxCount = cnxCount + 1)
     def releaseConnection(): ServerConnections = active.copy(cnxCount = math.max(0L, cnxCount - 1))
@@ -204,13 +263,13 @@ object DownloadManager {
   }
 
   object ServerConnections {
-    def apply(siteSettings: Main.settings.SiteSettings): ServerConnections = {
+    def apply(perSite: SiteConnections): ServerConnections = {
       ServerConnections(
-        lastActive = System.currentTimeMillis,
+        lastActive = perSite.lastActive,
         cnxCount = 0,
-        sslChanged = false,
-        sslTrust = siteSettings.getSslTrust,
-        sslErrorAsk = siteSettings.sslErrorAsk.opt
+        sslChanged = perSite.sslChanged,
+        sslTrust = perSite.sslTrust,
+        sslErrorAsk = perSite.sslErrorAsk
       )
     }
   }
@@ -246,7 +305,7 @@ class DownloadManager extends StrictLogging {
   private var cnxTotal = 0L
 
   /** Connections per site. */
-  private var cnxPerSite: Map[String, Long] = Map.empty.withDefaultValue(0L)
+  private var cnxPerSite: Map[String, SiteConnections] = Map.empty
 
   /** Connections per server. */
   private var cnxPerServer: Map[String, ServerConnections] = Map.empty
@@ -725,8 +784,8 @@ class DownloadManager extends StrictLogging {
     val site = siteSettings.site
     val host = uri.getHost
 
-    val perSite = cnxPerSite(site)
-    val perServer = cnxPerServer.getOrElse(host, ServerConnections(siteSettings))
+    val perSite = cnxPerSite.getOrElse(site, SiteConnections(siteSettings))
+    val perServer = cnxPerServer.getOrElse(host, ServerConnections(perSite))
 
     // Remember the acquired connection info to update the appropriate resources
     // in releaseConnection: the actual URI may change upon the first request
@@ -758,7 +817,7 @@ class DownloadManager extends StrictLogging {
       if (force || siteSettings.isDefault) None
       else {
         val limit = siteSettings.getCnxMax
-        if (perSite >= limit) Some(s"number of connections for site=<${acquired.site}> limit=<$limit>")
+        if (perSite.cnxCount >= limit) Some(s"number of connections for site=<${acquired.site}> limit=<$limit>")
         else None
       }
     }.orElse {
@@ -778,7 +837,7 @@ class DownloadManager extends StrictLogging {
       // Don't count connection when requested.
       if (count) {
         cnxTotal += 1
-        cnxPerSite += (acquired.site -> (perSite + 1))
+        cnxPerSite += (acquired.site -> perSite.acquireConnection())
         cnxPerServer += (acquired.host -> perServer.acquireConnection())
       }
       // Note: don't reset last reason. What really matters are 'new' reasons
@@ -796,11 +855,11 @@ class DownloadManager extends StrictLogging {
   def releaseConnection(acquired: AcquiredConnection): Unit = this.synchronized {
     // Don't count connection when requested.
     if (acquired.count) {
-      val perSite = cnxPerSite(acquired.site)
-
       if (cnxTotal > 0) cnxTotal -= 1
-      if (perSite > 1) cnxPerSite += (acquired.site -> (perSite - 1))
-      else cnxPerSite -= acquired.site
+      // Note: entries with 0 cnx count will be cleaned by janitor
+      cnxPerSite.get(acquired.site).foreach { perSite =>
+        cnxPerSite += (acquired.site -> perSite.releaseConnection)
+      }
       cnxPerServer.get(acquired.host).foreach { perServer =>
         cnxPerServer += (acquired.host -> perServer.releaseConnection)
       }
@@ -808,7 +867,9 @@ class DownloadManager extends StrictLogging {
   }
 
   def trustSslSiteConnection(site: String, trust: Boolean): Unit = this.synchronized {
-    // Apply trusting to known concerned servers.
+    val updated = getSiteConnections(site).trustSsl(trust)
+    cnxPerSite += (site -> updated)
+    // Also apply trusting to known concerned servers.
     cnxPerServer = cnxPerServer.map {
       case (host, group) =>
         val updated =
@@ -823,27 +884,27 @@ class DownloadManager extends StrictLogging {
     cnxPerServer += (host -> updated)
   }
 
-  def getServerConnections(site: String, host: String): ServerConnections = this.synchronized {
-    cnxPerServer.getOrElse(host, ServerConnections(Main.settings.getSite(site, allowDefault = true)))
+  def getSiteConnections(site: String): SiteConnections = this.synchronized {
+    cnxPerSite.getOrElse(site, SiteConnections(Main.settings.getSite(site, allowDefault = true)))
   }
 
-  def refreshServerConnections(): Unit = this.synchronized {
+  def getServerConnections(site: String, host: String): ServerConnections = this.synchronized {
+    cnxPerServer.getOrElse(host, ServerConnections(getSiteConnections(site)))
+  }
+
+  def refreshConnections(): Unit = this.synchronized {
+    cnxPerSite = cnxPerSite.map {
+      case (site, group) => site -> group.updateSsl(Main.settings.getSite(site, allowDefault = true))
+    }
     cnxPerServer = cnxPerServer.map {
       case (host, group) => host -> group.updateSsl(Main.settings.getServerSite(host))
     }
   }
 
-  def cleanupServerConnections(): Unit = this.synchronized {
-    // Keep if either:
-    //  - there are active connections
-    //  - ssl settings changed and last activity was less than 6 hours ago
-    // When ssl settings did not change (and there is no active connection)
-    // there is no need to keep anything.
-    cnxPerServer = cnxPerServer.filter {
-      case (_, group) =>
-        (group.cnxCount > 0) ||
-          (group.sslChanged && (group.lastActive >= System.currentTimeMillis - 6.hours.toMillis))
-    }
+  def cleanupConnections(): Unit = this.synchronized {
+    // Only keep eligible entries.
+    cnxPerSite = cnxPerSite.filter(_._2.retain)
+    cnxPerServer = cnxPerServer.filter(_._2.retain)
   }
 
 }
@@ -989,7 +1050,7 @@ class DownloadsJanitor(dlMngr: DownloadManager) extends Actor with StrictLogging
 
   def cleanupMngr(): Unit = {
     cleanupMngrCancellable = None
-    dlMngr.cleanupServerConnections()
+    dlMngr.cleanupConnections()
     scheduleCleanupMngr()
   }
 
