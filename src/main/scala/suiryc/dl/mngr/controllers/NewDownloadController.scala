@@ -116,14 +116,8 @@ class NewDownloadController extends StageLocationPersistentView(NewDownloadContr
     if (comment.nonEmpty) commentField.setText(comment)
     // Take into account given file(name)
     dlInfo.file.map(Paths.get(_)) match {
-      case Some(path) =>
-        // If this is an absolute path, use the parent folder
-        if (path.isAbsolute) folderField.setText(path.getParent.toString)
-        // In any case, use the filename
-        updateFilename(Some(path.getFileName.toString))
-
-      case None =>
-        updateFilename(None)
+      case Some(path) => setPath(path)
+      case None       => updateFilename(None)
     }
 
     startAutomaticallyField.setSelected(startAutomatically.get)
@@ -225,12 +219,16 @@ class NewDownloadController extends StageLocationPersistentView(NewDownloadContr
                 canRename = true,
                 defaultRestart = true
               )
-              val path = if (r.contains(ConflictResolution.Rename)) {
-                findAvailablePath(path0)
+              if (r.contains(ConflictResolution.Rename)) {
+                // Find available path to set for download.
+                setPath(findAvailablePath(path0))
+                // And return original path without result to caller: ensures
+                // there will be no 'file renamed' dialog while keeping the
+                // new download window open with the new available path found.
+                (path0, None)
               } else {
-                path0
+                (path0, r)
               }
-              (path, r)
             }
             // Inform if target was renamed
             if (path != path0) {
@@ -399,6 +397,13 @@ class NewDownloadController extends StageLocationPersistentView(NewDownloadContr
   }
 
   def getPath: Path = Paths.get(getPathRaw(sanitize = true))
+
+  def setPath(path: Path): Unit = {
+    // If this is an absolute path, use the parent folder
+    if (path.isAbsolute) folderField.setText(path.getParent.toString)
+    // In any case, use the filename
+    updateFilename(Some(path.getFileName.toString))
+  }
 
   def updateFilename(file: Option[String]): Unit = {
     file.orElse(getURI.map(Http.getFilename)).foreach { file =>
