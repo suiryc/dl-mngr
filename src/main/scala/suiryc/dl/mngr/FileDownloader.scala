@@ -864,9 +864,14 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
 
         case None =>
           // Automatically trust SSL, but not for site if it is the default
-          state.download.info.addLog(LogKind.Warning, "Enabling 'trustAll' after SSL issue")
+          val msg = s"Enabling 'trustAll' for ${
+            if (!acquired.isDefaultSite) s"site=<${acquired.site}>"
+            else s"server=<${acquired.host}>"
+          } after SSL issue"
+          logger.info(msg)
+          state.download.info.addLog(LogKind.Warning, msg)
           if (!acquired.isDefaultSite) state.dlMngr.trustSslSiteConnection(acquired.site, trust = true)
-          else state.dlMngr.trustSslServerConnection(acquired.host, trust = true)
+          else state.dlMngr.trustSslServerConnection(acquired.site, acquired.host, trust = true)
       }
     }
 

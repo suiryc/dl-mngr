@@ -193,8 +193,8 @@ object DownloadManager {
     sslErrorAsk: Option[Boolean]
   ) {
     def active: ServerConnections = copy(lastActive = System.currentTimeMillis)
-    def acquireConnection: ServerConnections = active.copy(cnxCount = cnxCount + 1)
-    def releaseConnection: ServerConnections = active.copy(cnxCount = math.max(0L, cnxCount - 1))
+    def acquireConnection(): ServerConnections = active.copy(cnxCount = cnxCount + 1)
+    def releaseConnection(): ServerConnections = active.copy(cnxCount = math.max(0L, cnxCount - 1))
     def updateSsl(trust: Boolean, ask: Option[Boolean]): ServerConnections =
       active.copy(sslTrust = trust, sslErrorAsk = ask)
     def updateSsl(siteSettings: Main.settings.SiteSettings): ServerConnections =
@@ -779,7 +779,7 @@ class DownloadManager extends StrictLogging {
       if (count) {
         cnxTotal += 1
         cnxPerSite += (acquired.site -> (perSite + 1))
-        cnxPerServer += (acquired.host -> perServer.acquireConnection)
+        cnxPerServer += (acquired.host -> perServer.acquireConnection())
       }
       // Note: don't reset last reason. What really matters are 'new' reasons
       // that we could not acquire a connection.
@@ -818,8 +818,9 @@ class DownloadManager extends StrictLogging {
     }
   }
 
-  def trustSslServerConnection(host: String, trust: Boolean): Unit = this.synchronized {
-    cnxPerServer += (host -> cnxPerServer.getOrElse(host, ServerConnections(Main.settings.getServerSite(host))).trustSsl(trust))
+  def trustSslServerConnection(site: String, host: String, trust: Boolean): Unit = this.synchronized {
+    val updated = getServerConnections(site, host).trustSsl(trust)
+    cnxPerServer += (host -> updated)
   }
 
   def getServerConnections(site: String, host: String): ServerConnections = this.synchronized {

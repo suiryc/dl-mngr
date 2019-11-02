@@ -1211,11 +1211,11 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
               true
 
             case `buttonServer` =>
-              dlMngr.trustSslServerConnection(host, trust = true)
+              dlMngr.trustSslServerConnection(site, host, trust = true)
               true
 
             case `buttonNo` =>
-              dlMngr.trustSslServerConnection(host, trust = false)
+              dlMngr.trustSslServerConnection(site, host, trust = false)
               false
 
             case _ =>
