@@ -61,7 +61,11 @@ if sys.platform.startswith('win'):
   #asyncio.set_event_loop(loop)
 
 classpath = os.pathsep.join([dirScript, os.path.join(dirScript, 'dl-mngr.jar'), os.path.join(dirScript, 'lib', '*')])
-cmd = [javaExe, '-Xms16M', '-Xmx64M', '-XX:MaxRAM=64M', '-cp', classpath, 'suiryc.dl.mngr.Main'] + args.arguments
+# 'java.net.preferIPv6Addresses' (and 'java.net.preferIPv4Stack') is read and
+# cached at VM startup. In order to prefer IPv6 addresses (when client and
+# server handle both IPv4 and IPv6), the property must be set before starting.
+# (System.setProperty even as first executed code does not work)
+cmd = [javaExe, '-Xms16M', '-Xmx64M', '-XX:MaxRAM=64M', '-Djava.net.preferIPv6Addresses=true', '-cp', classpath, 'suiryc.dl.mngr.Main'] + args.arguments
 
 # In simple cases 'Popen' and 'communicate' is the way to go. But it waits for
 # the process to terminate, which is not what we want (especially for the first
