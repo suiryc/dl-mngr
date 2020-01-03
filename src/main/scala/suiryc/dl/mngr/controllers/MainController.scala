@@ -97,6 +97,9 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
   protected var dlURIField: TextField = _
 
   @FXML
+  protected var dlIPField: TextField = _
+
+  @FXML
   protected var dlServerLink: Hyperlink = _
 
   @FXML
@@ -749,6 +752,7 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
         dlUserAgentField.setText(download.userAgent.orNull)
         def updateProperties(): Unit = {
           dlURIField.setText(info.actualUri.get.toString)
+          dlIPField.setText(info.inetAddress.get.map(_.getHostAddress).orNull)
           dlServerLink.setText(info.actualUri.get.getHost)
           dlFolderField.setText(info.path.get.getParent.toString)
           dlFileField.setText(info.path.get.getFileName.toString)
@@ -820,7 +824,7 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
             download.renameFile(selectedFile.toPath)
           }
         }
-        val propertiesCancellable = RichObservableValue.listen(info.actualUri, info.path, info.size, info.lastModified) {
+        val propertiesCancellable = RichObservableValue.listen(info.actualUri, info.path, info.inetAddress, info.size, info.lastModified) {
           JFXSystem.runLater {
             updateProperties()
           }
@@ -856,7 +860,7 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
           field.setValueFactory(null)
           field.getEditor.setText(null)
         }
-        List(dlURIField,
+        List(dlURIField, dlIPField,
           dlReferrerField, dlCookieField, dlUserAgentField,
           dlFolderField, dlFileField).foreach { field =>
           field.setText(null)

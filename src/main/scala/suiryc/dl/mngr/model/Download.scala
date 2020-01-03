@@ -1,6 +1,6 @@
 package suiryc.dl.mngr.model
 
-import java.net.URI
+import java.net.{Inet4Address, Inet6Address, InetAddress, URI}
 import java.nio.file.Path
 import java.time.LocalDateTime
 import java.util.{Date, UUID}
@@ -52,6 +52,8 @@ class DownloadInfo {
   val temporaryPath: SimpleObjectProperty[Path] = new SimpleObjectProperty()
   /** State (initially stopped). */
   val state: SimpleObjectProperty[DownloadState.Value] = new SimpleObjectProperty(DownloadState.Stopped)
+  /** Internet address. */
+  val inetAddress: SimpleObjectProperty[Option[InetAddress]] = new SimpleObjectProperty(None)
   /** Size. */
   val size: SimpleLongProperty = new SimpleLongProperty(Long.MinValue)
   /** File last modified time on server. */
@@ -88,6 +90,10 @@ class DownloadInfo {
   var rangeValidator: Option[String] = None
   /** Whether server accept ranges. */
   var acceptRanges: SimpleObjectProperty[Option[Boolean]] = new SimpleObjectProperty(None)
+
+  def isInetAddressDetermined: Boolean = inetAddress.get.nonEmpty
+  def isIPv4: Boolean = inetAddress.get.exists(_.isInstanceOf[Inet4Address])
+  def isIPv6: Boolean = inetAddress.get.exists(_.isInstanceOf[Inet6Address])
 
   // Note: size is Long.MinValue before download actually starts,
   // and is -1 when started and size is unknown.
@@ -260,6 +266,10 @@ case class Download(
     else if (range.length > 0) s"$context[range=${range.start}-${range.end}]"
     else context
   }
+
+  def ipContext: String = info.inetAddress.get.map { addr =>
+    s" ${if (info.isIPv6) "ipv6" else s"ipv4"}=<${addr.getHostAddress}>"
+  }.getOrElse("")
 
   def resume(reusedOpt: Option[Boolean], restart: Boolean): Unit = {
     if (restart) info.restart()

@@ -11,6 +11,7 @@ import org.apache.http.nio.{ContentDecoder, IOControl}
 import org.apache.http.protocol.HttpContext
 import org.apache.http._
 import org.apache.http.client.protocol.HttpClientContext
+import org.apache.http.nio.conn.ManagedNHttpClientConnection
 import scala.concurrent.Promise
 import scala.concurrent.duration._
 import scala.jdk.CollectionConverters._
@@ -657,7 +658,7 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
       //  or
       //   - in a one-shot client, with a specific callback to execute
       val context = HttpClientContext.create()
-      val responseConsumer = new ResponseConsumer(self, download, range, request)
+      val responseConsumer = new ResponseConsumer(self, download, range, request, context)
       val client = state.dlMngr.getClient(acquired.sslTrust)
       client.execute(requestProducer, responseConsumer, context, null)
 
@@ -712,7 +713,7 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
           download.info.addLog(LogKind.Info, message)
         }
       }
-      val message = s"Download contentLength=<$contentLength>${
+      val message = s"Download${download.ipContext} contentLength=<$contentLength>${
         lastModified.map(v => s" lastModified=<$v>").getOrElse("")
       } acceptRanges=<$acceptRanges>${
         validator.map(v => s" validator=<$v>").getOrElse("")
@@ -813,7 +814,8 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
       "finished"
     }
     val downloadedRange = if (downloaded.isDefined) s" downloaded=$downloaded" else ""
-    val message0 = s"Segment $status"
+    // Note: log IP address if segment failed upon start.
+    val message0 = s"Segment $status${if (exOpt.exists(!_.started)) download.ipContext else ""}"
     val message = s"${download.context(range)} $message0${
       exOpt.map(v => s" ex=<$v>").getOrElse("")
     }$downloadedRange; remaining segments=${state.getSegments}"
@@ -1109,7 +1111,8 @@ class ResponseConsumer(
   downloadHandler: ActorRef,
   download: Download,
   range: SegmentRange,
-  request: HttpRequestBase
+  request: HttpRequestBase,
+  context: HttpClientContext
 ) extends AbstractAsyncResponseConsumer[Unit] {
 
   private[mngr] var position: Long = range.start
@@ -1143,6 +1146,13 @@ class ResponseConsumer(
   }
 
   override def onResponseReceived(response: HttpResponse): Unit = {
+    // Through the context we can actually get hold of the underlying client
+    // connection.
+    if (download.info.inetAddress.get().isEmpty) {
+      Option(context.getConnection(classOf[ManagedNHttpClientConnection])).foreach { cnx =>
+        download.info.inetAddress.set(Some(cnx.getRemoteAddress))
+      }
+    }
     val statusLine = response.getStatusLine
     val failure = if (statusLine.getStatusCode / 100 != 2) {
       // Request failed with HTTP code other than 2xx
