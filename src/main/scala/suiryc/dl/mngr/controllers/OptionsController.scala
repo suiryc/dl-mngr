@@ -148,6 +148,12 @@ class OptionsController extends StageLocationPersistentView(OptionsController.st
 
   private var cnxBufferChanged = false
 
+  private lazy val siteFields = List(
+    siteNameField, sitePatternField, siteSslTrustField, siteSslTrustField,
+    siteSslErrorAskField, siteSslErrorAskField,
+    siteMaxCnxField, siteMaxSegmentsField
+  )
+
   private val sitesSnapshots = new SiteSettingsSnapshots
 
   def initialize(dialog: Dialog[_], snapshot1: SettingsSnapshot, snapshot2: SettingsSnapshot): Unit = {
@@ -433,6 +439,7 @@ class OptionsController extends StageLocationPersistentView(OptionsController.st
     siteMaxSegmentsField.getValueFactory.valueProperty.unbindBidirectional(maxSegmentsField.getValueFactory.valueProperty)
     Option(sitesField.getSelectionModel.getSelectedItem).flatten match {
       case Some(item) =>
+        siteFields.foreach(_.setDisable(false))
         // Notes:
         // We need to get the current draft value (which may have been changed
         // - refreshed - previously) instead of the setting value (draft not
@@ -458,15 +465,13 @@ class OptionsController extends StageLocationPersistentView(OptionsController.st
         siteRemoveButton.setDisable(item.isDefault)
 
       case None =>
+        siteFields.foreach(_.setDisable(true))
         setupSpinner(siteMaxCnxField, mandatory = false)
         siteMaxCnxField.getValueFactory.setValue(None)
         setupSpinner(siteMaxSegmentsField, mandatory = false)
         siteMaxSegmentsField.getValueFactory.setValue(None)
         siteNameField.setText(null)
-        siteNameField.setDisable(false)
         sitePatternField.setText(null)
-        sitePatternField.setDisable(false)
-        siteRemoveButton.setDisable(true)
     }
   }
 
@@ -635,7 +640,8 @@ class OptionsController extends StageLocationPersistentView(OptionsController.st
     val bufferMaxSizeOk = getBytes(bufferMaxSizeField.getEditor.getText, mandatory = false).getOrElse(-1L) >= 0
 
     val isDefaultSite = getSelectedSite.exists(_.isDefault)
-    val siteNameOk = getSiteName.exists { site =>
+    val siteSelected = getSelectedSite.nonEmpty
+    val siteNameOk = !siteSelected || getSiteName.exists { site =>
       getSelectedSite.map(_.site).contains(site) ||
         !sitesSnapshots.getSnapshots.map(_.site).toSet.contains(site)
     }
