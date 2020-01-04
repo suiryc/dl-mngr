@@ -121,6 +121,9 @@ class OptionsController extends StageLocationPersistentView(OptionsController.st
   protected var siteNameField: TextField = _
 
   @FXML
+  protected var sitePatternField: TextField = _
+
+  @FXML
   protected var siteSslTrustField: CheckBox = _
 
   @FXML
@@ -324,7 +327,7 @@ class OptionsController extends StageLocationPersistentView(OptionsController.st
       cnxRequestTimeoutField.getEditor.textProperty, cnxTimeoutField.getEditor.textProperty,
       socketTimeoutField.getEditor.textProperty, idleTimeoutField.getEditor.textProperty,
       bufferMinSizeField.getEditor.textProperty, bufferMaxSizeField.getEditor.textProperty,
-      siteNameField.textProperty, siteSslTrustField.selectedProperty, siteSslTrustField.indeterminateProperty,
+      siteNameField.textProperty, sitePatternField.textProperty, siteSslTrustField.selectedProperty, siteSslTrustField.indeterminateProperty,
       siteSslErrorAskField.selectedProperty, siteSslErrorAskField.indeterminateProperty,
       siteMaxCnxField.getEditor.textProperty, siteMaxSegmentsField.getEditor.textProperty,
       sitesField.getSelectionModel.selectedItemProperty
@@ -450,6 +453,8 @@ class OptionsController extends StageLocationPersistentView(OptionsController.st
         }
         siteNameField.setText(item.site)
         siteNameField.setDisable(item.isDefault)
+        sitePatternField.setText(item.pattern.getDraftValue(refreshed = false).orNull)
+        sitePatternField.setDisable(item.isDefault)
         siteRemoveButton.setDisable(item.isDefault)
 
       case None =>
@@ -459,6 +464,8 @@ class OptionsController extends StageLocationPersistentView(OptionsController.st
         siteMaxSegmentsField.getValueFactory.setValue(None)
         siteNameField.setText(null)
         siteNameField.setDisable(false)
+        sitePatternField.setText(null)
+        sitePatternField.setDisable(false)
         siteRemoveButton.setDisable(true)
     }
   }
@@ -548,6 +555,26 @@ class OptionsController extends StageLocationPersistentView(OptionsController.st
     snap
   }
 
+  private def sitePatternSnapshot(settings: Settings#SiteSettings): ConfigOptEntrySnapshot[String] = {
+    @inline
+    def isSelected: Boolean = isSiteSelected(settings)
+    val setting = settings.pattern
+    val snap = SettingSnapshot.opt(setting)
+    snap.setOnRefreshDraft {
+      if (isSelected) getSitePattern
+      else snap.getDraftValue(refreshed = false)
+    }
+    snap.setOnChange { _ =>
+      // Don't forget to refresh the pattern associated to this site settings.
+      settings.refreshPattern()
+      sitesChanged = true
+    }
+    def draftToField(): Unit = if (isSelected) sitePatternField.setText(snap.draft.get.orNull)
+    snap.draft.listen(draftToField())
+    draftToField()
+    snap
+  }
+
   private def bytesSettingSnapshot(field: Spinner[Option[Long]], setting: ConfigEntry[Long],
     isCnxLimit: Boolean = false, mandatory: Boolean = true): ConfigOptEntrySnapshot[Long] =
   {
@@ -612,6 +639,14 @@ class OptionsController extends StageLocationPersistentView(OptionsController.st
       getSelectedSite.map(_.site).contains(site) ||
         !sitesSnapshots.getSnapshots.map(_.site).toSet.contains(site)
     }
+    val sitePatternOk = Option(sitePatternField.getText).filterNot(_.isBlank).forall { pattern =>
+      try {
+        pattern.r
+        true
+      } catch {
+        case _: Exception => false
+      }
+    }
     // We allow emptying non-default site values
     val siteMaxCnxOk = getInt(siteMaxCnxField.getEditor.getText).getOrElse {
       if (isDefaultSite || !isEmpty(siteMaxCnxField.getEditor.getText)) -1
@@ -638,6 +673,7 @@ class OptionsController extends StageLocationPersistentView(OptionsController.st
     Styles.toggleError(bufferMinSizeField, !bufferMinSizeOk, Strings.validSizeExpected)
     Styles.toggleError(bufferMaxSizeField, !bufferMaxSizeOk, Strings.validSizeExpected)
     Styles.toggleError(siteNameField, !siteNameOk, Strings.mustNonEmptyUnique)
+    Styles.toggleError(sitePatternField, !sitePatternOk, Strings.validPatternExpected)
     Styles.toggleError(siteMaxCnxField, !siteMaxCnxOk, Strings.positiveValueExpected)
     Styles.toggleError(siteMaxSegmentsField, !siteMaxSegmentsOk, Strings.positiveValueExpected)
 
@@ -645,7 +681,7 @@ class OptionsController extends StageLocationPersistentView(OptionsController.st
       maxSegmentsOk && minSegmentSizeOk && writeBufferSizeOk && proxyOk &&
       maxErrorsOk && attemptDelayOk && cnxRequestTimeoutOk && cnxTimeoutOk && socketTimeoutOk && idleTimeoutOk &&
       bufferMinSizeOk && bufferMaxSizeOk &&
-      siteNameOk && siteMaxCnxOk && siteMaxSegmentsOk
+      siteNameOk && sitePatternOk && siteMaxCnxOk && siteMaxSegmentsOk
   }
 
   private def optToField(v: Option[Boolean], field: CheckBox): Unit = {
@@ -668,6 +704,16 @@ class OptionsController extends StageLocationPersistentView(OptionsController.st
   private def fieldToOpt(field: CheckBox): Option[Boolean] = {
     if (field.isAllowIndeterminate && field.isIndeterminate) None
     else Some(field.isSelected)
+  }
+
+  private def getSitePattern: Option[String] = {
+    val s = sitePatternField.getText
+    try {
+      if (isEmpty(s)) None
+      else Some(s.r.regex)
+    } catch {
+      case _: Exception => None
+    }
   }
 
   private def isEmpty(s: String): Boolean = Option(s).forall(_.trim.isEmpty)
@@ -705,6 +751,7 @@ class OptionsController extends StageLocationPersistentView(OptionsController.st
 
     val isDefault: Boolean = settings.isDefault
 
+    val pattern: ConfigOptEntrySnapshot[String] = sitePatternSnapshot(settings)
     val sslTrust: ConfigOptEntrySnapshot[Boolean] =
       sslTrustOnChange(booleanSettingSnapshot(siteSslTrustField, settings.sslTrust, Some(settings)))
     val sslErrorAsk: ConfigOptEntrySnapshot[Boolean] =
@@ -715,7 +762,7 @@ class OptionsController extends StageLocationPersistentView(OptionsController.st
       intSettingSnapshot(siteMaxSegmentsField, settings.segmentsMax, Some(settings), isCnxLimit = true)
 
     // Add the managed snapshots
-    add(sslTrust, sslErrorAsk, cnxMax, segmentsMax)
+    add(pattern, sslTrust, sslErrorAsk, cnxMax, segmentsMax)
 
     def isSiteChanged: Boolean = refreshedSiteName(checkSelected = true) != settings.site
 
@@ -744,6 +791,7 @@ class OptionsController extends StageLocationPersistentView(OptionsController.st
       val name = refreshedSiteName(checkSelected = false)
       val siteNameChanged = site != name
       site = name
+      pattern.draft.set(getSitePattern)
       refreshDraftBoolean(siteSslTrustField, sslTrust)
       refreshDraftBoolean(siteSslErrorAskField, sslErrorAsk)
       refreshDraftInt(siteMaxCnxField, cnxMax)
@@ -791,6 +839,7 @@ class OptionsController extends StageLocationPersistentView(OptionsController.st
         val newSettings = Main.settings.getSite(site, allowDefault = false)
         // And set our values. Make sure to get the refreshed draft value and
         // remove entry when applicable.
+        newSettings.setPattern(pattern.getDraftValue())
         optToValue(sslTrust, newSettings.sslTrust)
         optToValue(sslErrorAsk, newSettings.sslErrorAsk)
         optToValue(cnxMax, newSettings.cnxMax)
@@ -835,6 +884,7 @@ class OptionsController extends StageLocationPersistentView(OptionsController.st
       val snap = SiteSettingsSnapshot(siteSettings)
       // Build a unique site name to apply.
       snap.site = siteOpt.getOrElse(getName(0))
+      // Note: site pattern is empty by default.
       sitesField.getItems.get(0) match {
         case Some(sitesDefault) =>
           // Use current 'default' site snapshot values.

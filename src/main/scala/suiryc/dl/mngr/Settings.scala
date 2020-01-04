@@ -4,6 +4,7 @@ import java.net.URI
 import java.nio.file.{Path, Paths}
 import scala.concurrent.duration.FiniteDuration
 import scala.jdk.CollectionConverters._
+import scala.util.matching.Regex
 import suiryc.scala.settings.{BaseConfig, ConfigEntry, PortableSettings}
 import suiryc.scala.io.RichFile
 import suiryc.scala.sys.{Command, OS}
@@ -38,6 +39,7 @@ object Settings {
   private val KEY_MIN = "min"
   private val KEY_MIN_SIZE = "min-size"
   private val KEY_PATH = "path"
+  private val KEY_PATTERN = "pattern"
   private val KEY_PREALLOCATE = "preallocate"
   private val KEY_PROXY = "proxy"
   private val KEY_RATE_LIMIT = "rate-limit"
@@ -96,6 +98,14 @@ class Settings(path: Path) {
       key == KEY_DEFAULT
     }.map { key =>
       key -> new SiteSettings(key)
+    }.toMap
+  }
+
+  private var sitePatterns: Map[Regex, SiteSettings] = {
+    sites.values.flatMap { site =>
+      site.regex.map { pattern =>
+        pattern -> site
+      }
     }.toMap
   }
 
@@ -165,28 +175,32 @@ class Settings(path: Path) {
 
   def getSites: Map[String, SiteSettings] = sites
 
-  def getSite(uri: URI): SiteSettings = {
+  def findSite(uri: URI): SiteSettings = {
     @scala.annotation.tailrec
-    def loop(host: String): SiteSettings = {
+    def loop(host: String, full: Boolean): SiteSettings = {
       // Site name must not be TLD alone
       val els = host.split("\\.", 2)
       if (els.size > 1) {
-        // Check whether this host is known, otherwise go up one level
-        sites.get(host) match {
+        // Check whether this host is known, otherwise go up one level.
+        // As a fallback, we also check full host name against site patterns.
+        lazy val byPattern =
+          if (full) sitePatterns.find(_._1.findFirstIn(host).nonEmpty).map(_._2)
+          else None
+        sites.get(host).orElse(byPattern) match {
           case Some(siteSettings) => siteSettings
-          case None => loop(els(1))
+          case None => loop(els(1), full = false)
         }
       } else {
         // Fallback to default
         sitesDefault
       }
     }
-    loop(uri.getHost.toLowerCase)
+    loop(uri.getHost.toLowerCase, full = true)
   }
 
-  def getServerSite(host: String): SiteSettings = {
+  def findServerSite(host: String): SiteSettings = {
     try {
-      getSite(new URI("http", host, null, null))
+      findSite(new URI("http", host, null, null))
     } catch {
       case _: Exception => sitesDefault
     }
@@ -206,11 +220,19 @@ class Settings(path: Path) {
     }
   }
 
+  def changeSitePattern(site: SiteSettings, pattern: Option[Regex]): Unit = {
+    site.regex.foreach(sitePatterns -= _)
+    pattern.foreach { p =>
+      sitePatterns += (p -> site)
+    }
+  }
+
   def removeSite(s: SiteSettings): Unit = {
     val site = s.site
     if (site == KEY_DEFAULT) throw new Exception("Cannot access default site settings this way")
     s.remove()
     sites -= site
+    changeSitePattern(s, None)
   }
 
   def removeSite(site0: String): Unit = {
@@ -233,6 +255,8 @@ class Settings(path: Path) {
 
     private val settingsPrefix = sitesPrefix :+ site
 
+    val pattern: ConfigEntry[String] =
+      ConfigEntry.from(settings, settingsPrefix ++ Seq(KEY_PATTERN))
     val sslTrust: ConfigEntry[Boolean] =
       ConfigEntry.from(settings, settingsPrefix ++ Seq(KEY_SSL, KEY_TRUST))
     val sslErrorAsk: ConfigEntry[Boolean] =
@@ -241,6 +265,22 @@ class Settings(path: Path) {
       ConfigEntry.from(settings, settingsPrefix ++ Seq(KEY_CONNECTION, KEY_MAX))
     val segmentsMax: ConfigEntry[Int] =
       ConfigEntry.from(settings, settingsPrefix ++ Seq(KEY_SEGMENTS, KEY_MAX))
+
+    private def getPattern: Option[Regex] = pattern.opt.filterNot(_.isBlank).map(_.r)
+    var regex: Option[Regex] = getPattern
+
+    def refreshPattern(): Unit = {
+      val p = getPattern
+      changeSitePattern(this, p)
+      regex = p
+    }
+
+    def setPattern(s: Option[String]): Unit = {
+      val actual = s.getOrElse("")
+      if (actual.isBlank) pattern.reset()
+      else pattern.set(actual)
+      refreshPattern()
+    }
 
     def getSslTrust: Boolean = sslTrust.opt.getOrElse {
       Settings.this.sitesDefault.sslTrust.get

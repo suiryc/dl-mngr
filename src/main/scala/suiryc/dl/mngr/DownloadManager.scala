@@ -780,7 +780,7 @@ class DownloadManager extends StrictLogging {
   private def _tryAcquireConnection(download: Download, force: Boolean, count: Boolean, active: Boolean): Option[AcquiredConnection] = {
     // Use the actual URI (since this is the real one we connect to)
     val uri = download.info.actualUri.get
-    val siteSettings = Main.settings.getSite(uri)
+    val siteSettings = Main.settings.findSite(uri)
     val site = siteSettings.site
     val host = uri.getHost
 
@@ -873,7 +873,7 @@ class DownloadManager extends StrictLogging {
     cnxPerServer = cnxPerServer.map {
       case (host, group) =>
         val updated =
-          if (Main.settings.getServerSite(host).site != site) group
+          if (Main.settings.findServerSite(host).site != site) group
           else group.trustSsl(trust)
         host -> updated
     }
@@ -897,7 +897,7 @@ class DownloadManager extends StrictLogging {
       case (site, group) => site -> group.updateSsl(Main.settings.getSite(site, allowDefault = true))
     }
     cnxPerServer = cnxPerServer.map {
-      case (host, group) => host -> group.updateSsl(Main.settings.getServerSite(host))
+      case (host, group) => host -> group.updateSsl(Main.settings.findServerSite(host))
     }
   }
 

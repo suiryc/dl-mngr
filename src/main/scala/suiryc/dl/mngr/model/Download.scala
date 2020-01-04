@@ -213,7 +213,7 @@ case class Download(
   // We can restart upon failure, or if stopped and ranges are not supported.
   def canRestart: Boolean = isFailed || (isStopped && acceptRanges.contains(false))
 
-  def siteSettings: Main.settings.SiteSettings = Main.settings.getSite(info.actualUri.get)
+  def siteSettings: Main.settings.SiteSettings = Main.settings.findSite(info.actualUri.get)
   def activeSegments: Int = info.activeSegments.get
   def maxSegments: Int = siteSettings.getSegmentsMax
   def minSegmentSize: Long = Main.settings.segmentsMinSize.get

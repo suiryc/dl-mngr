@@ -59,6 +59,7 @@ object I18N extends suiryc.scala.util.I18N("i18n.dl-mngr") with I18NWithConfigEn
     def unexpectedIssue: String = getString("error.unexpected-issue")
     def unknownSize: String = getString("warning.size-unknown")
     def validDurationExpected: String = getString("Valid duration expected")
+    def validPatternExpected: String = getString("Valid pattern expected")
     def validSizeExpected: String = getString("Valid size expected")
     def validURLExpected: String = getString("Valid URL expected")
   }
