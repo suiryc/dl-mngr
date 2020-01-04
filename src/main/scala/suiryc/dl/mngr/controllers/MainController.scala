@@ -28,7 +28,7 @@ import scala.math.BigDecimal.RoundingMode
 import scala.util.{Failure, Success}
 import suiryc.dl.mngr.model._
 import suiryc.scala.misc.Units
-import suiryc.dl.mngr.{DownloadManager, I18N, Main, Settings}
+import suiryc.dl.mngr.{DownloadManager, I18N, Info, Main, Settings}
 import suiryc.dl.mngr.I18N.Strings
 import suiryc.dl.mngr.util.{Http, Icons}
 import suiryc.scala.RichOption._
@@ -49,7 +49,11 @@ import suiryc.scala.settings.ConfigEntry
 import suiryc.scala.util.CallsThrottler
 
 
-class MainController extends StageLocationPersistentView(MainController.stageLocation, first = true) with StrictLogging {
+class MainController
+  extends StageLocationPersistentView(MainController.stageLocation, first = true)
+  with ObservableLogs
+  with StrictLogging
+{
 
   import MainController._
 
@@ -187,6 +191,10 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
   private var downloadData: Map[UUID, DownloadData] = Map.empty
 
   def initialize(state: State): Unit = {
+    refreshLogs()
+    addLog(LogKind.Info, s"Started name=<${Info.name}> version=<${Info.version}>${
+      Info.gitHeadCommit.map(v => s" gitCommit=<$v>").getOrElse("")
+    } buildTime=<${Main.buildTimeString}>")
     state.stage.setTitle(Main.versionedName)
 
     // Note: make the actor name unique (with timestamp) so that it can be
@@ -442,7 +450,7 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
     downloadsTable.setContextMenu(downloadsContextMenu)
     downloadsTable.getSelectionModel.setSelectionMode(SelectionMode.MULTIPLE)
     downloadsTable.getSelectionModel.selectedItemProperty.listen {
-      refreshDlLogs()
+      refreshLogs()
       refreshDlProperties()
     }
 
@@ -516,16 +524,21 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
     logsTable.addEventHandler(KeyEvent.KEY_PRESSED, (event: KeyEvent) => {
       if (CTRL_C.`match`(event)) Option(logsTable.getSelectionModel.getSelectedItems.asScala.toList).foreach(copyDownloadLogsToClipboard)
     })
-    // If logs are changed (non-empty) while there is no selected download,
-    // refresh them (and properties): logs are pushed asynchronously and
-    // there may be a race condition between that and the time subscription
-    // cancellation happens.
-    logsTable.getItems.listen {
-      if (!logsTable.getItems.isEmpty && selectedDownload.isEmpty) {
-        refreshDlLogs()
-        refreshDlProperties()
-      }
-    }
+    // Note:
+    // Previously only download logs were displayed in logsTable. Since they
+    // are set asynchronously, a race condition was possible:
+    // 1. Download entry is selected
+    // 2.1. Download logs are about to be set in logsTable (through JavaFX
+    //      thread)
+    // 2.2. Download entry is de-selected (possibly successfully completed and
+    //      automatically removed)
+    // 2.3. logsTable is emptied
+    // 2.4. Logs from 2.1. are finally set in logsTable
+    // 3. logsTable displays logs from de-selected download
+    // A workaround was to listen for logsTable items changes, and refresh them
+    // (to empty the table) if there were items while no download was selected.
+    // Now that we also handle session logs (displayed when no download is
+    // selected), those would simply overwrite unwanted logs when applicable.
 
     Spinners.handleEvents(dlServerMaxCnxField)
     Spinners.handleEvents(dlSiteMaxCnxField)
@@ -557,106 +570,99 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
     ()
   }
 
-  private def refreshDlLogs(): Unit = {
+  private def refreshLogs(): Unit = {
     // Cancel previous subscriptions if any
     cancelSubscription(Option(logsTable.getUserData))
 
     // Fix minimum width; will be updated when setting cells content
     columnLogMessage.setMinWidth(computeTextWidth("MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM"))
 
-    selectedDownloadData match {
-      case Some(data) =>
-        val info = data.download.info
+    val observableLogs: ObservableLogs = selectedDownloadData.map(_.download.info).getOrElse(this)
+    def getLogs(l: java.util.List[_ <: LogEntry]): List[LogEntry] = {
+      val logs0 = l.asScala.toList
+      if (!Main.settings.debug.get) {
+        logs0.filter(_.kind != LogKind.Debug)
+      } else {
+        logs0
+      }
+    }
+    def setLogs(): Unit = {
+      // If we are called to initially populate the table, logs may be
+      // changed while we work with the list. To prevent concurrent access
+      // issues, lock the logs.
+      val logs = observableLogs.withLogs(getLogs)
+      // Note: we may not be in the JavaFX thread yet (e.g. dealing with
+      // logs changes).
+      JFXSystem.run {
+        logsTable.getItems.setAll(logs: _*)
+        updateLogMessageMinWidth(logs)
+      }
+    }
 
-        def getLogs(l: java.util.List[_ <: LogEntry]): List[LogEntry] = {
-          val logs0 = l.asScala.toList
-          if (!Main.settings.debug.get) {
-            logs0.filter(_.kind != LogKind.Debug)
+    def updateLogMessageMinWidth(els: List[LogEntry]): Unit = {
+      import scala.Ordering.Double.TotalOrdering
+
+      if (els.nonEmpty) {
+        val textWidth = els.map(entry => computeTextWidth(entry.message)).max
+        // To compute the minimum width, we need the maximum text width and
+        // any 'extra' (padding/insets) applied on the TableCell.
+        // The commented code below can be used to compute those.
+        //def insetsWidth(insets: Insets): Double = insets.getLeft + insets.getRight
+        //val extraWidth = insetsWidth(cell.getPadding) + insetsWidth(cell.getInsets) + insetsWidth(cell.getLabelPadding)
+        // But the very first built cells (that can be accessed in the
+        // CellFactory above for example) do not have any padding/insets
+        // yet ... (and 'runLater' does not help).
+        // Keep it simple and use a hard-coded value: 10 on Windows and ~12
+        // on Linux.
+        val extraWidth = 12.0
+        val minWidth = math.max(Graphics.iconSize + textWidth + extraWidth, columnLogMessage.getMinWidth)
+        // Note: if only setting minimum width, often the actual width does
+        // not change (when it was bigger before re-setting log entries)
+        // until interaction is done (e.g. resizing window).
+        // Setting max width (along with preferred width) helps applying the
+        // target width right now, as is done below (in restoreView).
+        columnLogMessage.setMinWidth(minWidth)
+      }
+    }
+
+    // Listen to logs changes.
+    // Notes:
+    // We only expect entries to be added, which can be propagated easily in
+    // the table. For any other change, re-set all the items.
+    // In either case, update the column minimum width accordingly.
+    // Don't forget to delegate UI changes to the JavaFX thread.
+    // As indicated in 'logs' field comments, no other change must happen
+    // while we iterate over added elements: thus only switch to the JavaFX
+    // thread when we are done with the change content, so that handling
+    // changes is done in the caller thread (which holds a lock).
+    val logsCancellable = observableLogs.logs.listen { change =>
+      @scala.annotation.tailrec
+      def loop(): Unit = {
+        if (change.next()) {
+          if (change.wasPermutated() || change.wasUpdated() || change.wasRemoved() || !change.wasAdded()) {
+            setLogs()
           } else {
-            logs0
-          }
-        }
-        def setLogs(): Unit = {
-          // If we are called to initially populate the table, logs may be
-          // changed while we work with the list. To prevent concurrent access
-          // issues, lock the logs.
-          val logs = info.withLogs(getLogs)
-          // Note: we may not be in the JavaFX thread yet (e.g. dealing with
-          // logs changes).
-          JFXSystem.run {
-            logsTable.getItems.setAll(logs: _*)
-            updateLogMessageMinWidth(logs)
-          }
-        }
-
-        def updateLogMessageMinWidth(els: List[LogEntry]): Unit = {
-          import scala.Ordering.Double.TotalOrdering
-
-          if (els.nonEmpty) {
-            val textWidth = els.map(entry => computeTextWidth(entry.message)).max
-            // To compute the minimum width, we need the maximum text width and
-            // any 'extra' (padding/insets) applied on the TableCell.
-            // The commented code below can be used to compute those.
-            //def insetsWidth(insets: Insets): Double = insets.getLeft + insets.getRight
-            //val extraWidth = insetsWidth(cell.getPadding) + insetsWidth(cell.getInsets) + insetsWidth(cell.getLabelPadding)
-            // But the very first built cells (that can be accessed in the
-            // CellFactory above for example) do not have any padding/insets
-            // yet ... (and 'runLater' does not help).
-            // Keep it simple and use a hard-coded value: 10 on Windows and ~12
-            // on Linux.
-            val extraWidth = 12.0
-            val minWidth = math.max(Graphics.iconSize + textWidth + extraWidth, columnLogMessage.getMinWidth)
-            // Note: if only setting minimum width, often the actual width does
-            // not change (when it was bigger before re-setting log entries)
-            // until interaction is done (e.g. resizing window).
-            // Setting max width (along with preferred width) helps applying the
-            // target width right now, as is done below (in restoreView).
-            columnLogMessage.setMinWidth(minWidth)
-          }
-        }
-
-        // Listen to this download logs.
-        // Notes:
-        // We only expect entries to be added, which can be propagated easily in
-        // the table. For any other change, re-set all the items.
-        // In either case, update the column minimum width accordingly.
-        // Don't forget to delegate UI changes to the JavaFX thread.
-        // As indicated in 'logs' field comments, no other change must happen
-        // while we iterate over added elements: thus only switch to the JavaFX
-        // thread when we are done with the change content, so that handling
-        // changes is done in the caller thread (which holds a lock).
-        val logsCancellable = info.logs.listen { change =>
-          @scala.annotation.tailrec
-          def loop(): Unit = {
-            if (change.next()) {
-              if (change.wasPermutated() || change.wasUpdated() || change.wasRemoved() || !change.wasAdded()) {
-                setLogs()
-              } else {
-                val logs = getLogs(change.getAddedSubList)
-                if (logs.nonEmpty) {
-                  JFXSystem.run {
-                    // We only expect adding at the end. Adding at position
-                    // 'change.getFrom' fails when filtering debug messages.
-                    logsTable.getItems.addAll(logs.asJava)
-                    updateLogMessageMinWidth(logs)
-                  }
-                }
-                loop()
+            val logs = getLogs(change.getAddedSubList)
+            if (logs.nonEmpty) {
+              JFXSystem.run {
+                // We only expect adding at the end. Adding at position
+                // 'change.getFrom' fails when filtering debug messages.
+                logsTable.getItems.addAll(logs.asJava)
+                updateLogMessageMinWidth(logs)
               }
             }
+            loop()
           }
-
-          loop()
         }
-        // Set initial value (only changes are listened)
-        setLogs()
+      }
 
-        // Remember this subscription
-        logsTable.setUserData(logsCancellable)
-
-      case None =>
-        logsTable.getItems.clear()
+      loop()
     }
+    // Set initial value (only changes are listened)
+    setLogs()
+
+    // Remember this subscription
+    logsTable.setUserData(logsCancellable)
   }
 
   private val USERDATA_HIGHLIGHTED_SITE = "highlighted-site"
@@ -1157,6 +1163,7 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
       contentText.map(v => s" text=<$v>").getOrElse("")
     } ${ex.getMessage}"
     logger.error(msg, ex)
+    addLog(LogKind.Error, msg, Some(ex))
     Dialogs.error(
       owner = Some(stage),
       title = title.orElse(Some(stage.getTitle)),
@@ -1397,7 +1404,7 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
 
       // Refresh selected DL logs to show/hide debug events.
       if (Main.settings.debug.get != debug0) {
-        refreshDlLogs()
+        refreshLogs()
       }
 
       // If SSL trusting changed, refresh download manager connections.

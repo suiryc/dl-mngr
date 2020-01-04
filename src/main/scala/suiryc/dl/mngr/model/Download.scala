@@ -2,22 +2,14 @@ package suiryc.dl.mngr.model
 
 import java.net.{Inet4Address, Inet6Address, InetAddress, URI}
 import java.nio.file.Path
-import java.time.LocalDateTime
 import java.util.{Date, UUID}
 import javafx.beans.property.{SimpleIntegerProperty, SimpleLongProperty, SimpleObjectProperty}
-import javafx.collections.{FXCollections, ObservableList}
 import scala.concurrent.Promise
 import suiryc.dl.mngr.{DownloadFile, Main}
 
 object DownloadState extends Enumeration {
   val Stopped, Pending, Running, Success, Failure = Value
 }
-
-object LogKind extends Enumeration {
-  val Debug, Info, Warning, Error = Value
-}
-
-case class LogEntry(time: LocalDateTime, kind: LogKind.Value, message: String, exOpt: Option[Exception] = None)
 
 case class NewDownloadInfo(
   /** Whether to automatically process this new download. */
@@ -38,7 +30,7 @@ case class NewDownloadInfo(
   comment: Option[String] = None
 )
 
-class DownloadInfo {
+class DownloadInfo extends ObservableLogs {
   // Note: some info changes need to be listened to (through Property).
   /** Promise completed once the download is 'finished' (success or failure). */
   var promise: Promise[Unit] = Promise()
@@ -66,20 +58,6 @@ class DownloadInfo {
   val maxSegments: SimpleIntegerProperty = new SimpleIntegerProperty(0)
   /** How many bytes are already downloaded. */
   val downloaded: SimpleLongProperty = new SimpleLongProperty(0)
-  /**
-   * Logs.
-   *
-   * Notes:
-   * FXCollections are sensible to concurrent changes when dealing with added
-   * elements: the exposed sublist wraps the original collection, and iterating
-   * over it may throw a ConcurrentModificationException if the collection has
-   * been changed since the exposed change.
-   * This means the bare minimum is for both modifications and listeners to
-   * either work in the same thread or synchronize themselves. The easiest
-   * solution is to first synchronize 'addLog' (prevent concurrent modifications
-   * on this end) and make sure listeners work on changes in the caller thread.
-   */
-  val logs: ObservableList[LogEntry] = FXCollections.observableArrayList()
 
   /** Whether download was active when download manager stopping was requested. */
   var wasActive: Boolean = false
@@ -107,16 +85,6 @@ class DownloadInfo {
     acceptRanges.set(None)
     lastModified.set(null)
     downloaded.set(0)
-  }
-
-  def withLogs[A](f: ObservableList[LogEntry] => A): A = logs.synchronized {
-    f(logs)
-  }
-
-  def addLog(kind: LogKind.Value, message: String, exOpt: Option[Exception] = None): Unit = logs.synchronized {
-    val entry = LogEntry(time = LocalDateTime.now, kind = kind, message = message, exOpt = exOpt)
-    logs.add(entry)
-    ()
   }
 
 }
