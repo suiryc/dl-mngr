@@ -3,6 +3,8 @@ package suiryc.dl.mngr
 import akka.actor.ActorSystem
 import java.io.Closeable
 import java.nio.file.Path
+import java.time.format.DateTimeFormatter
+import java.time.{Instant, LocalDateTime, ZoneId}
 import javafx.stage.Stage
 import monix.execution.Scheduler
 import scala.concurrent.{ExecutionContextExecutor, Future, Promise}
@@ -30,6 +32,8 @@ object Main extends JFXLauncher[MainApp] {
 
   import Akka.dispatcher
 
+  val timeFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS")
+
   val appPath: Path = Util.classLocation[this.type]
 
   def appPathRelative(other: String): Path = appPath.resolve(other)
@@ -38,8 +42,12 @@ object Main extends JFXLauncher[MainApp] {
 
   lazy val settings = new Settings(appPathRelative("application.conf"))
 
-  val versionedName: String = s"${suiryc.dl.mngr.Info.name} ${suiryc.dl.mngr.Info.version}" +
-    suiryc.dl.mngr.Info.gitHeadCommit.map(v => s" ($v)").getOrElse("")
+  val versionedName: String = s"${Info.name} ${Info.version}${
+    Info.gitHeadCommit.map(v => s" ($v)").getOrElse("")
+  }"
+
+  val buildTime: LocalDateTime = LocalDateTime.ofInstant(Instant.ofEpochMilli(Info.buildTime), ZoneId.systemDefault)
+  val buildTimeString: String = buildTime.format(timeFormatter)
 
   // Streams
   private val streams = SystemStreams()
@@ -87,6 +95,7 @@ object Main extends JFXLauncher[MainApp] {
     opt[Unit]("version").foreach { _ =>
       println(
         s"""$versionedName
+           |buildTime: $buildTimeString
            |scalaVersion: ${Info.scalaVersion}
            |sbtVersion: ${Info.sbtVersion}
            """.stripMargin)

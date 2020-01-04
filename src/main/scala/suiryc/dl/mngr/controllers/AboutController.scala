@@ -1,7 +1,5 @@
 package suiryc.dl.mngr.controllers
 
-import java.time.format.DateTimeFormatter
-import java.time.{Instant, LocalDateTime, ZoneId}
 import javafx.beans.property.SimpleStringProperty
 import javafx.fxml.{FXML, FXMLLoader}
 import javafx.scene.Node
@@ -9,7 +7,7 @@ import javafx.scene.control.{ButtonType, Dialog, Label, TableColumn, TableView}
 import javafx.scene.text.Font
 import javafx.stage.Window
 import suiryc.dl.mngr.util.Icons
-import suiryc.dl.mngr.{I18N, Info}
+import suiryc.dl.mngr.{I18N, Info, Main}
 import suiryc.scala.javafx.scene.Graphics
 import suiryc.scala.javafx.scene.text.Fonts
 import suiryc.scala.javafx.stage.Stages
@@ -46,8 +44,7 @@ class AboutController {
     scalaVersionLabel.setText(Info.scalaVersion)
     sbtVersionLabel.setText(Info.sbtVersion)
     gitCommitLabel.setText(Info.gitHeadCommit.orNull)
-    val buildTime = LocalDateTime.ofInstant(Instant.ofEpochMilli(Info.buildTime), ZoneId.systemDefault)
-    buildTimeLabel.setText(buildTime.format(timeFormatter))
+    buildTimeLabel.setText(Main.buildTimeString)
 
     val dependencies = Info.libraryDependencies.flatMap { dep =>
       val split = dep.split(':').reverse
@@ -80,8 +77,6 @@ object AboutController {
   import I18N.Strings
 
   case class Dependency(name: String, version: String)
-
-  private val timeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS")
 
   private def computeTextWidth(s: String): Double = Fonts.textWidth(Font.getDefault, s)
 

@@ -7,7 +7,6 @@ import java.io.{PrintWriter, StringWriter}
 import java.net.URI
 import java.nio.file.Path
 import java.text.SimpleDateFormat
-import java.time.format.DateTimeFormatter
 import java.util.UUID
 import javafx.beans.property.{SimpleBooleanProperty, SimpleLongProperty, SimpleObjectProperty, SimpleStringProperty}
 import javafx.event.ActionEvent
@@ -171,7 +170,6 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
   )
 
   private val columnLogTime = new TableColumn[LogEntry, String](Strings.time)
-  private val timeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS")
   private val columnLogMessage = new TableColumn[LogEntry, LogEntry](Strings.message)
 
   private val logsColumns = List(
@@ -406,7 +404,7 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
     logsColumns.foreach(_._2.setSortable(false))
     columnLogTime.setCellValueFactory { data =>
       Option(data.getValue).map { v =>
-        new SimpleStringProperty(v.time.format(timeFormatter))
+        new SimpleStringProperty(v.time.format(Main.timeFormatter))
       }.getOrElse {
         new SimpleStringProperty()
       }
@@ -545,7 +543,7 @@ class MainController extends StageLocationPersistentView(MainController.stageLoc
 
   private def copyDownloadLogsToClipboard(entries: List[LogEntry]): Unit = {
     val text = entries.map { entry =>
-      val lines = s"${entry.time.format(timeFormatter)} [${entry.kind}] ${entry.message}" :: entry.exOpt.map { ex =>
+      val lines = s"${entry.time.format(Main.timeFormatter)} [${entry.kind}] ${entry.message}" :: entry.exOpt.map { ex =>
         val sw = new StringWriter()
         val pw = new PrintWriter(sw)
         ex.printStackTrace(pw)
