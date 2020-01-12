@@ -9,6 +9,8 @@ trait ApplicativeException extends Exception
 case class DownloadException(
   message: String = null,
   cause: Throwable = null,
+  /** Whether to skip delay before next attempt. */
+  skipDelay: Boolean = false,
   /** Whether this download actually started. */
   started: Boolean = false,
   /** Whether stopping was requested. */

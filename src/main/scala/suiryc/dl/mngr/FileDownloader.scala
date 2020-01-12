@@ -793,7 +793,7 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
     }
     // Note: aborting request should not have triggered an exception.
     val aborted = dataOpt.exists(_.aborted)
-    val actualError: Option[DownloadException] = if (!aborted) {
+    var actualError: Option[DownloadException] = if (!aborted) {
       downloadError
     } else {
       None
@@ -872,6 +872,9 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
           } after SSL issue"
           logger.info(msg)
           state.download.info.addLog(LogKind.Warning, msg)
+          // Since we will now trust SSL for this server/site, don't apply the
+          // delay before the next attempt.
+          actualError = Some(ex.copy(skipDelay = true))
           if (!acquired.isDefaultSite) state.dlMngr.trustSslSiteConnection(acquired.site, trust = true)
           else state.dlMngr.trustSslServerConnection(acquired.site, acquired.host, trust = true)
       }
@@ -943,8 +946,9 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
   }
 
   def segmentFinished(state: State, aborted: Boolean, error: Option[DownloadException]): State = {
-    // We may try to start a new segment
-    if (error.isEmpty) {
+    // We may try to start a new segment.
+    // Skip delay if there was no error or we are requested to skip it.
+    if (error.forall(_.skipDelay)) {
       // Don't try a new segment if this one was aborted, unless we are below
       // the limit (should be because limit is 1 and we aborted the last
       // active segment).
