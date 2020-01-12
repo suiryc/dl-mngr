@@ -28,7 +28,7 @@ object FileDownloader {
   case object DownloadStop extends FileDownloaderMsg
   case class DownloadResume(restart: Boolean) extends FileDownloaderMsg
   case class SegmentStarted(consumer: ResponseConsumer, response: HttpResponse) extends FileDownloaderMsg
-  case class SegmentDone(consumer: ResponseConsumer, exOpt: Option[Exception]) extends FileDownloaderMsg
+  case class SegmentDone(consumer: ResponseConsumer, error: Option[Exception]) extends FileDownloaderMsg
   case class Downloaded(range: SegmentRange) extends FileDownloaderMsg
   case object TrySegment extends FileDownloaderMsg
   case object Refresh extends FileDownloaderMsg
@@ -262,8 +262,8 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
     case SegmentStarted(consumer, response) =>
       applyState(segmentStarted(state, consumer, response))
 
-    case SegmentDone(consumer, exOpt) =>
-      applyState(segmentDone(state, consumer, exOpt))
+    case SegmentDone(consumer, error) =>
+      applyState(segmentDone(state, consumer, error))
 
     case Downloaded(range) =>
       downloaded(state, range)
@@ -767,34 +767,34 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
     }
   }
 
-  def segmentDone(state: State, consumer: ResponseConsumer, exOpt: Option[Exception]): State = {
+  def segmentDone(state: State, consumer: ResponseConsumer, error: Option[Exception]): State = {
     state.segmentConsumers.get(consumer).map { data =>
       val downloaded = SegmentRange(data.range.start, consumer.position - 1)
       // Fail segment attempt when applicable.
       for {
         tryCnx <- data.tryCnx
-        ex <- exOpt
+        ex <- error
       } tryCnx.attemptFailure(ex)
-      segmentDone(state.removeConsumer(consumer), Some(data), data.range, forced = data.forced, data.acquired, downloaded, exOpt)
+      segmentDone(state.removeConsumer(consumer), Some(data), data.range, forced = data.forced, data.acquired, downloaded, error)
     }.getOrElse(state)
   }
 
   def segmentDone(state0: State, dataOpt: Option[SegmentHandlerData], range: SegmentRange, forced: Boolean,
-    acquired: AcquiredConnection, downloaded: SegmentRange, exOpt0: Option[Exception]
+    acquired: AcquiredConnection, downloaded: SegmentRange, error: Option[Exception]
   ): State = {
     var state = state0
     val download = state.download
     state.dlMngr.releaseConnection(acquired)
     download.rateLimiter.removeDownload()
     // Take into account our failure if any.
-    val exOpt1: Option[DownloadException] = exOpt0.map {
+    val downloadError: Option[DownloadException] = error.map {
       case ex0: DownloadException => ex0
       case ex0: Exception => DownloadException(message = ex0.getMessage, cause = ex0, started = dataOpt.exists(_.started))
     }
     // Note: aborting request should not have triggered an exception.
     val aborted = dataOpt.exists(_.aborted)
-    val exOpt: Option[DownloadException] = if (!aborted) {
-      exOpt1
+    val actualError: Option[DownloadException] = if (!aborted) {
+      downloadError
     } else {
       None
     }
@@ -802,24 +802,24 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
     // Remember when we can force another connection.
     if (forced && !aborted && !state.hasTooManyErrors) state = state.updateForceable(_ + 1)
 
-    state = handleWriteError(state, exOpt1)
-    exOpt.foreach { ex =>
+    state = handleWriteError(state, downloadError)
+    actualError.foreach { ex =>
       state = state.addError(ex, downloaded.isDefined)
     }
     val status = if (aborted) {
       "aborted"
-    } else if (exOpt.isDefined) {
+    } else if (actualError.isDefined) {
       "failed"
     } else {
       "finished"
     }
     val downloadedRange = if (downloaded.isDefined) s" downloaded=$downloaded" else ""
     // Note: log IP address if segment failed upon start.
-    val message0 = s"Segment $status${if (exOpt.exists(!_.started)) download.ipContext else ""}"
+    val message0 = s"Segment $status${if (actualError.exists(!_.started)) download.ipContext else ""}"
     val message = s"${download.context(range)} $message0${
-      exOpt.map(v => s" ex=<$v>").getOrElse("")
+      actualError.map(v => s" ex=<$v>").getOrElse("")
     }$downloadedRange; remaining segments=${state.getSegments}"
-    exOpt match {
+    actualError match {
       case Some(ex) =>
         logger.error(message, ex)
         state.download.info.addLog(LogKind.Error, s"$message0: ${ex.getMessage}", Some(ex))
@@ -831,7 +831,7 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
 
     // Upon issue, and if range was not started, try to give it back to its
     // original owner.
-    if (exOpt.isDefined && download.info.remainingRanges.exists(_.contains(range.start))) {
+    if (actualError.isDefined && download.info.remainingRanges.exists(_.contains(range.start))) {
       state.segmentConsumers.find {
         case (_, handlerData) =>
           // The range to give back must follow an handler end, and belong to
@@ -846,8 +846,8 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
     // Handle any SSL error.
     var stopped = false
     var askPending = false
-    if (exOpt.exists(_.isSSLException)) {
-      val ex = exOpt.get
+    if (actualError.exists(_.isSSLException)) {
+      val ex = actualError.get
       acquired.sslErrorAsk match {
         case Some(ask) =>
           if (ask) {
@@ -883,7 +883,7 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
     // finished without issue (and was not aborted).
     val finished = state.segmentConsumers.isEmpty && (
       state.stopping ||
-        (download.info.remainingRanges.isEmpty && exOpt.isEmpty && !aborted) ||
+        (download.info.remainingRanges.isEmpty && actualError.isEmpty && !aborted) ||
         download.info.remainingRanges.exists(_.getRanges.isEmpty)
       )
     state = if (stopped) {
@@ -891,7 +891,7 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
     } else if (finished) {
       done(state)
     } else {
-      handleError(state, aborted, exOpt)
+      handleError(state, aborted, actualError)
     }
 
     // Now that we may have tried a new connection, give a chance to other
@@ -903,8 +903,8 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
     state
   }
 
-  def handleWriteError(state: State, exOpt: Option[DownloadException]): State = {
-    val ranges = exOpt.map(_.rangesWriteFailed).getOrElse(Nil)
+  def handleWriteError(state: State, error: Option[DownloadException]): State = {
+    val ranges = error.map(_.rangesWriteFailed).getOrElse(Nil)
 
     if (ranges.nonEmpty) {
       // Re-add failed ranges to remaining ones.
@@ -934,17 +934,17 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
     }
   }
 
-  def handleError(state: State, aborted: Boolean, exOpt: Option[DownloadException]): State = {
+  def handleError(state: State, aborted: Boolean, error: Option[DownloadException]): State = {
     if (!state.hasTooManyErrors) {
-      segmentFinished(state, aborted, exOpt)
+      segmentFinished(state, aborted, error)
     } else {
-      tooManyErrors(state, exOpt)
+      tooManyErrors(state, error)
     }
   }
 
-  def segmentFinished(state: State, aborted: Boolean, exOpt: Option[DownloadException]): State = {
+  def segmentFinished(state: State, aborted: Boolean, error: Option[DownloadException]): State = {
     // We may try to start a new segment
-    if (exOpt.isEmpty) {
+    if (error.isEmpty) {
       // Don't try a new segment if this one was aborted, unless we are below
       // the limit (should be because limit is 1 and we aborted the last
       // active segment).
@@ -965,11 +965,11 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
     }
   }
 
-  def tooManyErrors(state0: State, exOpt: Option[DownloadException]): State = {
+  def tooManyErrors(state0: State, error: Option[DownloadException]): State = {
     // Too many issues.
     var state = state0
     val download = state.download
-    exOpt.foreach { ex =>
+    error.foreach { ex =>
       // We won't automatically force other connections.
       state = state.updateForceable(_ => 0)
       if (ex.rangeFailed) {
@@ -1063,7 +1063,7 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
     }
 
     // Close the file and handle any issue.
-    val closeExOpt = try {
+    val closeError = try {
       state1.download.closeFile(lastModified, done = state1.failed.isEmpty)
       None
     } catch {
@@ -1078,9 +1078,9 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
         ))
     }
 
-    val state = handleWriteError(state1, closeExOpt)
-    state.failed.orElse(closeExOpt) match {
-      case Some(ex) if closeExOpt.isEmpty =>
+    val state = handleWriteError(state1, closeError)
+    state.failed.orElse(closeError) match {
+      case Some(ex) if closeError.isEmpty =>
         // The download did fail on its own
         state.download.info.promise.tryFailure(ex)
         // Do not stop the actor (we can still resume/restart)

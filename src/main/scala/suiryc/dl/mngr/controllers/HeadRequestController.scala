@@ -83,7 +83,7 @@ class HeadRequestController {
     }
 
     // Handle the actual response.
-    def handleResponse(exOpt: Option[Exception]): Unit = JFXSystem.runLater {
+    def handleResponse(error: Option[Exception]): Unit = JFXSystem.runLater {
       buttons.foreach(_.setDisable(false))
       responseConsumer.response match {
         case Some(response) =>
@@ -143,7 +143,7 @@ class HeadRequestController {
           ))
 
         case None =>
-          exOpt match {
+          error match {
             case Some(ex) =>
               // Failure
               Main.controller.displayError(

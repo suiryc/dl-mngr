@@ -436,7 +436,7 @@ class MainController
         }
         override protected def updateItem(item: LogEntry, empty: Boolean): Unit = {
           super.updateItem(item, empty)
-          val tooltip = Option(item).flatMap(_.exOpt).map { ex =>
+          val tooltip = Option(item).flatMap(_.error).map { ex =>
             val sw = new StringWriter()
             val pw = new PrintWriter(sw)
             ex.printStackTrace(pw)
@@ -556,7 +556,7 @@ class MainController
 
   private def copyDownloadLogsToClipboard(entries: List[LogEntry]): Unit = {
     val text = entries.map { entry =>
-      val lines = s"${entry.time.format(Main.timeFormatter)} [${entry.kind}] ${entry.message}" :: entry.exOpt.map { ex =>
+      val lines = s"${entry.time.format(Main.timeFormatter)} [${entry.kind}] ${entry.message}" :: entry.error.map { ex =>
         val sw = new StringWriter()
         val pw = new PrintWriter(sw)
         ex.printStackTrace(pw)
