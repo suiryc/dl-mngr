@@ -1458,6 +1458,22 @@ class MainController
       dialogOpt.foreach { dialog =>
         dialog.initModality(Modality.WINDOW_MODAL)
         dialog.setResizable(true)
+        // On Windows (10), a modal dialog can be shown while the parent window
+        // remain iconified.
+        // On Gnome (3.34), showing a modal dialog does de-iconify the parent
+        // window, which is usually annoying as it remains there after closing
+        // the dialog.
+        // Setting the dialog without parent but "application modal" prevents
+        // the main application window to appear but only when showing the
+        // dialog: once closed the main application window is de-iconified.
+        // As a workaround, we can re-iconify the main stage once the dialog
+        // is closed.
+        if (stage.isIconified) Stages.onStageClosed(Stages.getStage(dialog)) {
+          // We need to defer iconification for it to properly work.
+          JFXSystem.runLater {
+            stage.setIconified(true)
+          }
+        }
         dialog.show()
       }
       promise.trySuccess(())
