@@ -436,11 +436,16 @@ class MainController
         }
         override protected def updateItem(item: LogEntry, empty: Boolean): Unit = {
           super.updateItem(item, empty)
-          val tooltip = Option(item).flatMap(_.error).map { ex =>
+          val tooltip = Option(item).flatMap { item =>
             val sw = new StringWriter()
-            val pw = new PrintWriter(sw)
-            ex.printStackTrace(pw)
-            new Tooltip(sw.toString)
+            item.tooltip.foreach(sw.append)
+            item.error.foreach { ex =>
+              if (sw.getBuffer.length > 0) sw.append("\n")
+              val pw = new PrintWriter(sw)
+              ex.printStackTrace(pw)
+            }
+            if (sw.getBuffer.length > 0) Some(new Tooltip(sw.toString))
+            else None
           }.orNull
           setTooltip(tooltip)
         }

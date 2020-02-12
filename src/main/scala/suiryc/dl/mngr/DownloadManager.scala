@@ -393,12 +393,25 @@ class DownloadManager extends StrictLogging {
   def addDownload(download: Download, insertFirst: Boolean): Download = {
     val dler = system.actorOf(Props(new FileDownloader(dlMngr = this, dl = download)))
     val dlEntry = DownloadEntry(download = download, done = Promise(), dler = dler)
+    val msgPrefix = s"Download file=<${download.fileContext}>"
     if (download.isDone) {
       logger.info(s"${download.context} Download uri=<${download.uri}> referrer=<${download.referrer.getOrElse("")}> file=<${download.path}> done")
-      download.info.addLog(LogKind.Info, s"Download file=<${download.path}> available")
+      val msg = s"$msgPrefix available"
+      val logEntry = LogEntry(
+        kind = LogKind.Info,
+        message = msg,
+        tooltip = Some(download.tooltip)
+      )
+      download.info.addLog(logEntry)
     } else {
       logger.info(s"${download.context} Download uri=<${download.uri}> referrer=<${download.referrer.getOrElse("")}> file=<${download.path}> ready")
-      download.info.addLog(LogKind.Info, s"Download file=<${download.path}> ready")
+      val msg = s"$msgPrefix ready"
+      val logEntry = LogEntry(
+        kind = LogKind.Info,
+        message = msg,
+        tooltip = Some(download.tooltip)
+      )
+      download.info.addLog(logEntry)
     }
     if (insertFirst) dlEntries ::= dlEntry
     else dlEntries :+= dlEntry

@@ -5,7 +5,7 @@ import java.nio.file.Path
 import java.util.{Date, UUID}
 import javafx.beans.property.{SimpleIntegerProperty, SimpleLongProperty, SimpleObjectProperty}
 import scala.concurrent.Promise
-import suiryc.dl.mngr.{DownloadFile, Main}
+import suiryc.dl.mngr.{DownloadFile, I18N, Main}
 
 object DownloadState extends Enumeration {
   val Stopped, Pending, Running, Success, Failure = Value
@@ -238,6 +238,21 @@ case class Download(
   def ipContext: String = info.inetAddress.get.map { addr =>
     s" ${if (info.isIPv6) "ipv6" else s"ipv4"}=<${addr.getHostAddress}>"
   }.getOrElse("")
+
+  def fileContext: String = {
+    // Keep the filename and parent path if any.
+    val count = path.getNameCount
+    if (count >= 3) path.subpath(count - 2, count).toString
+    else path.toString
+  }
+
+  def tooltip: String = {
+    List(
+      s"${I18N.Strings.fileColon} $path",
+      if (siteSettings.isDefault) s"${I18N.Strings.serverColon} ${uri.getHost}"
+      else s"${I18N.Strings.siteColon} ${siteSettings.site}"
+    ).mkString("\n")
+  }
 
   def resume(reusedOpt: Option[Boolean], restart: Boolean): Unit = {
     if (restart) info.restart()

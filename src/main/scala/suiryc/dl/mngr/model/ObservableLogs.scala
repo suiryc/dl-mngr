@@ -29,8 +29,17 @@ trait ObservableLogs {
     f(logs)
   }
 
-  def addLog(kind: LogKind.Value, message: String, error: Option[Throwable] = None): Unit = logs.synchronized {
-    val entry = LogEntry(time = LocalDateTime.now, kind = kind, message = message, error = error)
+  def addLog(kind: LogKind.Value, message: String, error: Option[Throwable] = None, tooltip: Option[String] = None): Unit = {
+    val entry = LogEntry(
+      kind = kind,
+      message = message,
+      error = error,
+      tooltip = tooltip
+    )
+    addLog(entry)
+  }
+
+  def addLog(entry: LogEntry): Unit = logs.synchronized {
     logs.add(entry)
     ()
   }
@@ -41,4 +50,10 @@ object LogKind extends Enumeration {
   val Debug, Info, Warning, Error = Value
 }
 
-case class LogEntry(time: LocalDateTime, kind: LogKind.Value, message: String, error: Option[Throwable] = None)
+case class LogEntry(
+  time: LocalDateTime = LocalDateTime.now,
+  kind: LogKind.Value,
+  message: String,
+  error: Option[Throwable] = None,
+  tooltip: Option[String] = None
+)
