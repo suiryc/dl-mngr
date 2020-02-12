@@ -403,6 +403,7 @@ class DownloadManager extends StrictLogging {
         tooltip = Some(download.tooltip)
       )
       download.info.addLog(logEntry)
+      Main.controller.addLog(logEntry)
     } else {
       logger.info(s"${download.context} Download uri=<${download.uri}> referrer=<${download.referrer.getOrElse("")}> file=<${download.path}> ready")
       val msg = s"$msgPrefix ready"
@@ -412,6 +413,7 @@ class DownloadManager extends StrictLogging {
         tooltip = Some(download.tooltip)
       )
       download.info.addLog(logEntry)
+      Main.controller.addLog(logEntry)
     }
     if (insertFirst) dlEntries ::= dlEntry
     else dlEntries :+= dlEntry
@@ -479,8 +481,18 @@ class DownloadManager extends StrictLogging {
 
   def removeDownload(id: UUID): Unit = this.synchronized {
     getDownloadEntry(id).foreach { dlEntry =>
-      if (dlEntry.download.isActive) {
+      val download = dlEntry.download
+      if (download.isActive) {
         throw new Exception("Cannot remove download which is active")
+      }
+      // If download is not successfully done, add a general log entry.
+      if (!download.isDone) {
+        val logEntry = LogEntry(
+          kind = LogKind.Info,
+          message = s"Download file=<${download.fileContext}> entry removed",
+          tooltip = Some(download.tooltip)
+        )
+        Main.controller.addLog(logEntry)
       }
       dlEntries = dlEntries.filterNot(_.download.id == id)
     }
@@ -504,12 +516,29 @@ class DownloadManager extends StrictLogging {
           logger.error(s"${download.context} Download uri=<${download.uri}> was not done before being resumed/restarted")
           download.info.addLog(LogKind.Error, "Download was not done before being resumed/restarted")
         } else {
+          // Determine final state, and add general log entry.
           val state = failureOpt match {
             case Some(ex) =>
+              // Stopping the download is not a true failure.
               if (ex.stopped) DownloadState.Stopped
-              else DownloadState.Failure
+              else {
+                val logEntry = LogEntry(
+                  kind = LogKind.Error,
+                  message =  s"Download file=<${download.fileContext}> failed",
+                  tooltip = Some(download.tooltip),
+                  error = Some(ex)
+                )
+                Main.controller.addLog(logEntry)
+                DownloadState.Failure
+              }
 
             case None =>
+              val logEntry = LogEntry(
+                kind = LogKind.Info,
+                message =  s"Download file=<${download.fileContext}> done",
+                tooltip = Some(download.tooltip)
+              )
+              Main.controller.addLog(logEntry)
               DownloadState.Success
           }
           download.info.state.setValue(state)
