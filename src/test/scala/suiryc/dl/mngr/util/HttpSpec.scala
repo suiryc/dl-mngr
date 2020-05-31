@@ -208,7 +208,7 @@ class HttpSpec extends WordSpec with Matchers {
       buf.append("attachment")
       if (parameters.nonEmpty) buf.append("; ")
       BasicHeaderValueFormatter.INSTANCE.formatParameters(buf, parameters.toArray, false)
-      response.addHeader(new BasicHeader("Content-Disposition", buf.toString))
+      response.addHeader(new BasicHeader(Http.HEADER_CONTENT_DISPOSITION, buf.toString))
     }
 
     response

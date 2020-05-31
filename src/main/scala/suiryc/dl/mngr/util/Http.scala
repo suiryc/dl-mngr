@@ -24,6 +24,8 @@ object Http extends StrictLogging {
 
   }
 
+  val HEADER_CONTENT_DISPOSITION = "Content-Disposition"
+
   private val CONTENT_RANGE_REGEXP = """\s*bytes\s+([\d]+)-([\d]+)/([*\d]+)\s*""".r
 
   /**
@@ -98,7 +100,7 @@ object Http extends StrictLogging {
     // parameters. e.g. 'name*0', 'name*1', ... or 'name*0*', 'name*1*', ...
     // would split a plain or encoded (if there is a trailing '*') value in
     // MIME, but are not defined (and thus not expected) in HTTP.
-    Option(response.getFirstHeader("Content-Disposition")).flatMap { h =>
+    Option(response.getFirstHeader(HEADER_CONTENT_DISPOSITION)).flatMap { h =>
       h.getElements.toList.flatMap { element =>
         Option(element.getParameterByName("filename*")).toList.map { p =>
           decodeString(p.getValue, rfc8187 = true)
