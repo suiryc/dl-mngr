@@ -830,6 +830,12 @@ class MainController
           )
           PathChoosers.setInitialPath(fileChooser, info.path.get.toFile)
           Option(fileChooser.showSaveDialog(stage)).foreach { selectedFile =>
+            // The 'save' dialog asks whether we wish to overwrite file if
+            // selected one exists. So delete the target path it it exists and
+            // is not the one we use already.
+            if ((selectedFile != download.downloadFile.getWorkingPath.toFile) && selectedFile.exists()) {
+              selectedFile.delete()
+            }
             download.renameFile(selectedFile.toPath)
           }
         }
