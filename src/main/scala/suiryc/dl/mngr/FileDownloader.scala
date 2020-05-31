@@ -2,6 +2,7 @@ package suiryc.dl.mngr
 
 import akka.actor.{Actor, ActorRef}
 import com.typesafe.scalalogging.StrictLogging
+import java.nio.file.Files
 import monix.execution.Cancelable
 import org.apache.http.client.methods.HttpRequestBase
 import org.apache.http.client.utils.URIUtils
@@ -19,7 +20,9 @@ import scala.util.{Failure, Success}
 import suiryc.dl.mngr.model._
 import suiryc.dl.mngr.util.Http
 import suiryc.scala.concurrent.RichFuture
+import suiryc.scala.io.SourceEx
 import suiryc.scala.misc.Units
+import scala.io.Codec
 
 // Notes:
 // DownloadManager globally manages all downloads.
@@ -267,6 +270,21 @@ object FileDownloader {
       }
     }
 
+  }
+
+  // Some sites return a positive response with "Expired" as content for
+  // expired files.
+  private val CONTENT_EXPIRED = "Expired"
+
+  // Check whether a successfully downloaded content means it was actually
+  // "Expired".
+  private def isExpired(download: Download): Boolean = {
+    val path = download.path
+    (Files.size(path) == CONTENT_EXPIRED.length) && {
+      SourceEx.autoCloseFile(path.toFile, Codec.ISO8859) { source =>
+        source.getLines().mkString.equalsIgnoreCase(CONTENT_EXPIRED)
+      }
+    }
   }
 
 }
@@ -1195,23 +1213,20 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
    * Flushes written data and updates file name/date upon success.
    */
   def done(state0: State): State = {
-    val download = state0.download
-    val lastModified = Option(state0.download.info.lastModified.get)
-    val complete = (download.info.remainingRanges.isEmpty && state0.started && state0.failed.isEmpty) ||
+    var state = state0
+    val download = state.download
+    val lastModified = Option(download.info.lastModified.get)
+    val complete = (download.info.remainingRanges.isEmpty && state.started && state.failed.isEmpty) ||
       download.info.remainingRanges.exists(_.getRanges.isEmpty)
 
     // If we had a failure, but download actually completed (e.g. only one
     // segment could be started, and the whole download range was completed)
     // ignore the failure.
-    val state1 = if (complete && state0.failed.nonEmpty) {
-      state0.copy(failed = None)
-    } else {
-      state0
-    }
+    if (complete && state.failed.nonEmpty) state = state.copy(failed = None)
 
     // Close the file and handle any issue.
     val closeError = try {
-      state1.download.closeFile(lastModified, done = state1.failed.isEmpty)
+      download.closeFile(lastModified, done = state.failed.isEmpty)
       None
     } catch {
       case ex: DownloadException =>
@@ -1221,15 +1236,15 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
         Some(DownloadException(
           message = s"I/O error: (${ex.getClass.getSimpleName}) ${ex.getMessage}",
           cause = ex,
-          started = state1.started
+          started = state.started
         ))
     }
 
-    val state = handleWriteError(state1, closeError)
+    state = handleWriteError(state, closeError)
     state.failed.orElse(closeError) match {
       case Some(ex) if closeError.isEmpty =>
         // The download did fail on its own
-        state.download.info.promise.tryFailure(ex)
+        download.info.promise.tryFailure(ex)
         // Do not stop the actor (we can still resume/restart)
         state
 
@@ -1246,9 +1261,27 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
         logger.info(s"${download.context} Download uri=<${download.uri}> done: success${
           lastModified.map(v => s" (file date=<$v>)").getOrElse("")
         }")
-        state.download.info.promise.trySuccess(())
-        // Time to stop ourself
-        context.stop(self)
+        if (isExpired(download)) {
+          // From the actual content, the uri appears to have expired.
+          val ex = DownloadException("Uri actually appear to have expired")
+          logger.error(s"${download.context} Download uri=<${download.uri}> error=<${ex.getMessage}>", ex)
+          download.info.addLog(LogKind.Error, s"Download error: ${ex.getMessage}", Some(ex))
+          // Reset the download information (ranges, etc.) so that we can
+          // fully restart it if wanted.
+          download.info.restart()
+          download.info.size.set(Long.MinValue)
+          // Also delete the created file, which is useless. Since we reset the
+          // info, it wouldn't be done when user remove the download.
+          // The temporary file, if any, already has been deleted by renaming it
+          // into the actual target: delete the target.
+          download.downloadFile.reset(reusedOpt = Some(false), restart = true)
+          download.downloadFile.getPath.toFile.delete()
+          download.info.promise.tryFailure(ex)
+        } else {
+          download.info.promise.trySuccess(())
+          // Time to stop ourself
+          context.stop(self)
+        }
         state
     }
   }
