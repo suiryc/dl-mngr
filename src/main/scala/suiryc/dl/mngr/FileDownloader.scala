@@ -21,20 +21,64 @@ import suiryc.dl.mngr.util.Http
 import suiryc.scala.concurrent.RichFuture
 import suiryc.scala.misc.Units
 
+// Notes:
+// DownloadManager globally manages all downloads.
+// It takes care of each download state change:
+//  - requested from user: e.g. adding new download, starting/resuming, trying
+//    starting a new segment, etc.
+//  - when download ends (following the associated Promise) successfully or
+//    with error
+//  - etc.
+// It takes care of connections life-cycle, in order to enforce limits when
+// applicable.
+//
+// FileDownloader manages one download.
+// It takes care of requested action to start/resume/stop, etc.
+// It handles the download in segments. There is at least one segment for the
+// whole content, but if the server handle ranges it can be divided in more
+// segments (each one downloading a range of the content), depending on limits:
+// number of segments per download, number of connections allowed (per
+// server/site) etc.
+//
+// DownloadFile manages the actual underlying file.
+// It takes care of creation/renaming when applicable: temporary file, name
+// already taken when needed, etc.
+// It takes care of I/O, especially concurrent accesses when writing, along with
+// errors (invalidating parts of downloaded ranges) upon flushing data on disk:
+// upon write error, an Exception listing invalidated ranges is thrown and
+// FileDownloader takes care of re-downloading them.
 
 object FileDownloader {
 
   sealed trait FileDownloaderMsg
+  // Request to stop download.
   case object DownloadStop extends FileDownloaderMsg
+  // Request to start/restart/resume download: only changes internal state.
+  // New connection attempt is managed by DownloadManager.
   case class DownloadResume(restart: Boolean) extends FileDownloaderMsg
+  // Internal: segment (request) successfully started.
   case class SegmentStarted(consumer: ResponseConsumer, response: HttpResponse) extends FileDownloaderMsg
+  // Internal: segment ended, successfully or not.
   case class SegmentDone(consumer: ResponseConsumer, error: Option[Exception]) extends FileDownloaderMsg
+  // Internal: a byte range was downloaded (written in file, but not necessarily
+  // flushed on disk).
+  // Note that this comes from DownloadFile (see comments there) and not
+  // FileDownloader itself.
   case class Downloaded(range: SegmentRange) extends FileDownloaderMsg
+  // Internal: try to start a new segment; triggered after a previous one ended
+  // with error, waiting the configured delay before next attempt.
   case object TrySegment extends FileDownloaderMsg
+  // Refresh download after settings changes.
   case object Refresh extends FileDownloaderMsg
+  // Request to (force) add a new connection: starts a new segment.
   case object AddConnection extends FileDownloaderMsg
+  // Removes one active connection: stops one segment (may be the download
+  // itself if there is only one active segment).
   case object RemoveConnection extends FileDownloaderMsg
+  // Tries to start a new segment or an existing one.
   case class TryConnection(promise: Promise[Unit]) extends FileDownloaderMsg
+  // Internal: resume download or re-try (new segment); triggered when an SSL
+  // error was encountered and we now 'trustAll' for the server/site.
   case object TryResume
 
   case class TryCnxData(caller: Promise[Unit], attempt: Promise[Unit] = Promise()) {
@@ -276,9 +320,25 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
     context.become(receive(state))
   }
 
+  /** Refreshes download (settings). */
   def refresh(state: State): State = {
+    // We are called because either:
+    //  - the maximum number of segments changed
+    //  - sites settings changed
+    // Note: caller does not precisely pinpoint which downloads are concerned by
+    // those changes, and trigger a refresh on all downloads.
+    // We may be concerned either if:
+    //  - we still use the general segment limit; because we did not encounter
+    //    errors making us determine a specific maximum for this download
+    //  - the site to which we are attached did change: our acquired connections
+    //    needs to be 'migrated' to the new site
+
+    // Recompute our maximum number of segments stored in 'info', so that it is
+    // reflected in the UI.
     state.updateMaxSegments()
 
+    // 'Migrate' connections information by re-acquiring them.
+    // Circumvents any limit for this one special case.
     val segmentConsumers = state.segmentConsumers.map {
       case (consumer, data) =>
         // Acquire (forced) 'new' connection with refreshed settings.
@@ -301,6 +361,12 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
     state.copy(segmentConsumers = segmentConsumers)
   }
 
+  /**
+   * Resumes download.
+   *
+   * Only resets the internal state: caller (download manager) is responsible
+   * to trigger new connection attempt when applicable.
+   */
   def resume(state0: State, restart: Boolean): State = {
     val action = if (restart) {
       "re-starting"
@@ -316,6 +382,15 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
     state
   }
 
+  /**
+   * Tries resuming download.
+   *
+   * This is an internal action in specific cases (enabling 'trustAll' after
+   * SSL issue).
+   * If the download can be resumed, request goes through the download manager
+   * as if explicitly done by user.
+   * Otherwise (download already 'running') try to (re)start a new segment.
+   */
   def tryResume(state: State): State = {
     if (state.download.canResume) {
       // The download manager does follow the downloads. So we need to go
@@ -325,6 +400,13 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
     } else trySegment(state)
   }
 
+  /**
+   * Stops download.
+   *
+   * Cancels any pending new segment attempt.
+   * Upon aborting, aborts each active segment. Otherwise let current segments
+   * finish, only preventing new ones to be created.
+   */
   def stop(state0: State, ex: DownloadException, abort: Boolean): State = {
     val download = state0.download
     logger.info(s"${download.context} Download stopping")
@@ -347,6 +429,11 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
     }
   }
 
+  /**
+   * Takes into account downloaded range.
+   *
+   * Updates remaining ranges.
+   */
   def downloaded(state: State, range: SegmentRange): Unit = {
     state.download.info.remainingRanges match {
       case Some(remainingRanges) =>
@@ -359,12 +446,29 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
     }
   }
 
+  /**
+   * Changes an active segment range start.
+   *
+   * Used after I/O flushing issue, so that the invalidated range (which is
+   * considered not written) is now considered not part of any active range
+   * and can picked up again when starting a new segment (as part of the
+   * remaining ranges).
+   */
   def changeSegmentStart(state: State, consumer: ResponseConsumer, start: Long): State = {
     state.updateConsumerData(consumer) { data =>
       data.copy(range = data.range.copy(start = start))
     }
   }
 
+  /**
+   * Changes an active segment range end.
+   *
+   * Used when:
+   *  - we now know the end of the segment (download size determined)
+   *  - the active segment has been split in two to start a new one
+   *  - a following segment (previously split from this one) failed to start
+   *    and is given back to its original segment
+   */
   def changeSegmentEnd(state: State, consumer: ResponseConsumer, end: Long): State = {
     val data = state.segmentConsumers(consumer)
     val range0 = data.range
@@ -380,6 +484,7 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
     }
   }
 
+  /** Tries to add a new connection (and thus start a new segment). */
   def tryConnection(state: State, promise: Promise[Unit]): State = {
     val tryCnx = TryCnxData(promise)
     // Pending segment trying counts as connection trying.
@@ -398,6 +503,14 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
     }
   }
 
+  /**
+   * Tries to start a new segment.
+   *
+   * If possible, or forced, selects a remaining range to download and start a
+   * new segment to handle it.
+   * May be a non-active one (not currently handled by active segments), or may
+   * be split from an existing active segment.
+   */
   def trySegment(state0: State, force: Boolean = false, tryCnx: Option[TryCnxData] = None): State = {
     var state = state0
     val download = state.download
@@ -475,6 +588,7 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
     state
   }
 
+  /** Determines an available remaining range and starts a new segment. */
   def trySegmentRange(state0: State, download: Download, force: Boolean, forced: Boolean, tryCnx: Option[TryCnxData])
     : (State, Boolean) =
   {
@@ -606,6 +720,7 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
     (state, trying)
   }
 
+  /** Tries to acquire a new connection. */
   def tryAcquireConnection(state: State, download: Download, forced: Boolean, tryCnx: Option[TryCnxData])
     : Either[State, Option[AcquiredConnection]] =
   {
@@ -620,6 +735,7 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
     }
   }
 
+  /** Starts a new segment. */
   def segmentStart(state0: State, range: SegmentRange, acquired: AcquiredConnection,
     force: Boolean, forced: Boolean, tryCnx: Option[TryCnxData]
   ) : State = {
@@ -688,6 +804,7 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
     state
   }
 
+  /** Called when new segment did start (successfully). */
   def segmentStarted(state0: State, consumer: ResponseConsumer, response: HttpResponse): State = {
     val download = state0.download
     val tryCnx = state0.segmentConsumers.get(consumer).flatMap(_.tryCnx)
@@ -767,6 +884,7 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
     }
   }
 
+  /** Called when segment is done (successfully or with error). */
   def segmentDone(state: State, consumer: ResponseConsumer, error: Option[Exception]): State = {
     state.segmentConsumers.get(consumer).map { data =>
       val downloaded = SegmentRange(data.range.start, consumer.position - 1)
@@ -906,6 +1024,13 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
     state
   }
 
+  /**
+   * Handles write error.
+   *
+   * Invalidates concerned range by reintegrating it in remaining ranges.
+   * Also updates concerned active segment range so that the invalidated range
+   * can be picked up again by the next new segment.
+   */
   def handleWriteError(state: State, error: Option[DownloadException]): State = {
     val ranges = error.map(_.rangesWriteFailed).getOrElse(Nil)
 
@@ -937,6 +1062,11 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
     }
   }
 
+  /**
+   * Handles connection or segment error.
+   *
+   * Trigger a new segment start unless there were too many errors.
+   */
   def handleError(state: State, aborted: Boolean, error: Option[DownloadException]): State = {
     if (!state.hasTooManyErrors) {
       segmentFinished(state, aborted, error)
@@ -969,6 +1099,13 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
     }
   }
 
+  /**
+   * Handles situation when there have been too many errors.
+   *
+   * If applicable, auto-determine the maximum number of segments for this
+   * download.
+   * Stops download if range validator did change.
+   */
   def tooManyErrors(state0: State, error: Option[DownloadException]): State = {
     // Too many issues.
     var state = state0
@@ -1032,6 +1169,7 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
     state
   }
 
+  /** Stops a segment if any. */
   def stopSegment(state0: State): State = {
     val segments = state0.getSegments
     if (segments == 1) {
@@ -1051,6 +1189,11 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
     }
   }
 
+  /**
+   * Called when download is done, whether successfully or not.
+   *
+   * Flushes written data and updates file name/date upon success.
+   */
   def done(state0: State): State = {
     val download = state0.download
     val lastModified = Option(state0.download.info.lastModified.get)
@@ -1094,7 +1237,8 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
         // The download was actually ok, but closing failed
         logger.error(s"${download.context} Download uri=<${download.uri}> error=<${ex.getMessage}>", ex)
         download.info.addLog(LogKind.Error, s"Download error: ${ex.getMessage}", Some(ex))
-        // Re-try right now
+        // Re-try right now: ranges that could not be written will be done
+        // again.
         segmentFinished(state, aborted = false, None)
 
       case None =>

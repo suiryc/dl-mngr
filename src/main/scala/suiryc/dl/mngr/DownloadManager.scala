@@ -625,7 +625,7 @@ class DownloadManager extends StrictLogging {
   }
 
   private def followDownload(download: Download): Unit = {
-    // Note: we use the download id because the actual download maye have been
+    // Note: we use the download id because the actual download may have been
     // updated since we started following it.
     download.info.promise.future.onComplete(r => downloadDone(download.id, r))
   }
