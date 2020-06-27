@@ -115,7 +115,10 @@ class NewDownloadController extends StageLocationPersistentView(NewDownloadContr
     ).flatten.mkString("\n")
     if (comment.nonEmpty) commentField.setText(comment)
     // Take into account given file(name)
-    dlInfo.file.map(Paths.get(_)) match {
+    dlInfo.file.map { filename =>
+      // First sanitize filename
+      sanitizePath(getFolder, Some(filename))
+    } match {
       case Some(path) => setPath(path)
       case None       => updateFilename(None)
     }
@@ -140,10 +143,35 @@ class NewDownloadController extends StageLocationPersistentView(NewDownloadContr
     ()
   }
 
+  protected def sanitizePath(folder: Option[String], filename: Option[String]): Path = {
+    // Notes:
+    // If the given path contains multiple successive hierarchy separator
+    // characters, Paths.get cleans them by only keeping one.
+    // Paths.get fails (InvalidPathException) if some 'illegal characters' are
+    // present. Those are a subset of the reserved characters we do want to
+    // sanitize; thus we must refrain from using Paths.get on non-sanitized
+    // values.
+    // As a side effect we also need to build ourselves the full path by
+    // appending folder and filename, so that we can both compare the initial
+    // and sanitized value.
+    val targetPath = (folder.toList ::: filename.toList).mkString(File.separator)
+    val sanitizedPath = (folder.map(PathsEx.sanitizePath).toList :::
+      filename.map(PathsEx.sanitizeFilename).toList).mkString(File.separator)
+    if (sanitizedPath != targetPath) {
+      Dialogs.information(
+        owner = Option(stage),
+        title = None,
+        headerText = Some(s"${Strings.reservedChars}\n$targetPath"),
+        contentText = Some(sanitizedPath)
+      )
+    }
+    Paths.get(sanitizedPath)
+  }
+
   protected def checkForm(): Unit = {
     val uriOk = getURI.isDefined
     val folderOk = getFolder.isDefined
-    val filenameOk = getFilename(sanitize = true).isDefined
+    val filenameOk = getFilename.isDefined
 
     Styles.toggleError(uriField, !uriOk, Strings.mustNonEmpty)
     Styles.toggleError(folderField, !folderOk, Strings.mustNonEmpty)
@@ -184,18 +212,8 @@ class NewDownloadController extends StageLocationPersistentView(NewDownloadContr
           }
 
         case None =>
-          // First check for special characters to replace in filename
-          val path0 = Paths.get(getPathRaw(sanitize = true))
-          val pathRaw0 = getPathRaw(sanitize = false)
-          val pathRaw1 = Paths.get(pathRaw0)
-          if (pathRaw1 != path0) {
-            Dialogs.information(
-              owner = Option(stage),
-              title = None,
-              headerText = Some(s"${Strings.reservedChars}\n$pathRaw1"),
-              contentText = Some(path0.toString)
-            )
-          }
+          // First sanitize path
+          val path0 = sanitizePath(getFolder, getFilename)
           // Then check whether target/temporary file already exists
           val temporary = Main.settings.getTemporaryFile(path0)
           val temporaryExists = temporary.exists(_.toFile.exists)
@@ -386,17 +404,9 @@ class NewDownloadController extends StageLocationPersistentView(NewDownloadContr
 
   def getFolder: Option[String] = getText(folderField.getText)
 
-  def getFilename(sanitize: Boolean): Option[String] = {
-    val file0 = getText(filenameField.getText)
-    if (sanitize) file0.map(PathsEx.sanitizeFilename) else file0
-  }
+  def getFilename: Option[String] = getText(filenameField.getText)
 
-  def getPathRaw(sanitize: Boolean): String = {
-    val file = getFilename(sanitize)
-    (getFolder.toList ::: file.toList).mkString(File.separator)
-  }
-
-  def getPath: Path = Paths.get(getPathRaw(sanitize = true))
+  def getPath: Path = sanitizePath(getFolder, getFilename)
 
   def setPath(path: Path): Unit = {
     // If this is an absolute path, use the parent folder
