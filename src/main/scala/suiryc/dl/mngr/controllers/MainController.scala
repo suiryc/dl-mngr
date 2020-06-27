@@ -1464,6 +1464,11 @@ class MainController
     }
 
     def onDownloadsAdd(state: State, dlInfo: NewDownloadInfo, promise: Promise[Unit]): Unit = {
+      // We actually notify caller once we take into account the new download,
+      // not whether we fail, user discard it, nor when it actually is added.
+      // So complete the promise now, in case we fail to build the dialog, in
+      // which case an appropriate error will be displayed.
+      promise.trySuccess(())
       val dialogOpt = NewDownloadController.buildDialog(MainController.this, state.stage, state.dlMngr, dlInfo)
       // In automatic mode, there is no dialog and download has been added.
       dialogOpt.foreach { dialog =>
@@ -1487,7 +1492,6 @@ class MainController
         }
         dialog.show()
       }
-      promise.trySuccess(())
       ()
     }
 

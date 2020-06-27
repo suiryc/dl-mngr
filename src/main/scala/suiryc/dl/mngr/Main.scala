@@ -187,6 +187,10 @@ object Main extends JFXLauncher[MainApp] {
           sizeHint = params.size,
           comment = params.comment
         )
+        // Reminder: we are notified when the new download is taken into
+        // account by the application, not whether it actually is added.
+        // This is what we wish: it only matters that the application properly
+        // started; any error will be displayed in the user interface and logs.
         controller.addDownload(dlInfo)
       } else {
         Future.successful(())
