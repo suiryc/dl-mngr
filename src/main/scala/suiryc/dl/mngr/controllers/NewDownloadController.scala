@@ -116,8 +116,20 @@ class NewDownloadController extends StageLocationPersistentView(NewDownloadContr
     if (comment.nonEmpty) commentField.setText(comment)
     // Take into account given file(name)
     dlInfo.file.map { filename =>
-      // First sanitize filename
-      sanitizePath(getFolder, Some(filename))
+      // First sanitize filename.
+      if (Paths.get(PathsEx.sanitizePath(filename)).isAbsolute) {
+        // The given filename actually is an absolute path.
+        // Separate the folder from the filename.
+        val split = filename.split(File.separatorChar)
+        val (folder, file) = split.splitAt(split.length - 1)
+        sanitizePath(
+          Some(folder.mkString(File.separator)),
+          Some(file.mkString(File.separator))
+        )
+      } else {
+        // Use the default folder.
+        sanitizePath(getFolder, Some(filename))
+      }
     } match {
       case Some(path) => setPath(path)
       case None       => updateFilename(None)
