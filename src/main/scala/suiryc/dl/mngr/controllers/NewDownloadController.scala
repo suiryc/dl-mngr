@@ -125,11 +125,17 @@ class NewDownloadController extends StageLocationPersistentView(NewDownloadContr
         sanitizePath(
           Some(folder.mkString(File.separator)),
           Some(file.mkString(File.separator)),
-          auto = dlInfo.auto
-        )
+          auto = dlInfo.auto,
+          canModify = false
+        )._1
       } else {
         // Use the default folder.
-        sanitizePath(getFolder, Some(filename), auto = dlInfo.auto)
+        sanitizePath(
+          getFolder,
+          Some(filename),
+          auto = dlInfo.auto,
+          canModify = false
+        )._1
       }
     } match {
       case Some(path) => setPath(path)
@@ -156,7 +162,11 @@ class NewDownloadController extends StageLocationPersistentView(NewDownloadContr
     ()
   }
 
-  protected def sanitizePath(folder: Option[String], filename: Option[String], auto: Boolean): Path = {
+  protected def sanitizePath(folder: Option[String],
+    filename: Option[String],
+    auto: Boolean,
+    canModify: Boolean): (Path, Boolean) =
+  {
     // Notes:
     // If the given path contains multiple successive hierarchy separator
     // characters, Paths.get cleans them by only keeping one.
@@ -170,15 +180,27 @@ class NewDownloadController extends StageLocationPersistentView(NewDownloadContr
     val targetPath = (folder.toList ::: filename.toList).mkString(File.separator)
     val sanitizedPath = (folder.map(PathsEx.sanitizePath).toList :::
       filename.map(PathsEx.sanitizeFilename).toList).mkString(File.separator)
-    if (!auto && (sanitizedPath != targetPath)) {
-      Dialogs.information(
-        owner = Option(stage),
-        title = None,
-        headerText = Some(s"${Strings.reservedChars}\n$targetPath"),
-        contentText = Some(sanitizedPath)
-      )
-    }
-    Paths.get(sanitizedPath)
+    val needModify = if (!auto && (sanitizedPath != targetPath)) {
+      if (canModify) {
+        Dialogs.confirmation(
+          owner = Option(stage),
+          title = None,
+          headerText = Some(s"${Strings.reservedChars}\n$targetPath"),
+          contentText = Some(sanitizedPath),
+          buttons = List(ButtonType.CLOSE, ButtonType.APPLY),
+          defaultButton = Some(ButtonType.APPLY)
+        ).contains(ButtonType.CLOSE)
+      } else {
+        Dialogs.information(
+          owner = Option(stage),
+          title = None,
+          headerText = Some(s"${Strings.reservedChars}\n$targetPath"),
+          contentText = Some(sanitizedPath)
+        )
+        false
+      }
+    } else false
+    (Paths.get(sanitizedPath), needModify)
   }
 
   protected def checkForm(): Unit = {
@@ -226,12 +248,16 @@ class NewDownloadController extends StageLocationPersistentView(NewDownloadContr
 
         case None =>
           // First sanitize path
-          val path0 = sanitizePath(getFolder, getFilename, auto)
+          val (path0, needModify) = sanitizePath(getFolder, getFilename, auto, canModify = true)
           // Then check whether target/temporary file already exists
           val temporary = Main.settings.getTemporaryFile(path0)
           val temporaryExists = temporary.exists(_.toFile.exists)
           val exists = (List(path0) ::: temporary.toList).filter(_.toFile.exists)
-          if (exists.nonEmpty) {
+          if (needModify) {
+            // Update (sanitized) path.
+            setPath(path0)
+            None
+          } else if (exists.nonEmpty) {
             // A file already exists
             val (path, r) = if (auto) {
               // In automatic mode, find available name.
@@ -419,7 +445,7 @@ class NewDownloadController extends StageLocationPersistentView(NewDownloadContr
 
   def getFilename: Option[String] = getText(filenameField.getText)
 
-  def getPath: Path = sanitizePath(getFolder, getFilename, auto = false)
+  def getPath: Path = sanitizePath(getFolder, getFilename, auto = false, canModify = false)._1
 
   def setPath(path: Path): Unit = {
     // If this is an absolute path, use the parent folder
