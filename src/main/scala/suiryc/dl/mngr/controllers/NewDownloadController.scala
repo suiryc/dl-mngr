@@ -124,11 +124,12 @@ class NewDownloadController extends StageLocationPersistentView(NewDownloadContr
         val (folder, file) = split.splitAt(split.length - 1)
         sanitizePath(
           Some(folder.mkString(File.separator)),
-          Some(file.mkString(File.separator))
+          Some(file.mkString(File.separator)),
+          auto = dlInfo.auto
         )
       } else {
         // Use the default folder.
-        sanitizePath(getFolder, Some(filename))
+        sanitizePath(getFolder, Some(filename), auto = dlInfo.auto)
       }
     } match {
       case Some(path) => setPath(path)
@@ -155,7 +156,7 @@ class NewDownloadController extends StageLocationPersistentView(NewDownloadContr
     ()
   }
 
-  protected def sanitizePath(folder: Option[String], filename: Option[String]): Path = {
+  protected def sanitizePath(folder: Option[String], filename: Option[String], auto: Boolean): Path = {
     // Notes:
     // If the given path contains multiple successive hierarchy separator
     // characters, Paths.get cleans them by only keeping one.
@@ -169,7 +170,7 @@ class NewDownloadController extends StageLocationPersistentView(NewDownloadContr
     val targetPath = (folder.toList ::: filename.toList).mkString(File.separator)
     val sanitizedPath = (folder.map(PathsEx.sanitizePath).toList :::
       filename.map(PathsEx.sanitizeFilename).toList).mkString(File.separator)
-    if (sanitizedPath != targetPath) {
+    if (!auto && (sanitizedPath != targetPath)) {
       Dialogs.information(
         owner = Option(stage),
         title = None,
@@ -225,7 +226,7 @@ class NewDownloadController extends StageLocationPersistentView(NewDownloadContr
 
         case None =>
           // First sanitize path
-          val path0 = sanitizePath(getFolder, getFilename)
+          val path0 = sanitizePath(getFolder, getFilename, auto)
           // Then check whether target/temporary file already exists
           val temporary = Main.settings.getTemporaryFile(path0)
           val temporaryExists = temporary.exists(_.toFile.exists)
@@ -418,7 +419,7 @@ class NewDownloadController extends StageLocationPersistentView(NewDownloadContr
 
   def getFilename: Option[String] = getText(filenameField.getText)
 
-  def getPath: Path = sanitizePath(getFolder, getFilename)
+  def getPath: Path = sanitizePath(getFolder, getFilename, auto = false)
 
   def setPath(path: Path): Unit = {
     // If this is an absolute path, use the parent folder
