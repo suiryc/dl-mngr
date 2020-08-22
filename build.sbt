@@ -85,7 +85,8 @@ lazy val dlMngr = project.in(file(".")).
       "org.scalatest"                  %% "scalatest"                     % versions("scalatest")    % "test",
       "org.slf4j"                      %  "jcl-over-slf4j"                % versions("slf4j"),
       "suiryc"                         %% "suiryc-scala-core"             % versions("suiryc-scala"),
-      "suiryc"                         %% "suiryc-scala-javafx"           % versions("suiryc-scala")
+      "suiryc"                         %% "suiryc-scala-javafx"           % versions("suiryc-scala"),
+      "suiryc"                         %% "suiryc-scala-log"              % versions("suiryc-scala")
     ),
 
     // Replace mappings for jar generation

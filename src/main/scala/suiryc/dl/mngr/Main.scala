@@ -8,6 +8,7 @@ import java.time.{Instant, LocalDateTime, ZoneId}
 import javafx.stage.Stage
 import monix.execution.Scheduler
 import scala.concurrent.{ExecutionContextExecutor, Future, Promise}
+import scala.concurrent.duration._
 import scala.util.Failure
 import suiryc.dl.mngr.I18N.Strings
 import suiryc.dl.mngr.controllers.MainController
@@ -17,9 +18,9 @@ import suiryc.scala.akka.CoreSystem
 import suiryc.scala.io.SystemStreams
 import suiryc.scala.javafx.{JFXApplication, JFXLauncher}
 import suiryc.scala.javafx.concurrent.JFXSystem
-import suiryc.scala.log.Loggers
+import suiryc.scala.log.{LoggerConfiguration, Loggers}
 import suiryc.scala.misc.Util
-import suiryc.scala.sys.UniqueInstance
+import suiryc.scala.sys.{OS, Signals, UniqueInstance}
 import suiryc.scala.sys.UniqueInstance.CommandResult
 
 object Main extends JFXLauncher[MainApp] {
@@ -113,6 +114,12 @@ object Main extends JFXLauncher[MainApp] {
     // target class, or pass the target class as parameter.
     // If values other than arguments need to be passed, the second approach is
     // to be used.
+    if (OS.isLinux) {
+      Signals.setSIGHUPHandler { _ =>
+        LoggerConfiguration.reload(onChange = false)
+      }
+    }
+    LoggerConfiguration.watch(10.seconds)
 
     // Note: first parsing is to check arguments are ok (and we are good to
     // start the UI) and get unique instance appId.
