@@ -252,22 +252,26 @@ class NewDownloadController extends StageLocationPersistentView(NewDownloadContr
           // Then check whether target/temporary file already exists
           val temporary = Main.settings.getTemporaryFile(path0)
           val temporaryExists = temporary.exists(_.toFile.exists)
-          val exists = (List(path0) ::: temporary.toList).filter(_.toFile.exists)
           if (needModify) {
             // Update (sanitized) path.
             setPath(path0)
             None
-          } else if (exists.nonEmpty) {
-            // A file already exists
+          } else if (!isPathAvailable(path0)) {
+            // A file already exists (or is used by another download).
             val (path, r) = if (auto) {
               // In automatic mode, find available name.
               val path = findAvailablePath(path0)
               (path, Some(ConflictResolution.Rename))
             } else {
               // We can only resume the file to which we are to write (temporary
-              // or not). Don't even consider resuming if we use preallocation.
+              // or not). Don't even consider resuming if we use pre-allocation.
               val canResume = !Main.settings.preallocateEnabled.get &&
                 (temporary.isEmpty || temporaryExists)
+              val exists = (List(path0) ::: temporary.toList).filter { path =>
+                path.toFile.exists || dlMngr.getDownloads.exists { download =>
+                  path == download.downloadFile.getPath
+                }
+              }
               val r = resolveConflict(
                 header = Strings.downloadAlreadyFile,
                 content = exists.mkString("\n"),
@@ -462,6 +466,16 @@ class NewDownloadController extends StageLocationPersistentView(NewDownloadContr
     }
   }
 
+  def isPathAvailable(path: Path): Boolean = {
+    // There is a name conflict if either
+    //  - the target name already exists
+    //  - the temporary filename already exists: we need to own it
+    //  - another download already uses the target name
+    !Files.exists(path) && !Main.settings.getTemporaryFile(path).exists(Files.exists(_)) && !dlMngr.getDownloads.exists { download =>
+      path == download.downloadFile.getPath
+    }
+  }
+
   /** Find path available (as download and temporary download file). */
   def findAvailablePath(path: Path): Path = {
     @scala.annotation.tailrec
@@ -473,7 +487,7 @@ class NewDownloadController extends StageLocationPersistentView(NewDownloadContr
         val extOpt = Some(ext).filterNot(_.isEmpty)
         path.resolveSibling(s"$base ($n)${extOpt.map(v => s".$v").getOrElse("")}")
       }
-      if (Files.exists(probe) || Main.settings.getTemporaryFile(probe).exists(Files.exists(_))) loop(n + 1)
+      if (!isPathAvailable(probe)) loop(n + 1)
       else probe
     }
 
