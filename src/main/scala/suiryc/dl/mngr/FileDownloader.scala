@@ -2,7 +2,7 @@ package suiryc.dl.mngr
 
 import akka.actor.{Actor, ActorRef}
 import com.typesafe.scalalogging.StrictLogging
-import java.nio.file.Files
+import java.nio.file.{Files, NoSuchFileException}
 import monix.execution.Cancelable
 import org.apache.http.client.methods.HttpRequestBase
 import org.apache.http.client.utils.URIUtils
@@ -16,7 +16,7 @@ import org.apache.http.nio.conn.ManagedNHttpClientConnection
 import scala.concurrent.Promise
 import scala.concurrent.duration._
 import scala.jdk.CollectionConverters._
-import scala.util.{Failure, Success}
+import scala.util.{Failure, Success, Try}
 import suiryc.dl.mngr.model._
 import suiryc.dl.mngr.util.Http
 import suiryc.scala.concurrent.RichFuture
@@ -163,6 +163,15 @@ object FileDownloader {
 
     def isActive: Boolean = trySegment.nonEmpty || segmentConsumers.nonEmpty
 
+    def isComplete: Boolean = {
+      // We are complete if either:
+      //  - ranges are supported, and there is no remaining one
+      //  - ranges are not supported, download started, is not active anymore
+      //    and there was no error (includes user stopping it)
+      (download.info.remainingRanges.isEmpty && started && failed.isEmpty && !isActive) ||
+        download.info.remainingRanges.exists(_.getRanges.isEmpty)
+    }
+
     def addError(ex: DownloadException, downloaded: Boolean): State = {
       copy(
         cnxErrors = cnxErrors + (if (!ex.started) 1 else 0),
@@ -280,11 +289,14 @@ object FileDownloader {
   // "Expired".
   private def isExpired(download: Download): Boolean = {
     val path = download.path
-    (Files.size(path) == CONTENT_EXPIRED.length) && {
-      SourceEx.autoCloseFile(path.toFile, Codec.ISO8859) { source =>
-        source.getLines().mkString.equalsIgnoreCase(CONTENT_EXPIRED)
+    // Belt and suspenders: don't fail when file does not exist.
+    Try {
+      Files.exists(path) && (Files.size(path) == CONTENT_EXPIRED.length) && {
+        SourceEx.autoCloseFile(path.toFile, Codec.ISO8859) { source =>
+          source.getLines().mkString.equalsIgnoreCase(CONTENT_EXPIRED)
+        }
       }
-    }
+    }.getOrElse(false)
   }
 
 }
@@ -622,7 +634,7 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
 
     // Clone the current remaining ranges (we will work with it)
     val trying = download.info.remainingRanges.map(_.clone()) match {
-      case Some(remainingRanges) =>
+      case Some(remainingRanges) if remainingRanges.getRanges.size > 0 =>
         val minSize = download.minSegmentSize
         val remaining = remainingRanges.getRanges
         // Get all active remaining ranges
@@ -711,6 +723,15 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
             }
             true
         }
+
+      case Some(_) =>
+        // Belt and suspenders: the download is actually finished, since there
+        // is no more segment to download. We don't expect it to happen in
+        // normal circumstances: download should properly end in success or
+        // failure; but some bugs may prevent us to properly set the download
+        // as ended.
+        state = done(state)
+        false
 
       case None =>
         // Size is unknown but ranges are accepted: we can only have one active
@@ -1213,20 +1234,22 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
    * Flushes written data and updates file name/date upon success.
    */
   def done(state0: State): State = {
-    var state = state0
+    // Belt and suspenders: since we are done, ensure there is no more pending
+    // 'trySegment', which is useful to check whether download is complete.
+    var state = state0.cancelTrySegment
     val download = state.download
     val lastModified = Option(download.info.lastModified.get)
-    val complete = (download.info.remainingRanges.isEmpty && state.started && state.failed.isEmpty) ||
-      download.info.remainingRanges.exists(_.getRanges.isEmpty)
 
     // If we had a failure, but download actually completed (e.g. only one
     // segment could be started, and the whole download range was completed)
     // ignore the failure.
-    if (complete && state.failed.nonEmpty) state = state.copy(failed = None)
+    if (state.isComplete && state.failed.nonEmpty) state = state.copy(failed = None)
 
     // Close the file and handle any issue.
     val closeError = try {
       download.closeFile(lastModified, done = state.failed.isEmpty)
+      // Ensure path (still) exists.
+      if (!Files.exists(download.path)) throw new NoSuchFileException(download.path.toString)
       None
     } catch {
       case ex: DownloadException =>
@@ -1249,12 +1272,30 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
         state
 
       case Some(ex) =>
-        // The download was actually ok, but closing failed
+        // The download was actually ok, but closing failed: we need to log the
+        // closing error (not done yet) before deciding whether we try to resume
+        // the download or leave it stopped in error.
         logger.error(s"${download.context} Download uri=<${download.uri}> error=<${ex.getMessage}>", ex)
         download.info.addLog(LogKind.Error, s"Download error: ${ex.getMessage}", Some(ex))
-        // Re-try right now: ranges that could not be written will be done
-        // again.
-        segmentFinished(state, aborted = false, None)
+        if (state.isComplete) {
+          // The download actually completed: there is nothing more to download
+          // and we should not try to resume it.
+          // A possible case is when the download file has been externally
+          // deleted, during or at the end of the download, not preventing the
+          // file to be fully written, which is at least possible with POSIX
+          // filesystems.
+          // Trying to resume may at best let the download stuck in 'pending'
+          // status, and at worst trigger a stack overflow or an infinite loop:
+          // since there is no more segment to complete, download is again
+          // considered 'done' and we are called back asynchronously or
+          // recursively while we may trigger the same closing error again.
+          download.info.promise.tryFailure(ex)
+          state
+        } else {
+          // Re-try right now: ranges that could not be written will be done
+          // again.
+          segmentFinished(state, aborted = false, None)
+        }
 
       case None =>
         // We are really done (success)
@@ -1362,9 +1403,7 @@ class ResponseConsumer(
         ))
       } else if (contentRange.exists(!_.matches(range))) {
         Some(DownloadException(
-          message = s"Range request content mismatch: expected=<${
-            range
-          }> actual=<${
+          message = s"Range request content mismatch: expected=<$range> actual=<${
             contentRange.getOrElse("")
           }>",
           rangeFailed = true,
