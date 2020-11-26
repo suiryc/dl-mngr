@@ -1284,7 +1284,7 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
         // the download or leave it stopped in error.
         logger.error(s"${download.context} Download uri=<${download.uri}> error=<${ex.getMessage}>", ex)
         info.addLog(LogKind.Error, s"Download error: ${ex.getMessage}", Some(ex))
-        if (state.isComplete) {
+        if (state.isComplete || (state.stopping && !state.isActive)) {
           // The download actually completed: there is nothing more to download
           // and we should not try to resume it.
           // A possible case is when the download file has been externally
@@ -1296,6 +1296,8 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
           // since there is no more segment to complete, download is again
           // considered 'done' and we are called back asynchronously or
           // recursively while we may trigger the same closing error again.
+          //
+          // Alternatively we are stopping and there is nothing else ongoing.
           info.promise.tryFailure(ex)
           state
         } else {
