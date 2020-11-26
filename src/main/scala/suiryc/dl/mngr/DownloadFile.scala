@@ -461,6 +461,8 @@ class DownloadFile(private var path: Path) extends LazyLogging {
           // We only reuse the file we write to (temporary in this case).
           // If the target file exists, rename ours.
           path = move(tempPath, path)
+          // We are done with the temporary path.
+          temporary = None
         }
       } else if (delete) {
         getWorkingPath.toFile.delete()
