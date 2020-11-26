@@ -1238,7 +1238,8 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
     // 'trySegment', which is useful to check whether download is complete.
     var state = state0.cancelTrySegment
     val download = state.download
-    val lastModified = Option(download.info.lastModified.get)
+    val info = download.info
+    val lastModified = Option(info.lastModified.get)
 
     // If we had a failure, but download actually completed (e.g. only one
     // segment could be started, and the whole download range was completed)
@@ -1266,9 +1267,14 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
 
     state = handleWriteError(state, closeError)
     state.failed.orElse(closeError) match {
-      case Some(ex) if closeError.isEmpty =>
-        // The download did fail on its own
-        download.info.promise.tryFailure(ex)
+      case Some(ex) if closeError.isEmpty || ex.stopped =>
+        // The download did fail on its own.
+        // Log any closing error (may happen upon stopping).
+        closeError.foreach { ex =>
+          logger.error(s"${download.context} Download uri=<${download.uri}> error=<${ex.getMessage}>", ex)
+          info.addLog(LogKind.Error, s"Download error: ${ex.getMessage}", Some(ex))
+        }
+        info.promise.tryFailure(ex)
         // Do not stop the actor (we can still resume/restart)
         state
 
@@ -1277,7 +1283,7 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
         // closing error (not done yet) before deciding whether we try to resume
         // the download or leave it stopped in error.
         logger.error(s"${download.context} Download uri=<${download.uri}> error=<${ex.getMessage}>", ex)
-        download.info.addLog(LogKind.Error, s"Download error: ${ex.getMessage}", Some(ex))
+        info.addLog(LogKind.Error, s"Download error: ${ex.getMessage}", Some(ex))
         if (state.isComplete) {
           // The download actually completed: there is nothing more to download
           // and we should not try to resume it.
@@ -1290,7 +1296,7 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
           // since there is no more segment to complete, download is again
           // considered 'done' and we are called back asynchronously or
           // recursively while we may trigger the same closing error again.
-          download.info.promise.tryFailure(ex)
+          info.promise.tryFailure(ex)
           state
         } else {
           // Re-try right now: ranges that could not be written will be done
@@ -1307,20 +1313,20 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
           // From the actual content, the uri appears to have expired.
           val ex = DownloadException("Uri actually appear to have expired")
           logger.error(s"${download.context} Download uri=<${download.uri}> error=<${ex.getMessage}>", ex)
-          download.info.addLog(LogKind.Error, s"Download error: ${ex.getMessage}", Some(ex))
+          info.addLog(LogKind.Error, s"Download error: ${ex.getMessage}", Some(ex))
           // Reset the download information (ranges, etc.) so that we can
           // fully restart it if wanted.
-          download.info.restart()
-          download.info.size.set(Long.MinValue)
+          info.restart()
+          info.size.set(Long.MinValue)
           // Also delete the created file, which is useless. Since we reset the
           // info, it wouldn't be done when user remove the download.
           // The temporary file, if any, already has been deleted by renaming it
           // into the actual target: delete the target.
           download.downloadFile.reset(reusedOpt = Some(false), restart = true)
           download.downloadFile.getPath.toFile.delete()
-          download.info.promise.tryFailure(ex)
+          info.promise.tryFailure(ex)
         } else {
-          download.info.promise.trySuccess(())
+          info.promise.trySuccess(())
           // Time to stop ourself
           context.stop(self)
         }
