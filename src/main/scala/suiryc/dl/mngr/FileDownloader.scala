@@ -775,7 +775,8 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
       if (ex.cause.isInstanceOf[NoSuchFileException]) {
         stop(state, ex, abort = false)
       } else {
-        handleError(state, aborted = false, Some(ex))
+        val newState = state.addError(ex, downloaded = false)
+        handleError(newState, aborted = false, Some(ex))
       }
     }
   }
