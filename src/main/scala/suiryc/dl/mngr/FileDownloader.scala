@@ -1324,7 +1324,7 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
           // info, it wouldn't be done when user remove the download.
           // The temporary file, if any, already has been deleted by renaming it
           // into the actual target: delete the target.
-          download.downloadFile.reset(reusedOpt = Some(false), restart = true)
+          download.downloadFile.reset(mustExist = false, reusedOpt = Some(false), restart = true)
           download.downloadFile.getPath.toFile.delete()
           info.promise.tryFailure(ex)
         } else {

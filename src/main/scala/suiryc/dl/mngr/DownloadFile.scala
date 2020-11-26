@@ -19,12 +19,15 @@ import suiryc.scala.io.{FileTimes, FilesEx, PathsEx}
 object DownloadFile {
 
   def reuse(path: Path): DownloadFile = {
-    reuse(path, Main.settings.getTemporaryFile(path))
+    // Note: we are called because the working path exists and user asked to
+    // resume downloading the existing file.
+    reuse(path, Main.settings.getTemporaryFile(path), mustExist = true)
   }
 
-  def reuse(path: Path, temporary: Option[Path]): DownloadFile = {
+  def reuse(path: Path, temporary: Option[Path], mustExist: Boolean): DownloadFile = {
     val downloadFile = new DownloadFile(path)
     downloadFile.temporary = temporary
+    downloadFile.mustExist = mustExist
     downloadFile.reused = true
     downloadFile
   }
@@ -38,6 +41,9 @@ class DownloadFile(private var path: Path) extends LazyLogging {
 
   /** Whether file is being reused. */
   private var reused: Boolean = false
+
+  /** Whether file is expected to exist. */
+  private var mustExist: Boolean = false
 
   /** Whether file is to be truncated. */
   private var truncate: Boolean = false
@@ -76,13 +82,15 @@ class DownloadFile(private var path: Path) extends LazyLogging {
   private def renewTemporary(): Unit = temporary = Main.settings.getTemporaryFile(path)
 
   /** Resets. */
-  def reset(reusedOpt: Option[Boolean], restart: Boolean): Unit = this.synchronized {
+  def reset(mustExist: Boolean, reusedOpt: Option[Boolean], restart: Boolean): Unit = this.synchronized {
     // Notes:
     // We only allow to delete temporary path. Having created a file also means
     // we reserved its name, so don't delete the real target if we created it.
     // In this case, we simply need to truncate it when we will (re-)open it.
     close(None, done = false, canDelete = restart && temporary.isDefined)
     reusedOpt.foreach(reused = _)
+    // File must exist if needed, we reuse it and we don't restart.
+    this.mustExist = mustExist && reused && !restart
     // We could also restrict truncating to 'without temporary path' cases, but
     // that is not necessary.
     this.truncate = restart
@@ -142,9 +150,10 @@ class DownloadFile(private var path: Path) extends LazyLogging {
       if (!reused) renewTemporary()
       val target = getWorkingPath
       // If not owned, make sure the file does not exist upon creating it.
-      val options = List(StandardOpenOption.CREATE, StandardOpenOption.WRITE) ++
-        (if (!reused) List(StandardOpenOption.CREATE_NEW) else List.empty) ++
-        (if (truncate) List(StandardOpenOption.TRUNCATE_EXISTING) else List.empty)
+      val options = List(StandardOpenOption.WRITE) ++
+        (if (!mustExist) List(StandardOpenOption.CREATE) else Nil)
+        (if (!reused) List(StandardOpenOption.CREATE_NEW) else Nil) ++
+        (if (truncate) List(StandardOpenOption.TRUNCATE_EXISTING) else Nil)
 
       try {
         channel = FileChannel.open(target, options: _*)
@@ -156,6 +165,8 @@ class DownloadFile(private var path: Path) extends LazyLogging {
           if (temporary.isEmpty) path = available
           else temporary = Some(available)
       }
+      // The file was created if applicable, so it must exist now.
+      mustExist = true
       // It's easier to force 'reused' to true now so that we can
       // stop/resume/restart without triggering renaming later.
       reused = true

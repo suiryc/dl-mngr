@@ -79,6 +79,8 @@ class DownloadInfo extends ObservableLogs {
   def isSizeUnknown: Boolean = size.get == -1
   def isSizeKnown: Boolean = size.get >= 0
 
+  def hasDownloaded: Boolean = downloaded.get > 0
+
   def restart(): Unit = {
     remainingRanges = None
     rangeValidator = None
@@ -257,7 +259,7 @@ case class Download(
   def resume(reusedOpt: Option[Boolean], restart: Boolean): Unit = {
     if (restart) info.restart()
     val reason = if (restart) "re-started" else "resumed"
-    downloadFile.reset(reusedOpt = reusedOpt, restart = restart)
+    downloadFile.reset(mustExist = info.hasDownloaded, reusedOpt = reusedOpt, restart = restart)
     // Belt and suspenders:
     // The current download should have properly been failed/stopped already.
     // We still try to fail the promise, and in case it had not yet been
