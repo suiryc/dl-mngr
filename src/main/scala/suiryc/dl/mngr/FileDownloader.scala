@@ -770,7 +770,13 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
       active = state.isActive
     ).left.map { ex =>
       tryCnx.foreach(_.attemptFailure(ex))
-      handleError(state, aborted = false, Some(ex))
+      // If we failed because the target file does not exist (while it should)
+      // we can stop right now.
+      if (ex.cause.isInstanceOf[NoSuchFileException]) {
+        stop(state, ex, abort = false)
+      } else {
+        handleError(state, aborted = false, Some(ex))
+      }
     }
   }
 
