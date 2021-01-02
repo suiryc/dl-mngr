@@ -842,7 +842,7 @@ class OptionsController extends StageLocationPersistentView(OptionsController.st
       // If site was not renamed, simply apply draft changes.
       if (isSiteChanged) {
         // Create a brand new site settings entry
-        val newSettings = Main.settings.getSite(site, allowDefault = false)
+        val newSettings = Main.settings.obtainSite(site)
         // And set our values. Make sure to get the refreshed draft value and
         // remove entry when applicable.
         newSettings.setPattern(pattern.getDraftValue())

@@ -1,10 +1,12 @@
 package suiryc.dl.mngr
 
+import com.typesafe.scalalogging.StrictLogging
 import java.net.URI
 import java.nio.file.{Path, Paths}
 import scala.concurrent.duration.FiniteDuration
 import scala.jdk.CollectionConverters._
 import scala.util.matching.Regex
+import suiryc.dl.mngr.model.LogKind
 import suiryc.scala.settings.{BaseConfig, ConfigEntry, PortableSettings}
 import suiryc.scala.io.RichFile
 import suiryc.scala.sys.{Command, OS}
@@ -82,7 +84,7 @@ object Settings {
 
 }
 
-class Settings(path: Path) {
+class Settings(path: Path) extends StrictLogging {
 
   import Settings._
 
@@ -206,18 +208,28 @@ class Settings(path: Path) {
     }
   }
 
-  def getSite(site0: String, allowDefault: Boolean): SiteSettings = {
+  def getSite(site0: String): SiteSettings = {
     val site = site0.toLowerCase
-    if (site == KEY_DEFAULT) {
-      if (!allowDefault) throw new Exception("Cannot access default site settings this way")
-      sitesDefault
-    } else {
-      sites.getOrElse(site, {
-        val s = new SiteSettings(site)
-        sites += (site -> s)
-        s
-      })
+    // Callers should only request known sites. If not, fallback to default site
+    // and log this bad access (with stacktrace to pinpoint caller).
+    val s = sites.getOrElse(site, sitesDefault)
+    if (s.isDefault && (site != KEY_DEFAULT)) {
+      val msg = s"Using default site instead of missing requested site=<$site>"
+      val ex = new Exception("Unknown site")
+      logger.warn(msg, ex)
+      Main.controller.addLog(LogKind.Warning, msg, Some(ex))
     }
+    s
+  }
+
+  def obtainSite(site0: String): SiteSettings = {
+    val site = site0.toLowerCase
+    if (site == KEY_DEFAULT) throw new Exception("Cannot access default site settings this way")
+    sites.getOrElse(site, {
+      val s = new SiteSettings(site)
+      sites += (site -> s)
+      s
+    })
   }
 
   def changeSitePattern(site: SiteSettings, pattern: Option[Regex]): Unit = {

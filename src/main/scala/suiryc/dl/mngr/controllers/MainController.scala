@@ -1225,7 +1225,7 @@ class MainController
    * @return whether a new attempt can be made (SSL will be trusted)
    */
   def askOnSslError(site: String, host: String, ex: Exception): Future[Boolean] = {
-    val siteSettings = Main.settings.getSite(site, allowDefault = true)
+    val siteSettings = Main.settings.getSite(site)
     val canTrustSite = !siteSettings.isDefault
     val buttonSite = new ButtonType(Strings.site)
     val buttonServer = new ButtonType(Strings.server)

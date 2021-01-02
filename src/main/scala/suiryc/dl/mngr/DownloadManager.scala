@@ -204,6 +204,8 @@ object DownloadManager {
 
   /** Connections information per site. */
   case class SiteConnections(
+    /** The concerned site. */
+    site: String,
     /** Last activity. */
     lastActive: Long,
     /** Active connections count. */
@@ -215,6 +217,11 @@ object DownloadManager {
     /** Whether to ask upon SSL error. */
     sslErrorAsk: Option[Boolean]
   ) extends Connections {
+    override def retain: Boolean = {
+      // Don't retain this entry if the corresponding site has been removed,
+      // and is now unknown.
+      super.retain && Main.settings.getSites.contains(site)
+    }
     def active: SiteConnections = copy(lastActive = System.currentTimeMillis)
     def acquireConnection(): SiteConnections = active.copy(cnxCount = cnxCount + 1)
     def releaseConnection(): SiteConnections = active.copy(cnxCount = math.max(0L, cnxCount - 1))
@@ -229,6 +236,7 @@ object DownloadManager {
   object SiteConnections {
     def apply(siteSettings: Main.settings.SiteSettings): SiteConnections = {
       SiteConnections(
+        site = siteSettings.site,
         lastActive = System.currentTimeMillis,
         cnxCount = 0,
         sslChanged = false,
@@ -932,7 +940,7 @@ class DownloadManager extends StrictLogging {
   }
 
   def getSiteConnections(site: String): SiteConnections = this.synchronized {
-    cnxPerSite.getOrElse(site, SiteConnections(Main.settings.getSite(site, allowDefault = true)))
+    cnxPerSite.getOrElse(site, SiteConnections(Main.settings.getSite(site)))
   }
 
   def getServerConnections(site: String, host: String): ServerConnections = this.synchronized {
@@ -940,8 +948,16 @@ class DownloadManager extends StrictLogging {
   }
 
   def refreshConnections(): Unit = this.synchronized {
+    // Notes:
+    // Each active download does take care of its acquired connection: they are
+    // 'migrated' to the new concerned site/server if needed, by forcing
+    // re-acquiring them.
+    // We do need to update SSL settings here though, in case they were changed.
+    // We also need to ensure we don't re-create a site entry for those that
+    // were removed: first drop them from our cache.
+    cleanupConnections()
     cnxPerSite = cnxPerSite.map {
-      case (site, group) => site -> group.updateSsl(Main.settings.getSite(site, allowDefault = true))
+      case (site, group) => site -> group.updateSsl(Main.settings.getSite(site))
     }
     cnxPerServer = cnxPerServer.map {
       case (host, group) => host -> group.updateSsl(Main.settings.findServerSite(host))
