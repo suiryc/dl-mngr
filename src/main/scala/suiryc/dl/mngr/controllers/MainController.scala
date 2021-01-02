@@ -614,6 +614,8 @@ class MainController
       // logs changes).
       JFXSystem.run {
         logsTable.getItems.setAll(logs: _*)
+        // Re-sort the table.
+        logsTable.sort()
         updateLogMessageMinWidth(logs)
       }
     }
@@ -656,10 +658,11 @@ class MainController
     // changes is done in the caller thread (which holds a lock).
     val logsCancellable = observableLogs.logs.listen { change =>
       @scala.annotation.tailrec
-      def loop(): Unit = {
+      def loop(): Boolean = {
         if (change.next()) {
           if (change.wasPermutated() || change.wasUpdated() || change.wasRemoved() || !change.wasAdded()) {
             setLogs()
+            false
           } else {
             val logs = getLogs(change.getAddedSubList)
             if (logs.nonEmpty) {
@@ -672,10 +675,24 @@ class MainController
             }
             loop()
           }
+        } else {
+          true
         }
       }
 
-      loop()
+      val resort = loop()
+      // If needed, re-sort the table.
+      // Alternatively this would also be done automatically by wrapping the
+      // ObservableList into a SortedList and binding its comparator to the
+      // table one: any change in the underlying list would be reflected in
+      // the SortedList (automatically sorted) and visually in the TableView;
+      // but since we listen to changes anyway, we can re-sort ourself without
+      // having to introduce an extra SortedList.
+      if (resort) {
+        JFXSystem.run {
+          logsTable.sort()
+        }
+      }
     }
     // Set initial value (only changes are listened)
     setLogs()
