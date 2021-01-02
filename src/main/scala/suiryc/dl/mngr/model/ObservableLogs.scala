@@ -1,6 +1,7 @@
 package suiryc.dl.mngr.model
 
 import java.time.LocalDateTime
+import java.util.concurrent.atomic.AtomicLong
 import javafx.collections.{FXCollections, ObservableList}
 
 trait ObservableLogs {
@@ -50,10 +51,16 @@ object LogKind extends Enumeration {
   val Debug, Info, Warning, Error = Value
 }
 
+object LogEntry {
+  private val idNext = new AtomicLong()
+}
+
 case class LogEntry(
   time: LocalDateTime = LocalDateTime.now,
   kind: LogKind.Value,
   message: String,
   error: Option[Throwable] = None,
   tooltip: Option[String] = None
-)
+) {
+  val id: Long = LogEntry.idNext.incrementAndGet()
+}

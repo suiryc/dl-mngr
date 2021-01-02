@@ -173,7 +173,7 @@ class MainController
     "segments" -> columnDownloadSegments
   )
 
-  private val columnLogTime = new TableColumn[LogEntry, String](Strings.time)
+  private val columnLogTime = new TableColumn[LogEntry, LogEntry](Strings.time)
   private val columnLogMessage = new TableColumn[LogEntry, LogEntry](Strings.message)
 
   private val logsColumns = List(
@@ -411,13 +411,27 @@ class MainController
 
     logsColumns.foreach(_._2.setSortable(false))
     columnLogTime.setCellValueFactory { data =>
-      Option(data.getValue).map { v =>
-        new SimpleStringProperty(v.time.format(Main.timeFormatter))
-      }.getOrElse {
-        new SimpleStringProperty()
+      new SimpleObjectProperty[LogEntry](data.getValue)
+    }
+    columnLogTime.setCellFactory { _ =>
+      new TableCellEx[LogEntry, LogEntry] {
+        override protected def itemText(item: LogEntry): String = {
+          item.time.format(Main.timeFormatter)
+        }
       }
     }
     columnLogTime.setMinWidth(computeTextWidth("_9999-99-99_99:99:99.999_"))
+    // We want to be able to sort logs by time, especially so that we can
+    // display recent logs at the top of the view.
+    // The way logs are created, we only expect increasing time.
+    // In the case two logs have the exact same time, use an increasing id to
+    // properly sort them.
+    columnLogTime.setSortable(true)
+    columnLogTime.setComparator((v1, v2) => {
+      val c = v1.time.compareTo(v2.time)
+      if (c == 0) (v1.id - v2.id).intValue
+      else c
+    })
 
     columnLogMessage.setCellValueFactory { data =>
       new SimpleObjectProperty[LogEntry](data.getValue)
@@ -1005,6 +1019,25 @@ class MainController
     // Restore columns order and width
     TableViews.setColumnsView(downloadsTable, downloadsColumns, downloadsColumnsPref.opt)
     TableViews.setColumnsView(logsTable, logsColumns, logsColumnsPref.opt)
+    // By default we want to display logs in 'reverse' time order: recent logs
+    // at the top of the view.
+    // We don't change restored sort order and types if either:
+    //  - a sort order has been set
+    //  - time column sort type is not the default 'ascending' one
+    // Here we rely on the fact that we do save 'ascending' as default sort
+    // order, and that JavaFX does cycle on sort types in this order:
+    //  - sorted, ascending
+    //  - sorted, descending
+    //  - unsorted, descending
+    //  - sorted, ascending
+    //  - ...
+    // So if saved sort order is 'descending', user did change the initial
+    // setup, and only the combination of 'unsorted' (empty sort order) and
+    // 'ascending' time sort type means we are in the initial setup.
+    if (logsTable.getSortOrder.isEmpty && (columnLogTime.getSortType == TableColumn.SortType.ASCENDING)) {
+      columnLogTime.setSortType(TableColumn.SortType.DESCENDING)
+      logsTable.getSortOrder.setAll(columnLogTime)
+    }
 
     // Automatically resize 'message' column to fit the whole table width.
     TableViews.autowidthColumn(columnLogMessage)
