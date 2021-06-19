@@ -1,9 +1,11 @@
 package suiryc.dl.mngr.model
 
-import org.scalatest.{Matchers, WordSpec}
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.wordspec.AnyWordSpec
+
 import scala.jdk.CollectionConverters._
 
-class SegmentRangesSpec extends WordSpec with Matchers {
+class SegmentRangesSpec extends AnyWordSpec with Matchers {
 
   "SegmentRanges" should {
     "properly initialize its whole full range" in {

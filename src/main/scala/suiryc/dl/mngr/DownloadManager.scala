@@ -2,10 +2,6 @@ package suiryc.dl.mngr
 
 import akka.actor.{Actor, ActorRef, Props}
 import com.typesafe.scalalogging.StrictLogging
-import java.net.URI
-import java.nio.charset.StandardCharsets
-import java.nio.file.{Files, Path}
-import java.util.UUID
 import monix.execution.Cancelable
 import org.apache.http.{HttpHeaders, HttpHost}
 import org.apache.http.client.config.RequestConfig
@@ -20,12 +16,18 @@ import org.apache.http.impl.nio.reactor.IOReactorConfig
 import org.apache.http.nio.conn.{NoopIOSessionStrategy, SchemeIOSessionStrategy}
 import org.apache.http.nio.conn.ssl.SSLIOSessionStrategy
 import org.apache.http.ssl.SSLContextBuilder
-import scala.concurrent.{Future, Promise}
-import scala.concurrent.duration._
-import scala.util.Try
 import suiryc.dl.mngr.model._
 import suiryc.dl.mngr.util.Http
 import suiryc.scala.io.PathsEx
+
+import java.net.URI
+import java.nio.charset.StandardCharsets
+import java.nio.file.{Files, Path}
+import java.util.UUID
+import scala.annotation.nowarn
+import scala.concurrent.{Future, Promise}
+import scala.concurrent.duration._
+import scala.util.Try
 
 
 object DownloadManager {
@@ -514,7 +516,7 @@ class DownloadManager extends StrictLogging {
         val failureOpt = result.failed.toOption.map {
           case ex: DownloadException => ex
           case ex: Exception => DownloadException(message = ex.getMessage, cause = ex)
-        }
+        }: @nowarn
         // Belt and suspenders:
         // If the failure is due to the download being resumed/restarted,
         // *DO NOT* touch the download file nor change its state.
@@ -913,10 +915,10 @@ class DownloadManager extends StrictLogging {
       if (cnxTotal > 0) cnxTotal -= 1
       // Note: entries with 0 cnx count will be cleaned by janitor
       cnxPerSite.get(acquired.site).foreach { perSite =>
-        cnxPerSite += (acquired.site -> perSite.releaseConnection)
+        cnxPerSite += (acquired.site -> perSite.releaseConnection())
       }
       cnxPerServer.get(acquired.host).foreach { perServer =>
-        cnxPerServer += (acquired.host -> perServer.releaseConnection)
+        cnxPerServer += (acquired.host -> perServer.releaseConnection())
       }
     }
   }

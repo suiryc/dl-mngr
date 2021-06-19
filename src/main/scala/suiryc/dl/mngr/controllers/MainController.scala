@@ -3,11 +3,6 @@ package suiryc.dl.mngr.controllers
 import akka.actor.{Actor, ActorRef, Props}
 import com.sun.javafx.scene.control.behavior.CellBehaviorBase
 import com.typesafe.scalalogging.StrictLogging
-import java.io.{PrintWriter, StringWriter}
-import java.net.URI
-import java.nio.file.Path
-import java.text.SimpleDateFormat
-import java.util.UUID
 import javafx.beans.property.{SimpleBooleanProperty, SimpleLongProperty, SimpleObjectProperty, SimpleStringProperty}
 import javafx.event.ActionEvent
 import javafx.fxml.{FXML, FXMLLoader}
@@ -20,12 +15,6 @@ import javafx.scene.text.{Font, Text}
 import javafx.stage.{FileChooser, Modality, Stage, WindowEvent}
 import javafx.util.StringConverter
 import monix.execution.Cancelable
-import scala.annotation.unused
-import scala.concurrent.{Future, Promise}
-import scala.concurrent.duration._
-import scala.jdk.CollectionConverters._
-import scala.math.BigDecimal.RoundingMode
-import scala.util.{Failure, Success}
 import suiryc.dl.mngr.model._
 import suiryc.scala.misc.Units
 import suiryc.dl.mngr.{DownloadManager, I18N, Info, Main, Settings}
@@ -47,6 +36,18 @@ import suiryc.scala.javafx.stage.{PathChoosers, StageLocationPersistentView, Sta
 import suiryc.scala.javafx.stage.Stages.StageLocation
 import suiryc.scala.settings.ConfigEntry
 import suiryc.scala.util.CallsThrottler
+
+import java.io.{PrintWriter, StringWriter}
+import java.net.URI
+import java.nio.file.Path
+import java.text.SimpleDateFormat
+import java.util.UUID
+import scala.annotation.{nowarn, unused}
+import scala.concurrent.{Future, Promise}
+import scala.concurrent.duration._
+import scala.jdk.CollectionConverters._
+import scala.math.BigDecimal.RoundingMode
+import scala.util.{Failure, Success}
 
 
 class MainController
@@ -1742,7 +1743,8 @@ class MainController
            .bind(throttlingSlow, data.rateValue, info.downloaded, info.state)
 
           BindingsEx.jfxBind(data.stateIcon, info.state, info.activeSegments) {
-            download.state match {
+            // @nowarn workarounds scala 2.13.x false-positive
+            (download.state: @nowarn) match {
               case DownloadState.Pending =>
                 Icons.hourglass().pane
 

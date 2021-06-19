@@ -1,15 +1,17 @@
 package suiryc.dl.mngr.util
 
-import java.net.URLEncoder
 import org.apache.http.entity.{ContentType, StringEntity}
 import org.apache.http._
 import org.apache.http.message.{BasicHeader, BasicHeaderValueFormatter, BasicHttpResponse, BasicNameValuePair}
 import org.apache.http.util.CharArrayBuffer
-import org.scalatest.{Matchers, WordSpec}
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.wordspec.AnyWordSpec
 import suiryc.dl.mngr.model.SegmentRange
 import suiryc.dl.mngr.util.Http.ContentRange
 
-class HttpSpec extends WordSpec with Matchers {
+import java.net.URLEncoder
+
+class HttpSpec extends AnyWordSpec with Matchers {
 
   "Http" when {
 
