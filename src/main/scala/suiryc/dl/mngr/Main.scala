@@ -25,8 +25,6 @@ import suiryc.scala.sys.UniqueInstance.CommandResult
 
 object Main extends JFXLauncher[MainApp] {
 
-  Configuration.setDefaultApplication()
-
   // Note: use 'lazy' for fields that indirectly trigger stdout/stderr writing
   // (e.g. through logger, or scala Console println etc), so that we can
   // redirect streams before it happens.
