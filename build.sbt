@@ -1,5 +1,6 @@
 import sbt._
 import Keys._
+import suiryc.scala.sbt.AssemblyEx
 
 lazy val versions = Map[String, String](
   "akka"                  -> "2.6.15",
@@ -22,9 +23,9 @@ lazy val versions = Map[String, String](
 )
 
 
-lazy val dlMngr = project.in(file(".")).
-  enablePlugins(BuildInfoPlugin, GitVersioning).
-  settings(
+lazy val dlMngr = project.in(file("."))
+  .enablePlugins(BuildInfoPlugin, GitVersioning)
+  .settings(
     organization := "suiryc",
     name := "dl-mngr",
     // Note: if we want to let sbt-git generate the version, we need to comment
@@ -131,7 +132,7 @@ assembly / assembledMappings ~= { mappings =>
 
 ThisBuild / assemblyMergeStrategy := {
   case PathList(x @ _*) if x.last == "module-info.class" => MergeStrategy.discard
-  case x if x.startsWith("application.conf") => MergeStrategy.discard
+  case "application.conf" => AssemblyEx.concatJarThenDir
   case x => (ThisBuild / assemblyMergeStrategy).value.apply(x)
 }
 
