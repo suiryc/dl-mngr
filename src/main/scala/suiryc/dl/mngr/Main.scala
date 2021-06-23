@@ -1,29 +1,28 @@
 package suiryc.dl.mngr
 
-import akka.actor.ActorSystem
-import java.io.Closeable
-import java.nio.file.Path
-import java.time.format.DateTimeFormatter
-import java.time.{Instant, LocalDateTime, ZoneId}
+import com.typesafe.scalalogging.StrictLogging
 import javafx.stage.Stage
 import monix.execution.Scheduler
-import scala.concurrent.{ExecutionContextExecutor, Future, Promise}
-import scala.concurrent.duration._
-import scala.util.Failure
 import suiryc.dl.mngr.I18N.Strings
 import suiryc.dl.mngr.controllers.MainController
 import suiryc.dl.mngr.model.NewDownloadInfo
-import suiryc.scala.Configuration
-import suiryc.scala.akka.CoreSystem
+import suiryc.scala.akka.{AkkaResources, CoreSystem}
 import suiryc.scala.io.SystemStreams
 import suiryc.scala.javafx.{JFXApplication, JFXLauncher}
-import suiryc.scala.javafx.concurrent.JFXSystem
 import suiryc.scala.log.{LoggerConfiguration, Loggers}
 import suiryc.scala.misc.Util
 import suiryc.scala.sys.{OS, Signals, UniqueInstance}
 import suiryc.scala.sys.UniqueInstance.CommandResult
 
-object Main extends JFXLauncher[MainApp] {
+import java.io.Closeable
+import java.nio.file.Path
+import java.time.format.DateTimeFormatter
+import java.time.{Instant, LocalDateTime, ZoneId}
+import scala.concurrent.{Await, Future, Promise}
+import scala.concurrent.duration._
+import scala.util.{Failure, Try}
+
+object Main extends JFXLauncher[MainApp] with StrictLogging {
 
   // Note: use 'lazy' for fields that indirectly trigger stdout/stderr writing
   // (e.g. through logger, or scala Console println etc), so that we can
@@ -221,21 +220,22 @@ object Main extends JFXLauncher[MainApp] {
     }
   }
 
-  object Akka {
+  val Akka: AkkaResources = CoreSystem.NonBlocking
 
-    implicit val system: ActorSystem = CoreSystem.system
-    implicit val dispatcher: ExecutionContextExecutor = system.dispatcher
+  lazy val scheduler: Scheduler = Akka.scheduler
 
-  }
-
-  lazy val scheduler: Scheduler = CoreSystem.scheduler
-
-  override def shutdown(): Unit = {
-    WSServer.stop()
+  override def shutdown(stage: Stage): Unit = {
+    // Reminder: we have to stop all JavaFX actors before closing stage and
+    // stopping JavaFX thread. the easy way is to stop the system.
+    val whenTerminated = WSServer.stop().flatMap { _ =>
+      CoreSystem.terminate()
+    }
     UniqueInstance.stop()
-    // Note: we share the same system
-    JFXSystem.terminate()
-    ()
+    Try(Await.ready(whenTerminated, 10.seconds)).toEither.swap.foreach { ex =>
+      logger.error("Shutdown failed", ex)
+    }
+    LoggerConfiguration.stop()
+    super.shutdown(stage)
   }
 
   case class Params(

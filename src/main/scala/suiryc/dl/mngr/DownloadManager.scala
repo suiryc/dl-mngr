@@ -321,7 +321,7 @@ class DownloadManager extends StrictLogging {
   private var cnxPerServer: Map[String, ServerConnections] = Map.empty
 
   // Janitoring is done in a dedicated actor.
-  private val janitor = system.actorOf(Props(new DownloadsJanitor(this)))
+  private val janitor = actorOf(Props(new DownloadsJanitor(this)))
 
   setClient()
 
@@ -401,7 +401,7 @@ class DownloadManager extends StrictLogging {
   }
 
   def addDownload(download: Download, insertFirst: Boolean): Download = {
-    val dler = system.actorOf(Props(new FileDownloader(dlMngr = this, dl = download)))
+    val dler = actorOf(Props(new FileDownloader(dlMngr = this, dl = download)))
     val dlEntry = DownloadEntry(download = download, done = Promise(), dler = dler)
     val msgPrefix = s"Download file=<${download.fileContext}>"
     if (download.isDone) {
