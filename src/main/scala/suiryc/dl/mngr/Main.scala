@@ -111,6 +111,7 @@ object Main extends JFXLauncher[MainApp] with StrictLogging {
     // target class, or pass the target class as parameter.
     // If values other than arguments need to be passed, the second approach is
     // to be used.
+    LoggerConfiguration.listenStatus()
     if (OS.isLinux) {
       Signals.setSIGHUPHandler { _ =>
         LoggerConfiguration.reload(onChange = false)
