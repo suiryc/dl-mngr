@@ -1,17 +1,20 @@
 package suiryc.dl.mngr
 
 import com.typesafe.scalalogging.StrictLogging
-import java.net.URI
-import java.nio.file.{Path, Paths}
-import scala.concurrent.duration.FiniteDuration
-import scala.jdk.CollectionConverters._
-import scala.util.matching.Regex
 import suiryc.dl.mngr.model.LogKind
 import suiryc.scala.settings.{BaseConfig, ConfigEntry, PortableSettings}
 import suiryc.scala.io.RichFile
 import suiryc.scala.sys.{Command, OS}
 
+import java.net.URI
+import java.nio.file.{Path, Paths}
+import scala.concurrent.duration._
+import scala.jdk.CollectionConverters._
+import scala.util.matching.Regex
+
 object Settings {
+
+  val DL_STOP_TIMEOUT: FiniteDuration = 15.seconds
 
   private[mngr] val KEY_SUIRYC = "suiryc"
   private[mngr] val KEY_DL_MNGR = "dl-mngr"

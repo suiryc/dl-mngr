@@ -1310,7 +1310,7 @@ class MainController
       actor ! OnExit
     } catch {
       case ex: NoClassDefFoundError =>
-        // Usually happens when jar has been replaced(on Windows at least).
+        // Usually happens when jar has been replaced (on Windows at least).
         // There is nothing much to do except exit.
         System.err.println("Exiting because classes are missing (JAR may have been overwritten)!")
         ex.printStackTrace()
@@ -1620,7 +1620,7 @@ class MainController
             active.flatMap { dlEntry =>
               state.dlMngr.stopDownload(dlEntry.download.id)
             }
-          }.map(_ => ()).withTimeout(30.seconds).onComplete {
+          }.map(_ => ()).withTimeout(Settings.DL_STOP_TIMEOUT).onComplete {
             case Success(_) =>
               doRemove()
 
