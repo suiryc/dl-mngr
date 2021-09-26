@@ -15,6 +15,7 @@ import scala.util.matching.Regex
 object Settings {
 
   val DL_STOP_TIMEOUT: FiniteDuration = 15.seconds
+  val SHUTDOWN_TIMEOUT: FiniteDuration = 10.seconds
 
   private[mngr] val KEY_SUIRYC = "suiryc"
   private[mngr] val KEY_DL_MNGR = "dl-mngr"

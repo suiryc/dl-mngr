@@ -232,7 +232,7 @@ object Main extends JFXLauncher[MainApp] with StrictLogging {
       CoreSystem.terminate()
     }
     UniqueInstance.stop()
-    Try(Await.ready(whenTerminated, 10.seconds)).toEither.swap.foreach { ex =>
+    Try(Await.ready(whenTerminated, Settings.SHUTDOWN_TIMEOUT)).toEither.swap.foreach { ex =>
       logger.error("Shutdown failed", ex)
     }
     LoggerConfiguration.stop()

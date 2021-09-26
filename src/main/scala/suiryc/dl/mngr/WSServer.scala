@@ -11,11 +11,13 @@ import io.netty.handler.codec.http.websocketx.extensions.compression.WebSocketSe
 import io.netty.handler.codec.http.{HttpObjectAggregator, HttpServerCodec}
 import io.netty.handler.logging.LoggingHandler
 import io.netty.util.concurrent.{Future => nettyFuture}
-import java.net.InetSocketAddress
-import scala.concurrent.{CancellationException, Future, Promise}
 import spray.json._
 import suiryc.dl.mngr.I18N.Strings
 import suiryc.scala.sys.UniqueInstance
+
+import java.net.InetSocketAddress
+import java.util.concurrent.TimeUnit
+import scala.concurrent.{CancellationException, Future, Promise}
 
 /**
  * WebSocket server.
@@ -100,7 +102,7 @@ object WSServer extends StrictLogging {
       case Some(inst) =>
         stopping = true
         instance = None
-        asScala(inst.group.shutdownGracefully())
+        asScala(inst.group.shutdownGracefully(0, Settings.SHUTDOWN_TIMEOUT.toSeconds, TimeUnit.SECONDS))
 
       case None =>
         Future.successful(())
