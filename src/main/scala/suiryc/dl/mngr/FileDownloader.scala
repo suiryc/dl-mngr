@@ -2,7 +2,6 @@ package suiryc.dl.mngr
 
 import akka.actor.{Actor, ActorRef}
 import com.typesafe.scalalogging.StrictLogging
-import java.nio.file.{Files, NoSuchFileException}
 import monix.execution.Cancelable
 import org.apache.http.client.methods.HttpRequestBase
 import org.apache.http.client.utils.URIUtils
@@ -13,16 +12,16 @@ import org.apache.http.protocol.HttpContext
 import org.apache.http._
 import org.apache.http.client.protocol.HttpClientContext
 import org.apache.http.nio.conn.ManagedNHttpClientConnection
-import scala.concurrent.Promise
-import scala.concurrent.duration._
-import scala.jdk.CollectionConverters._
-import scala.util.{Failure, Success, Try}
 import suiryc.dl.mngr.model._
 import suiryc.dl.mngr.util.Http
 import suiryc.scala.concurrent.RichFuture
-import suiryc.scala.io.SourceEx
 import suiryc.scala.misc.Units
-import scala.io.Codec
+
+import java.nio.file.{Files, NoSuchFileException}
+import scala.concurrent.Promise
+import scala.concurrent.duration._
+import scala.jdk.CollectionConverters._
+import scala.util.{Failure, Success}
 
 // Notes:
 // DownloadManager globally manages all downloads.
@@ -279,24 +278,6 @@ object FileDownloader {
       }
     }
 
-  }
-
-  // Some sites return a positive response with "Expired" as content for
-  // expired files.
-  private val CONTENT_EXPIRED = "Expired"
-
-  // Check whether a successfully downloaded content means it was actually
-  // "Expired".
-  private def isExpired(download: Download): Boolean = {
-    val path = download.path
-    // Belt and suspenders: don't fail when file does not exist.
-    Try {
-      Files.exists(path) && (Files.size(path) == CONTENT_EXPIRED.length) && {
-        SourceEx.autoCloseFile(path.toFile, Codec.ISO8859) { source =>
-          source.getLines().mkString.equalsIgnoreCase(CONTENT_EXPIRED)
-        }
-      }
-    }.getOrElse(false)
   }
 
 }
@@ -1318,27 +1299,10 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
         logger.info(s"${download.context} Download uri=<${download.uri}> done: success${
           lastModified.map(v => s" (file date=<$v>)").getOrElse("")
         }")
-        if (isExpired(download)) {
-          // From the actual content, the uri appears to have expired.
-          val ex = DownloadException("Uri actually appear to have expired")
-          logger.error(s"${download.context} Download uri=<${download.uri}> error=<${ex.getMessage}>", ex)
-          info.addLog(LogKind.Error, s"Download error: ${ex.getMessage}", Some(ex))
-          // Reset the download information (ranges, etc.) so that we can
-          // fully restart it if wanted.
-          info.restart()
-          info.size.set(Long.MinValue)
-          // Also delete the created file, which is useless. Since we reset the
-          // info, it wouldn't be done when user remove the download.
-          // The temporary file, if any, already has been deleted by renaming it
-          // into the actual target: delete the target.
-          download.downloadFile.reset(mustExist = false, reusedOpt = Some(false), restart = true)
-          download.downloadFile.getPath.toFile.delete()
-          info.promise.tryFailure(ex)
-        } else {
-          info.promise.trySuccess(())
-          // Time to stop ourself
-          context.stop(self)
-        }
+        info.promise.trySuccess(())
+        // Time to stop ourself, unless download is done with error (in which
+        // case user has to restart or remove it explicitly).
+        if (info.doneError.isEmpty) context.stop(self)
         state
     }
   }

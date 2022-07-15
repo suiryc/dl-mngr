@@ -83,3 +83,7 @@
 .icon-undo .svg-path {
   -fx-fill: color-neutral;
 }
+
+.icon-xmark-square .svg-path {
+  -fx-fill: color-failure;
+}

@@ -21,6 +21,7 @@ import suiryc.dl.mngr.model._
 import suiryc.dl.mngr.util.Http
 import suiryc.scala.io.PathsEx
 
+import java.io.FileInputStream
 import java.net.URI
 import java.nio.charset.StandardCharsets
 import java.nio.file.{Files, Path}
@@ -55,6 +56,10 @@ object DownloadManager {
   // or
   //  - shutdown the connection manager: the working thread will finish, and
   //    we are then expected to never use the client again
+
+  // Some sites return a positive response with small content
+  // indicating the original resource pointed by the URL did expire.
+  private val CONTENT_INVALID = Set("Expired", "error_expired")
 
   class LazyClient(trustAll: Boolean) extends StrictLogging {
 
@@ -415,6 +420,9 @@ class DownloadManager extends StrictLogging {
       )
       download.info.addLog(logEntry)
       Main.controller.addLog(logEntry)
+      download.doneError.foreach { error =>
+        download.info.addLog(LogKind.Error, error)
+      }
     } else {
       logger.info(s"${download.context} Download uri=<${download.uri}> referrer=<${download.referrer.getOrElse("")}> file=<${download.path}> ready")
       val msg = s"$msgPrefix ready"
@@ -497,7 +505,7 @@ class DownloadManager extends StrictLogging {
         throw new Exception("Cannot remove download which is active")
       }
       // If download is not successfully done, add a general log entry.
-      if (!download.isDone) {
+      if (!download.isDone || download.doneError.nonEmpty) {
         val logEntry = LogEntry(
           kind = LogKind.Info,
           message = s"Download file=<${download.fileContext}> entry removed",
@@ -561,7 +569,36 @@ class DownloadManager extends StrictLogging {
                 }
               }
 
-              DownloadState.Success
+              // Check actual content does not apear invalid (indicating
+              // resource expiration etc.).
+              val path = download.path
+              val invalid = Files.exists(path) && {
+                try {
+                  lazy val content = {
+                    val is = new FileInputStream(path.toFile)
+                    val b = LazyList.continually(is.read()).takeWhile(_ != -1).toArray
+                    is.close()
+                    b
+                  }
+                  CONTENT_INVALID.exists { s =>
+                    val b = s.getBytes(StandardCharsets.UTF_8)
+                    (info.downloaded.get == b.size) && {
+                      content.sameElements(b)
+                    }
+                  }
+                } catch {
+                  case _: Exception =>
+                    // We don't care
+                    false
+                }
+              }
+              if (invalid) {
+                val message = s"Download uri=<${download.uri}> content appears invalid (expired, ...)"
+                logger.error(s"${download.context} $message")
+                info.addLog(LogKind.Error, message)
+                info.doneError = Some(message)
+              }
+              DownloadState.Done
           }
           info.state.setValue(state)
           // This entry is now 'done'.
@@ -742,7 +779,8 @@ class DownloadManager extends StrictLogging {
           rateLimiter = rateLimiter
         ).setUri(downloadBackupInfo.uri)
         val info = download.info
-        if (downloadBackupInfo.done) info.state.set(DownloadState.Success)
+        info.doneError = downloadBackupInfo.doneError
+        if (downloadBackupInfo.done) info.state.set(DownloadState.Done)
         val remainingRanges = downloadBackupInfo.size.flatMap { size =>
           info.size.set(size)
           if (size >= 0) {

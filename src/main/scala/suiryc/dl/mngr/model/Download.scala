@@ -1,14 +1,16 @@
 package suiryc.dl.mngr.model
 
+import javafx.beans.property.{SimpleIntegerProperty, SimpleLongProperty, SimpleObjectProperty}
+import suiryc.dl.mngr.{DownloadFile, Main}
+import suiryc.dl.mngr.I18N.Strings
+
 import java.net.{Inet4Address, Inet6Address, InetAddress, URI}
 import java.nio.file.Path
 import java.util.{Date, UUID}
-import javafx.beans.property.{SimpleIntegerProperty, SimpleLongProperty, SimpleObjectProperty}
 import scala.concurrent.Promise
-import suiryc.dl.mngr.{DownloadFile, I18N, Main}
 
 object DownloadState extends Enumeration {
-  val Stopped, Pending, Running, Success, Failure = Value
+  val Stopped, Pending, Running, Done, Failure = Value
 }
 
 case class NewDownloadInfo(
@@ -59,6 +61,9 @@ class DownloadInfo extends ObservableLogs {
   /** How many bytes are already downloaded. */
   val downloaded: SimpleLongProperty = new SimpleLongProperty(0)
 
+  /** Done download error. */
+  var doneError: Option[String] = None
+
   /** Whether download was active when download manager stopping was requested. */
   var wasActive: Boolean = false
 
@@ -86,6 +91,7 @@ class DownloadInfo extends ObservableLogs {
     rangeValidator = None
     acceptRanges.set(None)
     lastModified.set(null)
+    size.set(Long.MinValue)
     downloaded.set(0)
   }
 
@@ -107,8 +113,10 @@ case class DownloadBackupInfo(
   path: Path,
   /** Temporary download path. */
   temporaryPath: Option[Path],
-  /** Whether the download was done (finished with success). */
+  /** Whether the download was done (finished with success or error). */
   done: Boolean,
+  /** Done download error. */
+  doneError: Option[String],
   /** Whether the download can be resumed upon starting application. */
   canResume: Boolean,
   /** Download size. */
@@ -206,14 +214,16 @@ case class Download(
   def isPending: Boolean = state == DownloadState.Pending
   def isRunning: Boolean = state == DownloadState.Running
   def isActive: Boolean = isRunning || isPending
-  def isDone: Boolean = state == DownloadState.Success
+  def isDone: Boolean = state == DownloadState.Done
   def isFailed: Boolean = state == DownloadState.Failure
   def canStop: Boolean = isActive
   def canResume(restart: Boolean): Boolean = if (restart) canRestart else canResume
   // We cannot resume if ranges are not supported.
   def canResume: Boolean = !acceptRanges.contains(false) && (isFailed || isStopped)
-  // We can restart upon failure, or if stopped and ranges are not supported.
-  def canRestart: Boolean = isFailed || (isStopped && acceptRanges.contains(false))
+  // We can restart upon failure, if stopped and ranges are not supported, or if done with error.
+  def canRestart: Boolean = isFailed || (isStopped && acceptRanges.contains(false)) || (isDone && doneError.nonEmpty)
+
+  def doneError: Option[String] = info.doneError
 
   def siteSettings: Main.settings.SiteSettings = Main.settings.findSite(info.actualUri.get)
   def activeSegments: Int = info.activeSegments.get
@@ -250,9 +260,9 @@ case class Download(
 
   def tooltip: String = {
     List(
-      s"${I18N.Strings.fileColon} $path",
-      if (siteSettings.isDefault) s"${I18N.Strings.serverColon} ${uri.getHost}"
-      else s"${I18N.Strings.siteColon} ${siteSettings.site}"
+      s"${Strings.fileColon} $path",
+      if (siteSettings.isDefault) s"${Strings.serverColon} ${uri.getHost}"
+      else s"${Strings.siteColon} ${siteSettings.site}"
     ).mkString("\n")
   }
 
@@ -280,6 +290,7 @@ case class Download(
       path = downloadFile.getPath,
       temporaryPath = downloadFile.getTemporaryPath,
       done = isDone,
+      doneError = doneError,
       canResume = (isActive || info.wasActive) && !acceptRanges.contains(false),
       size = if (info.isSizeDetermined) Some(info.size.get) else None,
       sizeHint = sizeHint,

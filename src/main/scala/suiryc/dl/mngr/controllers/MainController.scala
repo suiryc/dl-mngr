@@ -972,7 +972,7 @@ class MainController
       } + ${
         resume.get(DownloadState.Running)
       } + ${
-        resume.get(DownloadState.Success)
+        resume.get(DownloadState.Done)
       } / ${resume.total}"
     }
     allDlRunningLabel.setTooltip {
@@ -982,7 +982,7 @@ class MainController
           DownloadState.Stopped,
           DownloadState.Pending,
           DownloadState.Running,
-          DownloadState.Success,
+          DownloadState.Done,
           DownloadState.Failure
         ).foldLeft("") { (text, state) =>
           val count = resume.get(state)
@@ -1117,7 +1117,7 @@ class MainController
   }
 
   private def enableMenuRemoveCompleted(menu: MenuItem, data: List[DownloadData]): Unit = {
-    menu.setDisable(!data.exists(_.download.isDone))
+    menu.setDisable(!data.exists(d => d.download.isDone && d.download.doneError.isEmpty))
   }
 
   private def enableMenuRemove(menu: MenuItem, data: List[DownloadData]): Unit = {
@@ -1548,7 +1548,7 @@ class MainController
 
     def onDownloadsRemoveCompleted(state: State): Unit = {
       getDownloadsData.foreach { data =>
-        if (data.download.isDone) {
+        if (data.download.isDone && data.download.doneError.isEmpty) {
           removeDownload(state, data.download.id)
         }
       }
@@ -1563,7 +1563,7 @@ class MainController
 
         // We can safely remove if done (success) or not started (failure or not)
         val safe = removable.filter { data =>
-          data.download.isDone || !data.download.isStarted
+          (data.download.isDone && data.download.doneError.isEmpty) || !data.download.isStarted
         }
         safe.foreach { data =>
           removeDownload(state, data.download.id)
@@ -1706,7 +1706,7 @@ class MainController
               // more CPU (and apparently too much under Linux).
               info.state.get match {
                 case DownloadState.Running => 0.0
-                case DownloadState.Success => 1.0
+                case DownloadState.Done => 1.0
                 case _ => 0.0
               }
             }:Double
@@ -1760,9 +1760,15 @@ class MainController
                 val styleClass = if (download.activeSegments == 0) List("icon-download-started") else List("icon-download-running")
                 Icons.download(styleClass = styleClass).pane
 
-              case DownloadState.Success =>
-                if (Main.settings.removeCompleted.get) removeDownload(state, data.download.id)
-                Icons.checkSquare().pane
+              case DownloadState.Done =>
+                if (info.doneError.isEmpty) {
+                  if (Main.settings.removeCompleted.get) removeDownload(state, data.download.id)
+                  Icons.checkSquare().pane
+                } else {
+                  // Note: the parent table cell has a tooltip, preventing any
+                  // sub-node (like this icon) tooltip to be use-able.
+                  Icons.xmarkSquare().pane
+                }
 
               case DownloadState.Stopped =>
                 Icons.stop().pane

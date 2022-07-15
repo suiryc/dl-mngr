@@ -8,10 +8,11 @@ object Icons extends IconBuilders {
 
   private val PREFIX = "icon-"
 
-  // Font Awesome 5 SVG icons.
+  // Font Awesome SVG icons.
   // Font Awesome by Dave Gandy - http://fontawesome.io
   // License: http://fontawesome.io/license
 
+  // Font Awesome 5.
   // https://fontawesome.com/icons/angle-double-down?style=solid
   val angleDoubleDown: Builder = iconBuilder(s"${PREFIX}angle-double-down") { (styleClass, targetSvgSize) =>
     val params = SVGGroupParams(svgWidth = 320, svgHeight = 512, targetSvgSize = targetSvgSize, targetSize = targetSvgSize, styleClass = styleClass)
@@ -20,6 +21,7 @@ object Icons extends IconBuilders {
     )
   }
 
+  // Font Awesome 5.
   // https://fontawesome.com/icons/angle-down?style=solid
   val angleDown: Builder = iconBuilder(s"${PREFIX}angle-down") { (styleClass, targetSvgSize) =>
     val params = SVGGroupParams(svgWidth = 320, svgHeight = 512, targetSvgSize = targetSvgSize, targetSize = targetSvgSize, styleClass = styleClass)
@@ -28,6 +30,7 @@ object Icons extends IconBuilders {
     )
   }
 
+  // Font Awesome 5.
   // https://fontawesome.com/icons/angle-double-up?style=solid
   val angleDoubleUp: Builder = iconBuilder(s"${PREFIX}angle-double-up") { (styleClass, targetSvgSize) =>
     val params = SVGGroupParams(svgWidth = 320, svgHeight = 512, targetSvgSize = targetSvgSize, targetSize = targetSvgSize, styleClass = styleClass)
@@ -36,6 +39,7 @@ object Icons extends IconBuilders {
     )
   }
 
+  // Font Awesome 5.
   // https://fontawesome.com/icons/angle-up?style=solid
   val angleUp: Builder = iconBuilder(s"${PREFIX}angle-up") { (styleClass, targetSvgSize) =>
     val params = SVGGroupParams(svgWidth = 320, svgHeight = 512, targetSvgSize = targetSvgSize, targetSize = targetSvgSize, styleClass = styleClass)
@@ -44,6 +48,7 @@ object Icons extends IconBuilders {
     )
   }
 
+  // Font Awesome 5.
   // https://fontawesome.com/icons/bug?style=solid
   val bug: Builder = iconBuilder(s"${PREFIX}bug") { (styleClass, targetSvgSize) =>
     val params = SVGGroupParams(svgSize = 512, targetSvgSize = targetSvgSize, styleClass = styleClass)
@@ -52,6 +57,7 @@ object Icons extends IconBuilders {
     )
   }
 
+  // Font Awesome 5.
   // https://fontawesome.com/icons/check-square?style=solid
   val checkSquare: Builder = iconBuilder(s"${PREFIX}check-square") { (styleClass, targetSvgSize) =>
     val params = SVGGroupParams(svgWidth = 448, svgHeight = 512, targetSvgSize = targetSvgSize, targetSize = targetSvgSize, styleClass = styleClass)
@@ -60,6 +66,7 @@ object Icons extends IconBuilders {
     )
   }
 
+  // Font Awesome 5.
   // https://fontawesome.com/icons/cog?style=solid
   val cog: Builder = iconBuilder(s"${PREFIX}cog") { (styleClass, targetSvgSize) =>
     val params = SVGGroupParams(svgSize = 512, targetSvgSize = targetSvgSize, styleClass = styleClass)
@@ -68,6 +75,7 @@ object Icons extends IconBuilders {
     )
   }
 
+  // Font Awesome 5.
   // https://fontawesome.com/icons/download?style=solid
   val download: Builder = iconBuilder(s"${PREFIX}download") { (styleClass, targetSvgSize) =>
     val params = SVGGroupParams(svgSize = 512, targetSvgSize = targetSvgSize, styleClass = styleClass)
@@ -76,6 +84,7 @@ object Icons extends IconBuilders {
     )
   }
 
+  // Font Awesome 5.
   // https://fontawesome.com/icons/eraser?style=solid
   val eraser: Builder = iconBuilder(s"${PREFIX}eraser") { (styleClass, targetSvgSize) =>
     val params = SVGGroupParams(svgSize = 512, targetSvgSize = targetSvgSize, styleClass = styleClass)
@@ -84,6 +93,7 @@ object Icons extends IconBuilders {
     )
   }
 
+  // Font Awesome 5.
   // https://fontawesome.com/icons/exclamation-triangle?style=solid
   val exclamationTriangle: Builder = iconBuilder(s"${PREFIX}exclamation-triangle") { (styleClass, targetSvgSize) =>
     val params = SVGGroupParams(svgWidth = 576, svgHeight = 512, targetSvgSize = targetSvgSize, targetSize = targetSvgSize, styleClass = styleClass)
@@ -92,6 +102,7 @@ object Icons extends IconBuilders {
     )
   }
 
+  // Font Awesome 5.
   // https://fontawesome.com/icons/hourglass?style=regular
   val hourglass: Builder = iconBuilder(s"${PREFIX}hourglass") { (styleClass, targetSvgSize) =>
     val params = SVGGroupParams(svgWidth = 384, svgHeight = 512, targetSvgSize = targetSvgSize, targetSize = targetSvgSize, styleClass = styleClass)
@@ -100,6 +111,7 @@ object Icons extends IconBuilders {
     )
   }
 
+  // Font Awesome 5.
   // https://fontawesome.com/icons/info-circle?style=solid
   val infoCircle: Builder = iconBuilder(s"${PREFIX}info-circle") { (styleClass, targetSvgSize) =>
     val params = SVGGroupParams(svgSize = 512, targetSvgSize = targetSvgSize, targetSize = targetSvgSize, styleClass = styleClass)
@@ -108,6 +120,7 @@ object Icons extends IconBuilders {
     )
   }
 
+  // Font Awesome 5.
   // https://fontawesome.com/icons/minus?style=solid
   val minus: Builder = iconBuilder(s"${PREFIX}minus") { (styleClass, targetSvgSize) =>
     val params = SVGGroupParams(svgWidth = 448, svgHeight = 512, targetSvgSize = targetSvgSize, targetSize = targetSvgSize, snapToPixel = true, styleClass = styleClass)
@@ -116,6 +129,7 @@ object Icons extends IconBuilders {
     )
   }
 
+  // Font Awesome 5.
   // https://fontawesome.com/icons/save?style=regular
   val save: Builder = iconBuilder(s"${PREFIX}save") { (styleClass, targetSvgSize) =>
     val params = SVGGroupParams(svgWidth = 448, svgHeight = 512, targetSvgSize = targetSvgSize, targetSize = targetSvgSize, styleClass = styleClass)
@@ -124,6 +138,7 @@ object Icons extends IconBuilders {
     )
   }
 
+  // Font Awesome 5.
   // https://fontawesome.com/icons/sign-out-alt?style=solid
   val signOut: Builder = iconBuilder(s"${PREFIX}sign-out") { (styleClass, targetSvgSize) =>
     val params = SVGGroupParams(svgSize = 512, targetSvgSize = targetSvgSize, targetSize = targetSvgSize, styleClass = styleClass)
@@ -132,6 +147,7 @@ object Icons extends IconBuilders {
     )
   }
 
+  // Font Awesome 5.
   // https://fontawesome.com/icons/stop?style=solid
   val stop: Builder = iconBuilder(s"${PREFIX}stop") { (styleClass, targetSvgSize) =>
     val params = SVGGroupParams(svgWidth = 448, svgHeight = 512, targetSvgSize = targetSvgSize, targetSize = targetSvgSize, styleClass = styleClass)
@@ -140,6 +156,7 @@ object Icons extends IconBuilders {
     )
   }
 
+  // Font Awesome 5.
   // https://fontawesome.com/icons/sync?style=solid
   val sync: Builder = iconBuilder(s"${PREFIX}sync") { (styleClass, targetSvgSize) =>
     val params = SVGGroupParams(svgSize = 512, targetSvgSize = targetSvgSize, targetSize = targetSvgSize, styleClass = styleClass)
@@ -148,6 +165,7 @@ object Icons extends IconBuilders {
     )
   }
 
+  // Font Awesome 5.
   // https://fontawesome.com/icons/tachometer-alt?style=solid
   val tachometer: Builder = iconBuilder(s"${PREFIX}tachometer") { (styleClass, targetSvgSize) =>
     val params = SVGGroupParams(svgWidth = 576, svgHeight = 512, targetSvgSize = targetSvgSize, targetSize = targetSvgSize, styleClass = styleClass)
@@ -156,6 +174,7 @@ object Icons extends IconBuilders {
     )
   }
 
+  // Font Awesome 5.
   // https://fontawesome.com/icons/undo?style=solid
   val undo: Builder = iconBuilder(s"${PREFIX}undo") { (styleClass, targetSvgSize) =>
     val params = SVGGroupParams(svgSize = 512, targetSvgSize = targetSvgSize, styleClass = styleClass)
@@ -164,8 +183,17 @@ object Icons extends IconBuilders {
     )
   }
 
+  // Font Awesome 6.
+  // https://fontawesome.com/icons/square-xmark?s=solid
+  val xmarkSquare: Builder = iconBuilder(s"${PREFIX}xmark-square") { (styleClass, targetSvgSize) =>
+    val params = SVGGroupParams(svgWidth = 448, svgHeight = 512, targetSvgSize = targetSvgSize, targetSize = targetSvgSize, styleClass = styleClass)
+    SVGGroup(params,
+      svgPath("M384 32C419.3 32 448 60.65 448 96V416C448 451.3 419.3 480 384 480H64C28.65 480 0 451.3 0 416V96C0 60.65 28.65 32 64 32H384zM143 208.1L190.1 255.1L143 303C133.7 312.4 133.7 327.6 143 336.1C152.4 346.3 167.6 346.3 176.1 336.1L223.1 289.9L271 336.1C280.4 346.3 295.6 346.3 304.1 336.1C314.3 327.6 314.3 312.4 304.1 303L257.9 255.1L304.1 208.1C314.3 199.6 314.3 184.4 304.1 175C295.6 165.7 280.4 165.7 271 175L223.1 222.1L176.1 175C167.6 165.7 152.4 165.7 143 175C133.7 184.4 133.7 199.6 143 208.1V208.1z")
+    )
+  }
+
   val icons: Map[String, Builder] = List(bug, checkSquare, cog, download, eraser,
-    exclamationTriangle, infoCircle, minus, save, signOut, stop, sync, tachometer, undo).map { builder =>
+    exclamationTriangle, infoCircle, minus, save, signOut, stop, sync, tachometer, undo, xmarkSquare).map { builder =>
     builder().params.styleClass.head -> builder
   }.toMap
 
