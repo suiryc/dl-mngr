@@ -20,6 +20,7 @@ object I18N extends suiryc.scala.util.I18N("i18n.dl-mngr") with I18NWithConfigEn
     def eta: String = getString("ETA")
     def file: String = getString("File")
     def fileColon: String = getString("File:")
+    def hintSizeMismatch: String = getString("warning.size-hint-mismatch")
     def invalidURI: String = getString("error.invalid-uri")
     def message: String = getString("Message")
     def moveDown: String = getString("Move down")

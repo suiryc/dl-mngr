@@ -16,6 +16,7 @@ import org.apache.http.impl.nio.reactor.IOReactorConfig
 import org.apache.http.nio.conn.{NoopIOSessionStrategy, SchemeIOSessionStrategy}
 import org.apache.http.nio.conn.ssl.SSLIOSessionStrategy
 import org.apache.http.ssl.SSLContextBuilder
+import suiryc.dl.mngr.I18N.Strings
 import suiryc.dl.mngr.model._
 import suiryc.dl.mngr.util.Http
 import suiryc.scala.io.PathsEx
@@ -513,6 +514,7 @@ class DownloadManager extends StrictLogging {
     getDownloadEntry(id) match {
       case Some(dlEntry) =>
         val download = dlEntry.download
+        val info = download.info
         val failureOpt = result.failed.toOption.map {
           case ex: DownloadException => ex
           case ex: Exception => DownloadException(message = ex.getMessage, cause = ex)
@@ -524,7 +526,7 @@ class DownloadManager extends StrictLogging {
         // to resume/restart *after* the download has been 'done'.
         if (failureOpt.exists(_.reused)) {
           logger.error(s"${download.context} Download uri=<${download.uri}> was not done before being resumed/restarted")
-          download.info.addLog(LogKind.Error, "Download was not done before being resumed/restarted")
+          info.addLog(LogKind.Error, "Download was not done before being resumed/restarted")
         } else {
           // Determine final state, and add general log entry.
           val state = failureOpt match {
@@ -549,9 +551,19 @@ class DownloadManager extends StrictLogging {
                 tooltip = Some(download.tooltip)
               )
               Main.controller.addLog(logEntry)
+
+              // Check actual downloaded size against given size hint.
+              download.sizeHint.foreach { hint =>
+                if (hint != info.downloaded.get) {
+                  val message = s"Downloaded size=<${info.downloaded.get}> does not match hint=<$hint>"
+                  logger.info(s"${download.context} $message")
+                  download.info.addLog(LogKind.Warning, message)
+                }
+              }
+
               DownloadState.Success
           }
-          download.info.state.setValue(state)
+          info.state.setValue(state)
           // This entry is now 'done'.
           dlEntry.done.tryComplete(result)
           // Now that the state changed, give other downloads a chance to start and/or
@@ -759,7 +771,7 @@ class DownloadManager extends StrictLogging {
         case ex: Exception =>
           Main.controller.displayError(
             title = None,
-            contentText = Some(s"${I18N.Strings.readIssue}\n$path"),
+            contentText = Some(s"${Strings.readIssue}\n$path"),
             ex = ex
           )
           None
@@ -781,7 +793,7 @@ class DownloadManager extends StrictLogging {
           case ex: Exception =>
             Main.controller.displayError(
               title = None,
-              contentText = Some(s"${I18N.Strings.readIssue}\n$path"),
+              contentText = Some(s"${Strings.readIssue}\n$path"),
               ex = ex
             )
             (false, true)
@@ -1040,7 +1052,7 @@ class DownloadsJanitor(dlMngr: DownloadManager) extends Actor with StrictLogging
       case ex: Exception =>
         Main.controller.displayError(
           title = None,
-          contentText = Some(s"${I18N.Strings.writeIssue}\n${Main.statePath}"),
+          contentText = Some(s"${Strings.writeIssue}\n${Main.statePath}"),
           ex = ex
         )
     }

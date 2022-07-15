@@ -1661,7 +1661,10 @@ class MainController
           }
 
           def displaySize: String = {
-            val size = if (info.isSizeKnown) Option(info.size.get) else download.sizeHint
+            val size =
+              if (info.isSizeKnown) Option(info.size.get)
+              else if (download.isDone) Some(info.downloaded.get)
+              else download.sizeHint
             size.filter(_ >= 0).map { size =>
               Units.storage.toHumanReadable(size)
             }.orNull
@@ -1674,7 +1677,12 @@ class MainController
           }.add(data.sizeIcon) {
             val warnings =
               (if (!info.isSizeUnknown) Nil else List(Strings.unknownSize)) :::
-                (if (!download.acceptRanges.contains(false)) Nil else List(Strings.resumeUnsupported))
+                (if (!download.acceptRanges.contains(false)) Nil else List(Strings.resumeUnsupported)) :::
+                download.sizeHint.filter { hint =>
+                  download.isDone && (hint != info.downloaded.get)
+                }.map { hint =>
+                  Strings.hintSizeMismatch.format(info.downloaded.get, hint)
+                }.toList
 
             if (warnings.nonEmpty) {
               val icon = Icons.exclamationTriangle(styleClass = List("icon-exclamation-triangle-warning")).pane
@@ -1683,7 +1691,7 @@ class MainController
               icon
             } else null
           }.sideEffect(refreshAllDlProgress)
-           .bind(info.size, info.acceptRanges)
+           .bind(info.size, info.acceptRanges, info.state)
 
           BindingsEx.bind(data.downloadedProgress.progressProperty, throttlingFast, jfxThrottler, info.downloaded, info.state) {
             Option(info.size.get).filter(_ >= 0).map { size =>
