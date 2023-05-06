@@ -1237,9 +1237,9 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
     // Close the file and handle any issue.
     val closeError = try {
       download.closeFile(lastModified, done = state.failed.isEmpty)
-      // Ensure path (still) exists.
+      // Ensure path (still) exists when applicable.
       val path = download.downloadFile.getWorkingPath
-      if (!Files.exists(path)) throw new NoSuchFileException(path.toString)
+      if (download.info.hasDownloaded && !Files.exists(path)) throw new NoSuchFileException(path.toString)
       None
     } catch {
       case ex: DownloadException =>
