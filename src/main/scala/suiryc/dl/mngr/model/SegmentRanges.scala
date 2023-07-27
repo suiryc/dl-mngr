@@ -11,7 +11,8 @@ case class SegmentRange(start: Long, end: Long) {
 }
 
 object SegmentRange {
-  val zero = SegmentRange(0, -1)
+  val zero: SegmentRange = SegmentRange(0, -1)
+  val all: SegmentRange = SegmentRange(0)
   def apply(start: Long): SegmentRange = SegmentRange(start, Long.MaxValue)
 }
 

@@ -564,8 +564,16 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
           false
 
         case Right(acquiredOpt) =>
+          // Some servers won't indicate explicit ranges support (Accept-Ranges
+          // header) but still handle them when requested.
+          // So if we don't already know the server does not handle ranges,
+          // probe it by requesting whole content as a partial range request:
+          // we will be able to determine support in all cases.
+          val range =
+            if (download.acceptRanges.contains(false)) SegmentRange.zero
+            else SegmentRange.all
           acquiredOpt.exists { acquired =>
-            state = segmentStart(state, SegmentRange.zero, acquired, force, forced, tryCnx)
+            state = segmentStart(state, range, acquired, force, forced, tryCnx)
             true
           }
       }
@@ -842,7 +850,13 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
     } else {
       val contentLength = Http.getContentLength(response)
       val lastModified = Http.getLastModified(response)
-      val acceptRanges = Http.handleBytesRange(response)
+      // Some servers won't indicate explicit ranges support (no Accept-Ranges
+      // header), but properly respond to range request (status code and
+      // Content-Range header).
+      val acceptRanges = Http.handleBytesRange(response) || {
+        (response.getStatusLine.getStatusCode == HttpStatus.SC_PARTIAL_CONTENT) &&
+          Http.getContentRange(response).isDefined
+      }
       val validator = if (acceptRanges) Http.getValidator(response) else None
 
       // Update actual URI when applicable, so that next requests will use it
@@ -986,6 +1000,17 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
         case (consumer, _) =>
           state = changeSegmentEnd(state, consumer, range.end)
       }
+    }
+
+    // Handle partial ranges support discovery failure.
+    if (download.acceptRanges.isEmpty && actualError.exists(_.rangeFailed)) {
+      val ex = actualError.get
+      download.acceptRanges(false)
+      download.info.addLog(LogKind.Warning, "Download resuming is not supported")
+      // maxSegments will automatically be 1 now
+      state.updateMaxSegments()
+      // We can retry immediately, with ranges support disabled.
+      actualError = Some(ex.copy(skipDelay = true))
     }
 
     // Handle any SSL error.
@@ -1356,16 +1381,37 @@ class ResponseConsumer(
       }
     }
     val statusLine = response.getStatusLine
+    // Notes:
+    // On the very first try we request a range "0-", before knowing whether
+    // server supports returning ranges or not.
+    // Server is expected to return proper 206 success code if supported, or
+    // ignore the header and return standard 200 success code.
+    // For this first try, we actually don't want to enforce partial range
+    // correctness: 200 status code may indicate server does not support it,
+    // and when supported we only see the range validator for the first time
+    // (will be remembered by caller for later connections).
+    // Depending on returned headers, caller will properly determine whether
+    // server accept ranges.
+    //
+    // In case the server somehow understands we requested a range, does not
+    // support this feature and instead responds with the dedicated 416 error
+    // (Requested Range Not Satisfiable), report range failure to caller: it
+    // will remember server does not support ranges before retrying.
+    val firstCnx = !download.isStarted && download.acceptRanges.isEmpty
+    val isRange = (position > 0) || range.isDefined
     val failure = if (statusLine.getStatusCode / 100 != 2) {
       // Request failed with HTTP code other than 2xx
-      Some(DownloadException(s"Request failed with HTTP status=<(${statusLine.getStatusCode}) ${statusLine.getReasonPhrase}>"))
-    } else if ((position > 0) || range.isDefined) {
+      Some(DownloadException(
+        s"Request failed with HTTP status=<(${statusLine.getStatusCode}) ${statusLine.getReasonPhrase}>",
+        rangeFailed = isRange && (statusLine.getStatusCode == HttpStatus.SC_REQUESTED_RANGE_NOT_SATISFIABLE)
+      ))
+    } else if (!firstCnx && isRange) {
       // We requested a partial content; ensure the response is consistent.
       // It's the server responsibility to only return the appropriate HTTP code
       // when all is fine. We can still ensure that we get what we requested.
       val rangeValidator = Http.getValidator(response)
       val contentRange = Http.getContentRange(response)
-      if (response.getStatusLine.getStatusCode != HttpStatus.SC_PARTIAL_CONTENT) {
+      if (statusLine.getStatusCode != HttpStatus.SC_PARTIAL_CONTENT) {
         Some(DownloadException(
           message = s"Range request not honored; HTTP status=<(${statusLine.getStatusCode}) ${statusLine.getReasonPhrase}>",
           rangeFailed = true,
