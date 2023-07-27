@@ -1428,7 +1428,7 @@ class ResponseConsumer(
     @scala.annotation.tailrec
     def loop(first: Boolean): Boolean = {
       // Use hint when rate is limited
-      val count0 = if (end >= 0) end + 1 - position else Long.MaxValue
+      val count0 = if ((end >= 0) && (end != Long.MaxValue)) end + 1 - position else Long.MaxValue
       val count = math.min(count0, download.rateLimiter.getReadSizeHint)
       // Zero copy: transfer received content directly to file.
       // This require to do it right now: if we delegate, say to the parent
