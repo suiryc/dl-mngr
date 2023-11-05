@@ -11,7 +11,7 @@ import suiryc.scala.io.SystemStreams
 import suiryc.scala.javafx.{JFXApplication, JFXLauncher}
 import suiryc.scala.log.{LoggerConfiguration, Loggers}
 import suiryc.scala.misc.Util
-import suiryc.scala.sys.{OS, Signals, UniqueInstance}
+import suiryc.scala.sys.UniqueInstance
 import suiryc.scala.sys.UniqueInstance.CommandResult
 
 import java.io.Closeable
@@ -19,7 +19,6 @@ import java.nio.file.Path
 import java.time.format.DateTimeFormatter
 import java.time.{Instant, LocalDateTime, ZoneId}
 import scala.concurrent.{Await, Future, Promise}
-import scala.concurrent.duration._
 import scala.util.{Failure, Try}
 
 object Main extends JFXLauncher[MainApp] with StrictLogging {
@@ -111,13 +110,7 @@ object Main extends JFXLauncher[MainApp] with StrictLogging {
     // target class, or pass the target class as parameter.
     // If values other than arguments need to be passed, the second approach is
     // to be used.
-    LoggerConfiguration.listenStatus()
-    if (OS.isLinux) {
-      Signals.setSIGHUPHandler { _ =>
-        LoggerConfiguration.reload(onChange = false)
-      }
-    }
-    LoggerConfiguration.watch(10.seconds)
+    LoggerConfiguration.setup()
 
     // Note: first parsing is to check arguments are ok (and we are good to
     // start the UI) and get unique instance appId.

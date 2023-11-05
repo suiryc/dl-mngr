@@ -576,7 +576,7 @@ class DownloadManager extends StrictLogging {
                 try {
                   lazy val content = {
                     val is = new FileInputStream(path.toFile)
-                    val b = LazyList.continually(is.read()).takeWhile(_ != -1).toArray
+                    val b = LazyList.continually(is.read()).takeWhile(_ != -1).map(_.toByte).toArray
                     is.close()
                     b
                   }

@@ -871,7 +871,7 @@ class MainController
             download.renameFile(selectedFile.toPath)
           }
         }
-        val propertiesCancellable = RichObservableValue.listen(info.actualUri, info.path, info.inetAddress, info.size, info.lastModified) {
+        val propertiesCancellable = RichObservableValue.listen[Any](info.actualUri, info.path, info.inetAddress, info.size, info.lastModified) {
           JFXSystem.runLater {
             updateProperties()
           }

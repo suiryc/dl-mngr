@@ -1,44 +1,48 @@
-import sbt._
-import Keys._
-import suiryc.scala.sbt.AssemblyEx
+import sbt.*
+import Keys.*
+import suiryc.scala.sbt.{AssemblyEx, Versioning}
 
 lazy val versions = Map[String, String](
-  "akka"                  -> "2.6.15",
-  "bouncycastle"          -> "1.69",
-  "config"                -> "1.4.1",
-  "dl-mngr"               -> "1.0-SNAPSHOT",
+  "akka"                  -> "2.6.21",
+  "bouncycastle"          -> "1.76",
+  "config"                -> "1.4.3",
   "httpasyncclient"       -> "4.1.5",
   "httpclient"            -> "4.5.14",
   "javafx"                -> "12.0.1",
-  "logback"               -> "1.2.3",
+  "logback"               -> "1.4.11",
   "monix"                 -> "3.4.0",
-  "netty"                 -> "4.1.65.Final",
-  "scala"                 -> "2.13.6",
-  "scala-logging"         -> "3.9.3",
-  "scalatest"             -> "3.2.9",
-  "scopt"                 -> "4.0.1",
-  "slf4j"                 -> "1.7.31",
+  "netty"                 -> "4.1.100.Final",
+  "scala"                 -> "2.13.12",
+  "scala-logging"         -> "3.9.5",
+  "scalatest"             -> "3.2.17",
+  "scopt"                 -> "4.1.0",
+  "slf4j"                 -> "2.0.9",
   "spray-json"            -> "1.3.6",
   "suiryc-scala"          -> "0.0.4-SNAPSHOT"
 )
 
+// Determine version (and log it) once before using it.
+lazy val projectVersion = Versioning.version
+Global / onLoad := {
+  val original = (Global / onLoad).value
+  sLog.value.info(s"Project version: $projectVersion")
+  original
+}
 
 lazy val dlMngr = project.in(file("."))
-  .enablePlugins(BuildInfoPlugin, GitVersioning)
+  .enablePlugins(BuildInfoPlugin)
   .settings(
     organization := "suiryc",
     name := "dl-mngr",
-    // Note: if we want to let sbt-git generate the version, we need to comment
-    // "version", uncomment "git.baseVersion" and remove "-SNAPSHOT" (sbt-git
-    // will append it if necessary).
-    version := versions("dl-mngr"),
-    //git.baseVersion := versions("dl-mngr"),
+    version := projectVersion,
     scalaVersion := versions("scala"),
 
     buildInfoKeys := Seq[BuildInfoKey](
       name,
       version,
-      git.gitHeadCommit,
+      BuildInfoKey.action("gitHeadCommit") {
+        Versioning.commitId
+      },
       scalaVersion,
       sbtVersion,
       BuildInfoKey.action("buildTime") {
@@ -80,7 +84,14 @@ lazy val dlMngr = project.in(file("."))
         exclude ("commons-logging", "commons-logging"),
       "org.apache.httpcomponents"      %  "httpasyncclient"               % versions("httpasyncclient")
         exclude ("commons-logging", "commons-logging"),
-      "org.bouncycastle"               %  "bcprov-jdk15on"                % versions("bouncycastle"),
+      // Starting with bouncycastle 1.71, jdk15on is not released anymore and
+      // fully replaced by jdk18on.
+      "org.bouncycastle"               %  "bcprov-jdk18on"                % versions("bouncycastle"),
+      // Debug variants: beware that the "-debug" variants use the non-debug
+      // variants as dependencies, so for consistency we need to declare all
+      // dependencies (direct or transitive) explicitly and exclude transitive
+      // non-debug dependencies.
+      //"org.bouncycastle"               %  "bcprov-debug-jdk18on"          % versions("bouncycastle"),
       "org.openjfx"                    %  "javafx-base"                   % versions("javafx") classifier jfxPlatform,
       "org.openjfx"                    %  "javafx-controls"               % versions("javafx") classifier jfxPlatform,
       "org.openjfx"                    %  "javafx-fxml"                   % versions("javafx") classifier jfxPlatform,
@@ -99,11 +110,12 @@ lazy val dlMngr = project.in(file("."))
     publishTo := Some(Resolver.mavenLocal)
   )
 
+// Files to exclude: are generated inside 'target/classes' if running
+// from IDE. Useful when not cleaning up before packaging ...
+// Note: "reference.conf*" is also discarded in assembly merge strategy.
+lazy val excludedFiles = Set("application.conf", "reference.conf.bak", "state.json")
+
 def remap(mappings: Seq[(File, String)]): Seq[(File, String)] = {
-  // Files to exclude: are generated inside 'target/classes' if running
-  // from IDE. Useful when not cleaning up before packaging ...
-  // Note: "application.conf*" is also discarded in assembly merge strategy.
-  val exclude = Set("application.conf", "application.conf.bak", "state.json")
   // The 'package' path
   val matchPath = "package"
   // Get all files to package, and determine the actual destination path
@@ -118,21 +130,18 @@ def remap(mappings: Seq[(File, String)]): Seq[(File, String)] = {
   val toPackageDst = toPackage.map(_._2).toSet
   // Replace mappings that we are explicitly packaging
   mappings.filter {
-    case (src, dst) => !toPackageSrc.contains(src) && !toPackageDst.contains(dst) && !exclude.contains(dst)
+    case (src, dst) => !toPackageSrc.contains(src) && !toPackageDst.contains(dst) && !excludedFiles.contains(dst)
   } ++ toPackage
 }
 
-// Replace mappings for fat jar generation
-assembly / assembledMappings ~= { mappings =>
-  mappings.map { m =>
-    if (m.sourcePackage.isEmpty) m.copy(mappings = remap(m.mappings).toVector)
-    else m
-  }
-}
+// Since sbt-assembly 1.0.0, running tests must be configured explicitly
+assembly / test := (Test / test).value
 
 ThisBuild / assemblyMergeStrategy := {
   case PathList(x @ _*) if x.last == "module-info.class" => MergeStrategy.discard
-  case "application.conf" => AssemblyEx.concatJarThenDir
+  case PathList("META-INF", "io.netty.versions.properties") => MergeStrategy.concat
+  case "application.conf" => AssemblyEx.strategies.concatLibsThenProject
+  case x if excludedFiles.contains(x) => AssemblyEx.strategies.libsOnly
   case x => (ThisBuild / assemblyMergeStrategy).value.apply(x)
 }
 
