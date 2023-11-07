@@ -194,7 +194,7 @@ class MainController
   def initialize(state: State): Unit = {
     refreshLogs()
     addLog(LogKind.Info, s"Started name=<${Info.name}> version=<${Info.version}>${
-      Info.gitHeadCommit.map(v => s" gitCommit=<$v>").getOrElse("")
+      Info.commitId.map(v => s" gitCommit=<$v>").getOrElse("")
     } buildTime=<${Main.buildTimeString}>")
     state.stage.setTitle(Main.versionedName)
 

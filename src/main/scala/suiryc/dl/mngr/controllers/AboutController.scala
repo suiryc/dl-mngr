@@ -43,7 +43,7 @@ class AboutController {
     versionLabel.setText(Info.version)
     scalaVersionLabel.setText(Info.scalaVersion)
     sbtVersionLabel.setText(Info.sbtVersion)
-    gitCommitLabel.setText(Info.gitHeadCommit.orNull)
+    gitCommitLabel.setText(Info.commitId.orNull)
     buildTimeLabel.setText(Main.buildTimeString)
 
     val dependencies = Info.libraryDependencies.flatMap { dep =>

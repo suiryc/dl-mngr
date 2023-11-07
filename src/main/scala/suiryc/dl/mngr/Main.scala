@@ -40,7 +40,7 @@ object Main extends JFXLauncher[MainApp] with StrictLogging {
   lazy val settings = new Settings(appPathRelative("application.conf"))
 
   val versionedName: String = s"${Info.name} ${Info.version}${
-    Info.gitHeadCommit.map(v => s" ($v)").getOrElse("")
+    Info.commitId.map(v => s" ($v)").getOrElse("")
   }"
 
   val buildTime: LocalDateTime = LocalDateTime.ofInstant(Instant.ofEpochMilli(Info.buildTime), ZoneId.systemDefault)
