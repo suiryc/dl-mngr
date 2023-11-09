@@ -6,12 +6,15 @@
 
   <contextListener class="ch.qos.logback.classic.jul.LevelChangePropagator"/>
 
-  <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
-    <!-- Encoders are assigned the type ch.qos.logback.classic.encoder.PatternLayoutEncoder by default -->
+  <!-- Encoders are assigned the type ch.qos.logback.classic.encoder.PatternLayoutEncoder by default -->
+
+  <!-- Comment unused appenders, otherwise logback will issue warnings printed -->
+  <!-- by the status listener. -->
+  <!-- <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
     <encoder>
       <pattern>%d{HH:mm:ss.SSS} %-5level [%thread][%logger{48}] %msg%n</pattern>
     </encoder>
-  </appender>
+  </appender> -->
 
   <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
     <!-- 'file' property must not be set in prudent mode -->
@@ -22,7 +25,6 @@
     <!-- append mode is automatic in prudent mode -->
     <append>true</append>
     <immediateFlush>true</immediateFlush>
-    <!-- Encoders are assigned the type ch.qos.logback.classic.encoder.PatternLayoutEncoder by default -->
     <encoder>
       <pattern>%d{HH:mm:ss.SSS} %-5level [%thread][%logger{48}] %msg%n</pattern>
     </encoder>
