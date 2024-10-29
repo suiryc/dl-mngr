@@ -14,11 +14,12 @@ import suiryc.scala.misc.Util
 import suiryc.scala.sys.UniqueInstance
 import suiryc.scala.sys.UniqueInstance.CommandResult
 
-import java.io.Closeable
+import java.io.{Closeable, InputStream}
 import java.nio.file.Path
 import java.time.format.DateTimeFormatter
 import java.time.{Instant, LocalDateTime, ZoneId}
 import scala.concurrent.{Await, Future, Promise}
+import scala.io.StdIn
 import scala.util.{Failure, Try}
 
 object Main extends JFXLauncher[MainApp] with StrictLogging {
@@ -157,11 +158,19 @@ object Main extends JFXLauncher[MainApp] with StrictLogging {
     }
   }
 
-  protected def _cmd(args: Array[String]): Future[CommandResult] = {
-    // Second parsing to actually process the arguments through unique instance.
-    parser.parse(args, Params()).map(cmd).getOrElse {
-      // Should not happen
-      Future.successful(CommandResult(UniqueInstance.CODE_CMD_ERROR, Some("Invalid arguments")))
+  protected def _cmd(args: Array[String], input: InputStream): Future[CommandResult] = {
+    // Replace stdin *and* scala Console.in
+    val streams = SystemStreams.replace(input)
+    try {
+      Console.withIn(input) {
+        // Second parsing to actually process the arguments through unique instance.
+        parser.parse(args, Params()).map(cmd).getOrElse {
+          // Should not happen
+          Future.successful(CommandResult(UniqueInstance.CODE_CMD_ERROR, Some("Invalid arguments")))
+        }
+      }
+    } finally {
+      SystemStreams.restore(streams)
     }
   }
 
