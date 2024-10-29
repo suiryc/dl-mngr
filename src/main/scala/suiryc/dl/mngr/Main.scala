@@ -3,6 +3,7 @@ package suiryc.dl.mngr
 import com.typesafe.scalalogging.StrictLogging
 import javafx.stage.Stage
 import monix.execution.Scheduler
+import spray.json._
 import suiryc.dl.mngr.I18N.Strings
 import suiryc.dl.mngr.controllers.MainController
 import suiryc.dl.mngr.model.NewDownloadInfo
@@ -77,6 +78,9 @@ object Main extends JFXLauncher[MainApp] with StrictLogging {
     }
     opt[Boolean]("io-capture").action { (v, c) =>
       c.copy(ioCapture = Some(v))
+    }
+    opt[Unit]("json").action { (_, c) =>
+      c.copy(json = Some(true))
     }
     opt[Long]("size").action { (v, c) =>
       c.copy(size = Some(v))
@@ -164,13 +168,28 @@ object Main extends JFXLauncher[MainApp] with StrictLogging {
     try {
       Console.withIn(input) {
         // Second parsing to actually process the arguments through unique instance.
-        parser.parse(args, Params()).map(cmd).getOrElse {
+        parser.parse(args, Params()).map(parseJsonParams).map(cmd).getOrElse {
           // Should not happen
           Future.successful(CommandResult(UniqueInstance.CODE_CMD_ERROR, Some("Invalid arguments")))
         }
       }
     } finally {
       SystemStreams.restore(streams)
+    }
+  }
+
+  private def parseJsonParams(params: Params): Params = {
+    if (params.withJson) {
+      val line = Option(StdIn.readLine()).map(_.trim).getOrElse("")
+      try {
+        params.merge(line.parseJson.convertTo[Params])
+      } catch {
+        case ex: Exception =>
+          logger.error(s"Invalid JSON input=<$line>", ex)
+          params
+      }
+    } else {
+      params
     }
   }
 
@@ -206,7 +225,15 @@ object Main extends JFXLauncher[MainApp] with StrictLogging {
         wsPort <- fWS
         _ <- fExec
       } yield {
-        CommandResult(UniqueInstance.CODE_SUCCESS, if (wsPort > 0) Some(wsPort.toString) else None)
+        val output = if (params.withJson) {
+          val json = CommandOutput(
+            wsPort = if (wsPort > 0) Some(wsPort) else None
+          ).toJson.compactPrint
+          Some(json)
+        } else {
+          if (wsPort > 0) Some(wsPort.toString) else None
+        }
+        CommandResult(UniqueInstance.CODE_SUCCESS, output)
       }
       f.andThen {
         case Failure(ex) =>
@@ -248,6 +275,7 @@ object Main extends JFXLauncher[MainApp] with StrictLogging {
     correlationId: Option[String] = None,
     file: Option[String] = None,
     ioCapture: Option[Boolean] = Some(true),
+    json: Option[Boolean] = Some(false),
     referrer: Option[String] = None,
     size: Option[Long] = None,
     uniqueInstanceId: Option[String] = Some("suiryc.dl-mngr"),
@@ -255,12 +283,33 @@ object Main extends JFXLauncher[MainApp] with StrictLogging {
     userAgent: Option[String] = None,
     ws: Option[Boolean] = None
   ) {
+
     def isAuto: Boolean = auto.contains(true)
+
+    def withJson: Boolean = json.contains(true)
+
     def needWs: Boolean = ws.contains(true)
+
+    def merge(other: Params): Params = {
+      // Convert objects to JSON, then merge fields: 'other' overrides ours.
+      // And convert back to Params.
+      val fields = (this:Params).toJson.asJsObject.fields ++
+        other.toJson.asJsObject.fields
+      JsObject(fields).convertTo[Params]
+    }
+
   }
 
   object Params extends DefaultJsonProtocol {
-    implicit val paramsFormat: RootJsonFormat[Params] = jsonFormat12(Params.apply)
+    implicit val paramsFormat: RootJsonFormat[Params] = jsonFormat13(Params.apply)
+  }
+
+  private case class CommandOutput(
+    wsPort: Option[Int]
+  )
+
+  private object CommandOutput extends DefaultJsonProtocol {
+    implicit val commandOutputFormat: RootJsonFormat[CommandOutput] = jsonFormat1(CommandOutput.apply)
   }
 
 }
