@@ -168,7 +168,6 @@ object WSServer extends StrictLogging {
     }
 
     private def processMessage(msg: String): Future[String] = {
-      import JsonProtocol._
       val paramsOpt = try {
         Right(msg.parseJson.convertTo[Main.Params])
       } catch {
@@ -218,9 +217,8 @@ object WSServer extends StrictLogging {
     output: Option[String] = None
   )
 
-  private object JsonProtocol extends DefaultJsonProtocol {
-    implicit val paramsFormat: RootJsonFormat[Main.Params] = jsonFormat12(Main.Params)
-    implicit val resultFormat: RootJsonFormat[CommandResult] = jsonFormat3(CommandResult)
+  private object CommandResult extends DefaultJsonProtocol {
+    implicit val resultFormat: RootJsonFormat[CommandResult] = jsonFormat3(CommandResult.apply)
   }
 
 }

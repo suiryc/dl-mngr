@@ -259,6 +259,10 @@ object Main extends JFXLauncher[MainApp] with StrictLogging {
     def needWs: Boolean = ws.contains(true)
   }
 
+  object Params extends DefaultJsonProtocol {
+    implicit val paramsFormat: RootJsonFormat[Params] = jsonFormat12(Params.apply)
+  }
+
 }
 
 class MainApp extends JFXApplication {
