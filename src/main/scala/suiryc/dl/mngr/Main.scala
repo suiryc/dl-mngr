@@ -180,7 +180,7 @@ object Main extends JFXLauncher[MainApp] with StrictLogging {
 
   private def parseJsonParams(params: Params): Params = {
     if (params.withJson) {
-      val line = Option(StdIn.readLine()).map(_.trim).getOrElse("")
+      val line = Option(StdIn.readLine()).map(_.trim).filterNot(_.isEmpty).getOrElse("{}")
       try {
         params.merge(line.parseJson.convertTo[Params])
       } catch {
