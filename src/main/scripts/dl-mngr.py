@@ -116,9 +116,23 @@ async def start(remainingAttempts = 2):
       continue
     return returncode
 
-# Note:
+# Notes:
 # Usually we would 'asyncio.run()', or alternatively (more explicitly)
 # 'loop.run_until_complete()' then 'loop.close()'.
 # But this (closing the loop) kills the subprocess. So don't do it.
+#
+# In recent python versions (some 3.10/3.11 and >= 3.12), if no event loop was
+# created in asyncio first, 'get_event_loop' will emit a deprecation warning
+#   DeprecationWarning: There is no current event loop
+#   (source code line where the warning was triggered)
+# In future versions, it will plainly fail.
+# We need to create a loop, then we can set/get it
+#   asyncio.set_event_loop(asyncio.new_event_loop())
+#   asyncio.get_event_loop()...
+# Alternatively we could simply use it after creating it
+#   asyncio.new_event_loop()...
+# But doing so will kill the subprocess once the loop is done.
+#
 # Exit with the received return code (or one we decided).
+asyncio.set_event_loop(asyncio.new_event_loop())
 exit(asyncio.get_event_loop().run_until_complete(start()))
