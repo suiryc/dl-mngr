@@ -30,8 +30,9 @@ import sys
 # Use 'javaw' to prevent a (visible) cmd console to be created.
 
 # Linux:
-# Use the Java 10 binary explicitly.
+# Use the Java 11 binary explicitly.
 # Passing a non-0 creationflags may not work in Popen (without giving error).
+# 64M/80M of max memory may cause OOMs in JavaFX prism. 96M appears ok.
 
 if 'CREATE_BREAKAWAY_FROM_JOB' not in dir( subprocess ):
   subprocess.CREATE_BREAKAWAY_FROM_JOB = 0x01000000
@@ -50,9 +51,11 @@ args = parser.parse_args()
 
 javaExe = '/usr/lib/jvm/java-11-openjdk/bin/java'
 creationflags = 0
+memMax='96M'
 if sys.platform.startswith('win'):
   javaExe = 'javaw'
   creationflags = subprocess.CREATE_BREAKAWAY_FROM_JOB
+  memMax='64M'
   # See: https://docs.python.org/3/library/asyncio-platforms.html#asyncio-windows-subprocess
   asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
   # Apparently equivalent to explicitly setting the loop
@@ -65,7 +68,7 @@ classpath = os.pathsep.join([dirScript, os.path.join(dirScript, 'dl-mngr.jar'), 
 # cached at VM startup. In order to prefer IPv6 addresses (when client and
 # server handle both IPv4 and IPv6), the property must be set before starting.
 # (System.setProperty even as first executed code does not work)
-cmd = [javaExe, '-Xms16M', '-Xmx64M', '-XX:MaxRAM=64M', '-Djava.net.preferIPv6Addresses=true', '-cp', classpath, 'suiryc.dl.mngr.Main'] + args.arguments
+cmd = [javaExe, '-Xms16M', f'-Xmx{memMax}', f'-XX:MaxRAM={memMax}', '-Djava.net.preferIPv6Addresses=true', '-cp', classpath, 'suiryc.dl.mngr.Main'] + args.arguments
 
 # In simple cases 'Popen' and 'communicate' is the way to go. But it waits for
 # the process to terminate, which is not what we want (especially for the first
