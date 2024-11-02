@@ -274,10 +274,12 @@ object Main extends JFXLauncher[MainApp] with StrictLogging {
     cookie: Option[String] = None,
     correlationId: Option[String] = None,
     file: Option[String] = None,
+    hls: Option[Params.HLS] = None,
     ioCapture: Option[Boolean] = Some(true),
     json: Option[Boolean] = Some(false),
     referrer: Option[String] = None,
     size: Option[Long] = None,
+    subtitle: Option[Params.Subtitle] = None,
     uniqueInstanceId: Option[String] = Some("suiryc.dl-mngr"),
     url: Option[String] = None,
     userAgent: Option[String] = None,
@@ -301,7 +303,32 @@ object Main extends JFXLauncher[MainApp] with StrictLogging {
   }
 
   object Params extends DefaultJsonProtocol {
-    implicit val paramsFormat: RootJsonFormat[Params] = jsonFormat13(Params.apply)
+
+    case class HLSKey(
+      method: String,
+      url: Option[String],
+      raw: Option[String]
+    )
+
+    case class HLS(
+      raw: String,
+      url: String,
+      keys: List[HLSKey]
+    )
+
+    case class Subtitle(
+      raw: String,
+      url: String,
+      filename: String,
+      lang: Option[String],
+      name: Option[String]
+    )
+
+    implicit val hlsKeyFormat: RootJsonFormat[HLSKey] = jsonFormat3(HLSKey)
+    implicit val hlsFormat: RootJsonFormat[HLS] = jsonFormat3(HLS)
+    implicit val subtitleFormat: RootJsonFormat[Subtitle] = jsonFormat5(Subtitle)
+    implicit val paramsFormat: RootJsonFormat[Params] = jsonFormat15(Params.apply)
+
   }
 
   private case class CommandOutput(
