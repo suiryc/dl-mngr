@@ -10,7 +10,7 @@ import javafx.scene.control._
 import javafx.scene.input.Clipboard
 import javafx.stage.{FileChooser, Modality, Stage, Window}
 import scala.annotation.unused
-import suiryc.dl.mngr.model.{Download, NewDownloadInfo, SegmentRange}
+import suiryc.dl.mngr.model.{Download, SegmentRange}
 import suiryc.dl.mngr.util.{Http, Icons}
 import suiryc.dl.mngr.{DownloadManager, I18N, Main, Settings}
 import suiryc.scala.io.PathsEx
@@ -66,14 +66,14 @@ class NewDownloadController extends StageLocationPersistentView(NewDownloadContr
 
   private var dlMngr: DownloadManager = _
 
-  private var dlInfo: NewDownloadInfo = _
+  private var dlParams: Main.Params = _
 
   private var result: Option[Result] = None
 
-  def initialize(dialog: Dialog[_], dlMngr: DownloadManager, dlInfo: NewDownloadInfo): Unit = {
+  def initialize(dialog: Dialog[_], dlMngr: DownloadManager, dlParams: Main.Params): Unit = {
     this.dialog = dialog
     this.dlMngr = dlMngr
-    this.dlInfo = dlInfo
+    this.dlParams = dlParams
 
     // Load css
     Styles.addStylesheet(stage.getScene)
@@ -84,7 +84,7 @@ class NewDownloadController extends StageLocationPersistentView(NewDownloadContr
 
     folderField.setText(Main.settings.downloadsPath.get.toString)
 
-    dlInfo.uri match {
+    dlParams.url match {
       case Some(uri) =>
         uriField.setText(uri)
 
@@ -106,16 +106,16 @@ class NewDownloadController extends StageLocationPersistentView(NewDownloadContr
           uriField.setText(uri.toString)
         }
     }
-    dlInfo.referrer.foreach(referrerField.setText)
-    dlInfo.cookie.foreach(cookieField.setText)
-    dlInfo.userAgent.foreach(userAgentField.setText)
+    dlParams.referrer.foreach(referrerField.setText)
+    dlParams.cookie.foreach(cookieField.setText)
+    dlParams.userAgent.foreach(userAgentField.setText)
     val comment = List(
-      dlInfo.sizeHint.filter(_ >= 0).map(Units.storage.toHumanReadable(_)),
-      dlInfo.comment
+      dlParams.size.filter(_ >= 0).map(Units.storage.toHumanReadable(_)),
+      dlParams.comment
     ).flatten.mkString("\n")
     if (comment.nonEmpty) commentField.setText(comment)
     // Take into account given file(name)
-    dlInfo.file.map { filename =>
+    dlParams.file.map { filename =>
       // First sanitize filename.
       if (Paths.get(PathsEx.sanitizePath(filename)).isAbsolute) {
         // The given filename actually is an absolute path.
@@ -125,7 +125,7 @@ class NewDownloadController extends StageLocationPersistentView(NewDownloadContr
         sanitizePath(
           Some(folder.mkString(File.separator)),
           Some(file.mkString(File.separator)),
-          auto = dlInfo.auto,
+          auto = dlParams.isAuto,
           canModify = false
         )._1
       } else {
@@ -133,7 +133,7 @@ class NewDownloadController extends StageLocationPersistentView(NewDownloadContr
         sanitizePath(
           getFolder,
           Some(filename),
-          auto = dlInfo.auto,
+          auto = dlParams.isAuto,
           canModify = false
         )._1
       }
@@ -157,7 +157,7 @@ class NewDownloadController extends StageLocationPersistentView(NewDownloadContr
       if (result.isEmpty) event.consume()
     })
 
-    if (dlInfo.auto) result = checkForm(auto = dlInfo.auto)
+    if (dlParams.isAuto) result = checkForm(auto = dlParams.isAuto)
     else RichObservableValue.listen(uriField.textProperty, folderField.textProperty, filenameField.textProperty)(checkForm())
     ()
   }
@@ -365,7 +365,7 @@ class NewDownloadController extends StageLocationPersistentView(NewDownloadContr
         hints.uri.foreach { uri =>
           uriField.setText(uri.toString)
         }
-        if (hints.size.isDefined) dlInfo = dlInfo.copy(sizeHint = hints.size)
+        if (hints.size.isDefined) dlParams = dlParams.copy(size = hints.size)
         hints.filename.foreach(filenameField.setText)
       }
     }
@@ -556,7 +556,7 @@ object NewDownloadController {
   }
 
   /** Builds a dialog out of this controller. */
-  def buildDialog(mainController: MainController, owner: Window, dlMngr: DownloadManager, dlInfo: NewDownloadInfo): Option[Dialog[Option[Download]]] = {
+  def buildDialog(mainController: MainController, owner: Window, dlMngr: DownloadManager, dlParams: Main.Params): Option[Dialog[Option[Download]]] = {
     val dialog = new Dialog[Option[Download]]()
     Stages.initOwner(dialog, owner)
     dialog.setTitle(Strings.addDownload)
@@ -565,13 +565,13 @@ object NewDownloadController {
     val loader = new FXMLLoader(getClass.getResource("/fxml/new-download.fxml"), I18N.getResources)
     dialog.getDialogPane.setContent(loader.load[Node]())
     val controller = loader.getController[NewDownloadController]
-    controller.initialize(dialog, dlMngr, dlInfo)
+    controller.initialize(dialog, dlMngr, dlParams)
 
     // Note: we must set the result converter in order to process the result
     // (be it in automatic mode or not)
     dialog.setResultConverter(resultConverter(mainController, controller) _)
 
-    if (!dlInfo.auto || controller.result.isEmpty) {
+    if (!dlParams.isAuto || controller.result.isEmpty) {
       Dialogs.addPersistence(dialog, controller)
 
       // Bring to front once shown
@@ -611,7 +611,7 @@ object NewDownloadController {
           cookie = result.cookie,
           userAgent = result.userAgent,
           save = result.path,
-          sizeHint = controller.dlInfo.sizeHint.filter(_ >= 0),
+          sizeHint = controller.dlParams.size.filter(_ >= 0),
           reused = result.reused,
           insertFirst = result.insertFirst
         )

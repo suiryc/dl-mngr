@@ -1303,9 +1303,9 @@ class MainController
     }
   }
 
-  def addDownload(dlInfo: NewDownloadInfo): Future[Unit] = {
+  def addDownload(dlParams: Main.Params): Future[Unit] = {
     val promise = Promise[Unit]()
-    actor ! OnDownloadsAdd(dlInfo, promise)
+    actor ! OnDownloadsAdd(dlParams, promise)
     promise.future
   }
 
@@ -1341,7 +1341,7 @@ class MainController
 
   @unused
   def onDownloadsAdd(@unused event: ActionEvent): Unit = {
-    addDownload(NewDownloadInfo())
+    addDownload(Main.Params())
     ()
   }
 
@@ -1418,14 +1418,14 @@ class MainController
       }
 
     private def receive0(state: State): Receive = {
-      case OnOptions(display)              => onOptions(state, display)
-      case OnAbout                         => onAbout(state)
-      case OnExit                          => onExit(state)
-      case OnDownloadsAdd(dlInfo, promise) => onDownloadsAdd(state, dlInfo, promise)
-      case OnDownloadsRemoveCompleted      => onDownloadsRemoveCompleted(state)
-      case OnDownloadsRemove(force)        => onDownloadsRemove(state, force)
-      case AddDownload(id, first, select)  => addDownload(state, id, first, select)
-      case MoveDownloads(ids, up, most)    => moveDownloads(state, ids, up, most)
+      case OnOptions(display)                => onOptions(state, display)
+      case OnAbout                           => onAbout(state)
+      case OnExit                            => onExit(state)
+      case OnDownloadsAdd(dlParams, promise) => onDownloadsAdd(state, dlParams, promise)
+      case OnDownloadsRemoveCompleted        => onDownloadsRemoveCompleted(state)
+      case OnDownloadsRemove(force)          => onDownloadsRemove(state, force)
+      case AddDownload(id, first, select)    => addDownload(state, id, first, select)
+      case MoveDownloads(ids, up, most)      => moveDownloads(state, ids, up, most)
     }
 
     private def onExit(state: State): Unit = {
@@ -1524,13 +1524,13 @@ class MainController
       dialog.show()
     }
 
-    private def onDownloadsAdd(state: State, dlInfo: NewDownloadInfo, promise: Promise[Unit]): Unit = {
+    private def onDownloadsAdd(state: State, dlParams: Main.Params, promise: Promise[Unit]): Unit = {
       // We actually notify caller once we take into account the new download,
       // not whether we fail, user discard it, nor when it actually is added.
       // So complete the promise now, in case we fail to build the dialog, in
       // which case an appropriate error will be displayed.
       promise.trySuccess(())
-      val dialogOpt = NewDownloadController.buildDialog(MainController.this, state.stage, state.dlMngr, dlInfo)
+      val dialogOpt = NewDownloadController.buildDialog(MainController.this, state.stage, state.dlMngr, dlParams)
       // In automatic mode, there is no dialog and download has been added.
       dialogOpt.foreach { dialog =>
         dialog.initModality(Modality.WINDOW_MODAL)
@@ -2007,7 +2007,7 @@ object MainController {
   case class OnOptions(display: OptionsController.Display = OptionsController.Display())
   case object OnAbout
   case object OnExit
-  case class OnDownloadsAdd(dlInfo: NewDownloadInfo, promise: Promise[Unit])
+  case class OnDownloadsAdd(dlParams: Main.Params, promise: Promise[Unit])
   case object OnDownloadsRemoveCompleted
   case class OnDownloadsRemove(force: Boolean)
   case class AddDownload(id: UUID, first: Boolean, select: Boolean)

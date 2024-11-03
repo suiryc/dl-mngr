@@ -6,7 +6,6 @@ import monix.execution.Scheduler
 import spray.json._
 import suiryc.dl.mngr.I18N.Strings
 import suiryc.dl.mngr.controllers.MainController
-import suiryc.dl.mngr.model.NewDownloadInfo
 import suiryc.scala.akka.{AkkaResources, CoreSystem}
 import suiryc.scala.io.SystemStreams
 import suiryc.scala.javafx.{JFXApplication, JFXLauncher}
@@ -203,21 +202,11 @@ object Main extends JFXLauncher[MainApp] with StrictLogging {
         Future.successful(-1)
       }
       val fExec = if (params.url.isDefined) {
-        val dlInfo = NewDownloadInfo(
-          auto = params.isAuto,
-          uri = params.url,
-          referrer = params.referrer,
-          cookie = params.cookie,
-          userAgent = params.userAgent,
-          file = params.file,
-          sizeHint = params.size,
-          comment = params.comment
-        )
         // Reminder: we are notified when the new download is taken into
         // account by the application, not whether it actually is added.
         // This is what we wish: it only matters that the application properly
         // started; any error will be displayed in the user interface and logs.
-        controller.addDownload(dlInfo)
+        controller.addDownload(params)
       } else {
         Future.successful(())
       }
@@ -269,20 +258,35 @@ object Main extends JFXLauncher[MainApp] with StrictLogging {
   }
 
   case class Params(
+    /** Whether to automatically process this new download. */
     auto: Option[Boolean] = None,
+    /** Comment. */
     comment: Option[String] = None,
+    /** Cookie. */
     cookie: Option[String] = None,
+    /** WebSocket correlation id (for response). */
     correlationId: Option[String] = None,
+    /** Filename. */
     file: Option[String] = None,
+    /** Video HLS. */
     hls: Option[Params.HLS] = None,
+    /** Whether to capture console I/O. */
     ioCapture: Option[Boolean] = Some(true),
+    /** Whether params are passed as JSON (after command line). */
     json: Option[Boolean] = Some(false),
+    /** Referrer URI. */
     referrer: Option[String] = None,
+    /** Size hint (informational). */
     size: Option[Long] = None,
+    /** Video subtitles. */
     subtitle: Option[Params.Subtitle] = None,
+    /** Unique instance id to use. */
     uniqueInstanceId: Option[String] = Some("suiryc.dl-mngr"),
+    /** Remote URI to download from. */
     url: Option[String] = None,
+    /** User agent. */
     userAgent: Option[String] = None,
+    /** Whether to return (start if needed) WebSocket port. */
     ws: Option[Boolean] = None
   ) {
 

@@ -13,25 +13,6 @@ object DownloadState extends Enumeration {
   val Stopped, Pending, Running, Done, Failure = Value
 }
 
-case class NewDownloadInfo(
-  /** Whether to automatically process this new download. */
-  auto: Boolean = false,
-  /** Remote URI to download from. */
-  uri: Option[String] = None,
-  /** Referrer URI. */
-  referrer: Option[String] = None,
-  /** Cookie. */
-  cookie: Option[String] = None,
-  /** User agent. */
-  userAgent: Option[String] = None,
-  /** Filename. */
-  file: Option[String] = None,
-  /** Size hint (informational). */
-  sizeHint: Option[Long] = None,
-  /** Comment. */
-  comment: Option[String] = None
-)
-
 class DownloadInfo extends ObservableLogs {
   // Note: some info changes need to be listened to (through Property).
   /** Promise completed once the download is 'finished' (success or failure). */
