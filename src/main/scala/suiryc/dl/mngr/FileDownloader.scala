@@ -1375,7 +1375,7 @@ class ResponseConsumer(
   override def onResponseReceived(response: HttpResponse): Unit = {
     // Through the context we can actually get hold of the underlying client
     // connection.
-    if (download.info.inetAddress.get().isEmpty) {
+    if (!download.info.isInetAddressDetermined) {
       Option(context.getConnection(classOf[ManagedNHttpClientConnection])).foreach { cnx =>
         download.info.inetAddress.set(Some(cnx.getRemoteAddress))
       }
