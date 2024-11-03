@@ -162,7 +162,7 @@ class NewDownloadController extends StageLocationPersistentView(NewDownloadContr
     ()
   }
 
-  protected def sanitizePath(folder: Option[String],
+  private def sanitizePath(folder: Option[String],
     filename: Option[String],
     auto: Boolean,
     canModify: Boolean): (Path, Boolean) =
@@ -341,6 +341,7 @@ class NewDownloadController extends StageLocationPersistentView(NewDownloadContr
     }
   }
 
+  @unused
   def onUriDebug(@unused event: ActionEvent): Unit = {
     import suiryc.scala.RichOption._
 
@@ -370,11 +371,13 @@ class NewDownloadController extends StageLocationPersistentView(NewDownloadContr
     }
   }
 
+  @unused
   def onFilenameRefresh(): Unit = {
     filenameField.textField.requestFocus()
     updateFilename(None)
   }
 
+  @unused
   def onFileSelect(@unused event: ActionEvent): Unit = {
     val fileChooser = new FileChooser()
     fileChooser.setTitle(dialog.getTitle)
@@ -388,7 +391,7 @@ class NewDownloadController extends StageLocationPersistentView(NewDownloadContr
     }
   }
 
-  def resolveConflict(header: String, content: String,
+  private def resolveConflict(header: String, content: String,
     canResume: Boolean, canRestart: Boolean, canRename: Boolean,
     defaultRestart: Boolean): Option[ConflictResolution.Value] =
   {
@@ -420,9 +423,9 @@ class NewDownloadController extends StageLocationPersistentView(NewDownloadContr
     }
   }
 
-  def getText(s: String): Option[String] = Option(s).filterNot(_.trim.isEmpty)
+  private def getText(s: String): Option[String] = Option(s).filterNot(_.trim.isEmpty)
 
-  def getURI(s: String): Option[URI] = {
+  private def getURI(s: String): Option[URI] = {
     try {
       getText(s).map(Http.getURI)
     } catch {
@@ -437,28 +440,28 @@ class NewDownloadController extends StageLocationPersistentView(NewDownloadContr
     }
   }
 
-  def getURI: Option[URI] = getURI(uriField.getText)
+  private def getURI: Option[URI] = getURI(uriField.getText)
 
-  def getReferrer: Option[URI] = getURI(referrerField.getText)
+  private def getReferrer: Option[URI] = getURI(referrerField.getText)
 
-  def getCookie: Option[String] = getText(cookieField.getText)
+  private def getCookie: Option[String] = getText(cookieField.getText)
 
-  def getUserAgent: Option[String] = getText(userAgentField.getText)
+  private def getUserAgent: Option[String] = getText(userAgentField.getText)
 
-  def getFolder: Option[String] = getText(folderField.getText)
+  private def getFolder: Option[String] = getText(folderField.getText)
 
-  def getFilename: Option[String] = getText(filenameField.getText)
+  private def getFilename: Option[String] = getText(filenameField.getText)
 
-  def getPath: Path = sanitizePath(getFolder, getFilename, auto = false, canModify = false)._1
+  private def getPath: Path = sanitizePath(getFolder, getFilename, auto = false, canModify = false)._1
 
-  def setPath(path: Path): Unit = {
+  private def setPath(path: Path): Unit = {
     // If this is an absolute path, use the parent folder
     if (path.isAbsolute) folderField.setText(path.getParent.toString)
     // In any case, use the filename
     updateFilename(Some(path.getFileName.toString))
   }
 
-  def updateFilename(file: Option[String]): Unit = {
+  private def updateFilename(file: Option[String]): Unit = {
     file.orElse(getURI.map(Http.getFilename)).foreach { file =>
       val value = PathsEx.sanitizeFilename(file)
       filenameField.setText(value)
@@ -466,7 +469,7 @@ class NewDownloadController extends StageLocationPersistentView(NewDownloadContr
     }
   }
 
-  def isPathAvailable(path: Path): Boolean = {
+  private def isPathAvailable(path: Path): Boolean = {
     // There is a name conflict if either
     //  - the target name already exists
     //  - the temporary filename already exists: we need to own it
@@ -477,7 +480,7 @@ class NewDownloadController extends StageLocationPersistentView(NewDownloadContr
   }
 
   /** Find path available (as download and temporary download file). */
-  def findAvailablePath(path: Path): Path = {
+  private def findAvailablePath(path: Path): Path = {
     @scala.annotation.tailrec
     def loop(n: Int): Path = {
       val probe = if (n == 0) {
@@ -515,7 +518,7 @@ object NewDownloadController {
       Settings.prefix ++ Seq(Settings.KEY_STAGE, settingsKeyPrefix, "insert-first"))
   }
 
-  protected object ConflictResolution extends Enumeration {
+  private object ConflictResolution extends Enumeration {
     val Noop, Resume, Restart, Rename = Value
   }
 

@@ -62,15 +62,19 @@ class MainController
   protected var downloadsMenu: Menu = _
 
   @FXML
+  @unused
   protected var downloadsStopAllMenu: MenuItem = _
 
   @FXML
+  @unused
   protected var downloadsResumeAllMenu: MenuItem = _
 
   @FXML
+  @unused
   protected var downloadsRemoveCompletedMenu: MenuItem = _
 
   @FXML
+  @unused
   protected var downloadsRemoveMenu: MenuItem = _
 
   @FXML
@@ -1320,18 +1324,22 @@ class MainController
     event.consume()
   }
 
+  @unused
   def onOptions(@unused event: ActionEvent): Unit = {
     actor ! OnOptions()
   }
 
+  @unused
   def onAbout(@unused event: ActionEvent): Unit = {
     actor ! OnAbout
   }
 
+  @unused
   def onExit(@unused event: ActionEvent): Unit = {
     actor ! OnExit
   }
 
+  @unused
   def onDownloadsAdd(@unused event: ActionEvent): Unit = {
     addDownload(NewDownloadInfo())
     ()
@@ -1362,6 +1370,7 @@ class MainController
     actor ! OnDownloadsRemove(force)
   }
 
+  @unused
   def onDlServerSettings(@unused event: ActionEvent): Unit = {
     selectedDownloadData.foreach { data =>
       val host = data.download.info.actualUri.get.getHost
@@ -1369,6 +1378,7 @@ class MainController
     }
   }
 
+  @unused
   def onDlSiteSettings(@unused event: ActionEvent): Unit = {
     selectedDownloadData.foreach { data =>
       val siteSettings = data.download.siteSettings
@@ -1380,17 +1390,17 @@ class MainController
     actor ! AddDownload(id, first, select)
   }
 
-  def moveDownloads(ids: List[UUID], up: Boolean, most: Boolean): Unit = {
+  private def moveDownloads(ids: List[UUID], up: Boolean, most: Boolean): Unit = {
     actor ! MoveDownloads(ids, up, most)
   }
 
-  class ControllerActor(state0: State) extends Actor {
+  private class ControllerActor(state0: State) extends Actor {
 
     override def receive: Receive = receive(state0)
 
     // Wrap actual partial function in a try/catch to display unexpected issues.
-    // Otherwise window becomes unusable (akka messages goes to dead letters).
-    def receive(state: State): Receive =
+    // Otherwise, window becomes unusable (akka messages goes to dead letters).
+    private def receive(state: State): Receive =
       new PartialFunction[Any, Unit]() {
         val r: Receive = receive0(state)
         override def isDefinedAt(x: Any): Boolean = r.isDefinedAt(x)
@@ -1407,7 +1417,7 @@ class MainController
         }
       }
 
-    def receive0(state: State): Receive = {
+    private def receive0(state: State): Receive = {
       case OnOptions(display)              => onOptions(state, display)
       case OnAbout                         => onAbout(state)
       case OnExit                          => onExit(state)
@@ -1418,7 +1428,7 @@ class MainController
       case MoveDownloads(ids, up, most)    => moveDownloads(state, ids, up, most)
     }
 
-    def onExit(state: State): Unit = {
+    private def onExit(state: State): Unit = {
       val canExit = !getDownloadsData.exists(_.download.canStop) || {
         Dialogs.confirmation(
           owner = Option(stage),
@@ -1456,7 +1466,7 @@ class MainController
       }
     }
 
-    def onOptions(state: State, display: OptionsController.Display): Unit = {
+    private def onOptions(state: State, display: OptionsController.Display): Unit = {
       val dlMngr = state.dlMngr
       val debug0 = Main.settings.debug.get
       val dialog = OptionsController.buildDialog(state.stage, display)
@@ -1507,14 +1517,14 @@ class MainController
       }
     }
 
-    def onAbout(state: State): Unit = {
+    private def onAbout(state: State): Unit = {
       val dialog = AboutController.buildDialog(state.stage)
       dialog.initModality(Modality.WINDOW_MODAL)
       dialog.setResizable(true)
       dialog.show()
     }
 
-    def onDownloadsAdd(state: State, dlInfo: NewDownloadInfo, promise: Promise[Unit]): Unit = {
+    private def onDownloadsAdd(state: State, dlInfo: NewDownloadInfo, promise: Promise[Unit]): Unit = {
       // We actually notify caller once we take into account the new download,
       // not whether we fail, user discard it, nor when it actually is added.
       // So complete the promise now, in case we fail to build the dialog, in
@@ -1546,7 +1556,7 @@ class MainController
       ()
     }
 
-    def onDownloadsRemoveCompleted(state: State): Unit = {
+    private def onDownloadsRemoveCompleted(state: State): Unit = {
       getDownloadsData.foreach { data =>
         if (data.download.isDone && data.download.doneError.isEmpty) {
           removeDownload(state, data.download.id)
@@ -1554,7 +1564,7 @@ class MainController
       }
     }
 
-    def onDownloadsRemove(state: State, force: Boolean): Unit = {
+    private def onDownloadsRemove(state: State, force: Boolean): Unit = {
       val selected = selectedDownloadsData
 
       def doRemove(): Unit = {
@@ -1640,7 +1650,7 @@ class MainController
       if (removeNow) doRemove()
     }
 
-    def removeDownload(state: State, id: UUID): Unit = {
+    private def removeDownload(state: State, id: UUID): Unit = {
       // Remove this download from the manager, our own data, and the table items
       state.dlMngr.removeDownload(id)
       removeDownloadData(id)
@@ -1648,7 +1658,7 @@ class MainController
       ()
     }
 
-    def addDownload(state: State, id: UUID, first: Boolean, select: Boolean): Unit = {
+    private def addDownload(state: State, id: UUID, first: Boolean, select: Boolean): Unit = {
       val items = downloadsTable.getItems
       if (!items.asScala.toSet.contains(id)) {
         state.dlMngr.getDownload(id).foreach { download =>
@@ -1815,7 +1825,7 @@ class MainController
      *
      * Listed downloads are expected to be in ascending index order.
      */
-    def moveDownloads(state: State, ids: List[UUID], up: Boolean, most: Boolean): Unit = {
+    private def moveDownloads(state: State, ids: List[UUID], up: Boolean, most: Boolean): Unit = {
       // Save current selection
       val selectedItem = downloadsTable.getSelectionModel.getSelectedItem
       val selectedItems = selectedDownloads.toSet
@@ -1936,10 +1946,10 @@ object MainController {
     // While download is running, regularly sets the value which is resetted
     // when rate is changed: while data are downloaded, this changes nothing,
     // but if download is still running but frozen, this forces rate update.
-    val rateUpdate: SimpleBooleanProperty = new SimpleBooleanProperty()
+    private val rateUpdate: SimpleBooleanProperty = new SimpleBooleanProperty()
     private var rateUpdateCancellable: Option[Cancelable] = None
 
-    def refreshRateUpdate(state: DownloadState.Value): Unit = this.synchronized {
+    private def refreshRateUpdate(state: DownloadState.Value): Unit = this.synchronized {
       val running = state == DownloadState.Running
       rateUpdateCancellable match {
         case Some(cancellable) =>

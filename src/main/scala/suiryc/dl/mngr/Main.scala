@@ -26,16 +26,16 @@ import scala.util.{Failure, Try}
 object Main extends JFXLauncher[MainApp] with StrictLogging {
 
   // Note: use 'lazy' for fields that indirectly trigger stdout/stderr writing
-  // (e.g. through logger, or scala Console println etc), so that we can
+  // (e.g. through logger, or scala Console println etc.), so that we can
   // redirect streams before it happens.
 
   import Akka.dispatcher
 
   val timeFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS")
 
-  val appPath: Path = Util.classLocation[this.type]
+  private val appPath: Path = Util.classLocation[this.type]
 
-  def appPathRelative(other: String): Path = appPath.resolve(other)
+  private def appPathRelative(other: String): Path = appPath.resolve(other)
 
   val statePath: Path = appPathRelative("state.json")
 
@@ -128,7 +128,7 @@ object Main extends JFXLauncher[MainApp] with StrictLogging {
         // the values are marked deprecated)
         val ioCapture = params.ioCapture.contains(true) && Loggers.captureIo().nonEmpty
         val uniqueInstanceId = params.uniqueInstanceId.get
-        val processed = UniqueInstance.start(uniqueInstanceId, _cmd _, args, promise.future, streams)
+        val processed = UniqueInstance.start(uniqueInstanceId, _cmd, args, promise.future, streams)
         // We only end up here if we are the (first) unique instance.
         // Close initial streams when we are done processing the command: this
         // hints the caller process (e.g. our launcher script) that we are done
@@ -162,7 +162,7 @@ object Main extends JFXLauncher[MainApp] with StrictLogging {
     }
   }
 
-  protected def _cmd(args: Array[String], input: InputStream): Future[CommandResult] = {
+  private def _cmd(args: Array[String], input: InputStream): Future[CommandResult] = {
     // Replace stdin *and* scala Console.in
     val streams = SystemStreams.replace(input)
     try {
