@@ -6,7 +6,7 @@ import javafx.scene.Node
 import javafx.scene.control._
 import javafx.scene.input.Clipboard
 import javafx.stage.{FileChooser, Modality, Stage, Window}
-import suiryc.dl.mngr.model.{Download, SegmentRange}
+import suiryc.dl.mngr.model.{Download, SegmentRange, SubtitleInfo}
 import suiryc.dl.mngr.util.{Http, Icons}
 import suiryc.dl.mngr.{DownloadManager, I18N, Main, Settings}
 import suiryc.scala.io.PathsEx
@@ -612,16 +612,27 @@ object NewDownloadController {
       val dlParams = controller.dlParams
       val dlMngr = controller.dlMngr
       val download = result.download.getOrElse {
-        val sizeHint = controller.dlParams.size.filter(_ >= 0)
+        val sizeHint = dlParams.size.filter(_ >= 0)
         val sizeQualifier = Option.when(sizeHint.nonEmpty)(dlParams.sizeQualifier).flatten
+        val subtitle = dlParams.subtitle.map { subtitleParams =>
+          // Extract extension from original filename.
+          // Use 'vtt' if no extension was present.
+          val extension = PathsEx.extension(subtitleParams.filename)
+          SubtitleInfo(
+            raw = Some(subtitleParams.raw),
+            extension = if (extension.nonEmpty) extension else "vtt",
+            filename = None
+          )
+        }
         dlMngr.addDownload(
           uri = result.uri,
           referrer = result.referrer,
           cookie = result.cookie,
           userAgent = result.userAgent,
           save = result.path,
-          sizeHint = controller.dlParams.size.filter(_ >= 0),
+          sizeHint = dlParams.size.filter(_ >= 0),
           sizeQualifier = sizeQualifier,
+          subtitle = subtitle,
           reused = result.reused,
           insertFirst = result.insertFirst
         )

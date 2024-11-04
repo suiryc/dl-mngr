@@ -385,6 +385,7 @@ class DownloadManager extends StrictLogging {
     save: Path,
     sizeHint: Option[Long],
     sizeQualifier: Option[String],
+    subtitle: Option[SubtitleInfo],
     reused: Boolean,
     insertFirst: Boolean
   ): Download = {
@@ -406,6 +407,7 @@ class DownloadManager extends StrictLogging {
       sizeQualifier = sizeQualifier,
       rateLimiter = rateLimiter
     ).setUri(uri)
+      .setSubtitle(subtitle)
     if (reused) {
       // When resuming a file, consider its current length as already downloaded.
       val length = math.max(0, downloadFile.getWorkingPath.toFile.length)
@@ -795,6 +797,7 @@ class DownloadManager extends StrictLogging {
           sizeQualifier = downloadBackupInfo.sizeQualifier,
           rateLimiter = rateLimiter
         ).setUri(downloadBackupInfo.uri)
+          .setSubtitle(downloadBackupInfo.subtitle)
         val info = download.info
         info.doneError = downloadBackupInfo.doneError
         if (downloadBackupInfo.done) info.state.set(DownloadState.Done)

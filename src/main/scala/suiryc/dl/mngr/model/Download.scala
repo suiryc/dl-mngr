@@ -5,6 +5,7 @@ import spray.json._
 import suiryc.dl.mngr.{DownloadFile, Main}
 import suiryc.dl.mngr.I18N.Strings
 import suiryc.dl.mngr.util.Misc
+import suiryc.scala.io.PathsEx
 import suiryc.scala.spray.json.JsonFormats
 
 import java.net.{Inet4Address, Inet6Address, InetAddress, URI}
@@ -58,6 +59,9 @@ class DownloadInfo extends ObservableLogs {
   /** Whether server accept ranges. */
   var acceptRanges: SimpleObjectProperty[Option[Boolean]] = new SimpleObjectProperty(None)
 
+  /** Associated subtitles. */
+  var subtitle: Option[SubtitleInfo] = None
+
   def isInetAddressDetermined: Boolean = inetAddress.get.nonEmpty
   def isIPv4: Boolean = inetAddress.get.exists(_.isInstanceOf[Inet4Address])
   def isIPv6: Boolean = inetAddress.get.exists(_.isInstanceOf[Inet6Address])
@@ -80,6 +84,20 @@ class DownloadInfo extends ObservableLogs {
   }
 
 }
+
+/**
+ * Subtitles info.
+ *
+ * Used both in live and backup info.
+ */
+case class SubtitleInfo(
+  /** Subtitles raw content (if not already saved). */
+  raw: Option[String],
+  /** Subtitles file extension to use. */
+  extension: String,
+  /** Subtitles filename (if already saved). */
+  filename: Option[String]
+)
 
 /** Info to back up for a download. */
 case class DownloadBackupInfo(
@@ -116,12 +134,15 @@ case class DownloadBackupInfo(
   /** File last modified time on server */
   lastModified: Option[Date],
   /** Downloaded ranges. */
-  downloadedRanges: List[SegmentRange]
+  downloadedRanges: List[SegmentRange],
+  /** Subtitles. */
+  subtitle: Option[SubtitleInfo]
 )
 
 object DownloadBackupInfo extends DefaultJsonProtocol with JsonFormats {
   implicit val segmentRangeFormat: RootJsonFormat[SegmentRange] = jsonFormat2(SegmentRange.apply)
-  implicit val downloadBackupFormat: RootJsonFormat[DownloadBackupInfo] = jsonFormat17(DownloadBackupInfo.apply)
+  implicit val subtitlesBackupFormat: RootJsonFormat[SubtitleInfo] = jsonFormat3(SubtitleInfo.apply)
+  implicit val downloadBackupFormat: RootJsonFormat[DownloadBackupInfo] = jsonFormat18(DownloadBackupInfo.apply)
 }
 
 /**
@@ -161,6 +182,11 @@ case class Download(
     this
   }
 
+  def setSubtitle(subtitle: Option[SubtitleInfo]): Download = {
+    info.subtitle = subtitle
+    this
+  }
+
   def path: Path = downloadFile.getPath
 
   def temporaryPath: Option[Path] = downloadFile.getTemporaryPath
@@ -189,7 +215,38 @@ case class Download(
   }
 
   def renameFile(target: Path): Unit = {
+    // Determine current folder and name.
+    val currentFolder = path.getParent
+    val currentName = PathsEx.atomicName(path)
+    // Rename download, and determine new folder and name.
+    // (actual name may have been changed if requested one was not available)
     downloadFile.rename(target)
+    val newFolder = path.getParent
+    val newName = PathsEx.atomicName(path)
+
+    // Rename subtitle file when applicable: we must have already saved
+    // subtitles in a file (filename known).
+    info.subtitle.foreach { subtitle =>
+      subtitle.filename.foreach { subtitleFilename =>
+        // And new download folder/name should have changed.
+        if ((newName != currentName) || (newFolder != currentFolder)) {
+          // We re-determine the subtitle filename from actual download. This is
+          // useful if original subtitle filename was renamed if not available:
+          // we get a chance to use the preferred filename if available.
+          val newFilename = PathsEx.filename(newName, subtitle.extension)
+          val actualPath = Misc.moveFile(
+            currentFolder.resolve(subtitleFilename),
+            newFolder.resolve(newFilename),
+            dot = true
+          )
+          // Remember new filename.
+          setSubtitle(Some(subtitle.copy(
+            filename = Some(actualPath.getFileName.toString)
+          )))
+        }
+      }
+    }
+
     refreshPaths()
   }
 
@@ -286,7 +343,8 @@ case class Download(
       rangeValidator = info.rangeValidator,
       acceptRanges = acceptRanges,
       lastModified = Option(info.lastModified.get),
-      downloadedRanges = downloadFile.getDownloadedRanges(info)
+      downloadedRanges = downloadFile.getDownloadedRanges(info),
+      subtitle = info.subtitle
     )
   }
 

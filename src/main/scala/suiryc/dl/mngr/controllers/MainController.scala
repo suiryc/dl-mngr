@@ -1571,12 +1571,25 @@ class MainController
         // We don't remove 'active' downloads
         val removable = selected.filter(!_.download.isActive)
 
+        def removeSubtitle(download: Download): Unit = {
+          // Delete subtitle file if applicable.
+          download.info.subtitle.flatMap(_.filename).foreach { subtitleFilename =>
+            // Subtitle file is saved next to target (not temporary)
+            // download file.
+            download.downloadFile.getPath.resolveSibling(subtitleFilename).toFile.delete()
+          }
+        }
+
         // We can safely remove if done (success) or not started (failure or not)
         val safe = removable.filter { data =>
           (data.download.isDone && data.download.doneError.isEmpty) || !data.download.isStarted
         }
         safe.foreach { data =>
-          removeDownload(state, data.download.id)
+          val download = data.download
+          removeDownload(state, download.id)
+          // We obviously can only delete subtitles if download was not done
+          // (either not started, or completed but considered invalid).
+          if (!data.download.isDone) removeSubtitle(download)
         }
 
         // Get remaining selected downloads (started and unfinished)
@@ -1600,6 +1613,7 @@ class MainController
                 // Since the download is unfinished, we only need to delete the
                 // temporary file if any (or the real file otherwise).
                 download.downloadFile.getWorkingPath.toFile.delete()
+                removeSubtitle(download)
               }
             }
           }

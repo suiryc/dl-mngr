@@ -13,10 +13,12 @@ import org.apache.http._
 import org.apache.http.client.protocol.HttpClientContext
 import org.apache.http.nio.conn.ManagedNHttpClientConnection
 import suiryc.dl.mngr.model._
-import suiryc.dl.mngr.util.Http
+import suiryc.dl.mngr.util.{Http, Misc}
 import suiryc.scala.concurrent.RichFuture
+import suiryc.scala.io.PathsEx
 import suiryc.scala.misc.Units
 
+import java.nio.charset.StandardCharsets
 import java.nio.file.{Files, NoSuchFileException}
 import scala.concurrent.Promise
 import scala.concurrent.duration._
@@ -896,6 +898,31 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
         download.info.addLog(LogKind.Warning, "Download resuming is not supported")
         // maxSegments will automatically be 1 now
         state0.updateMaxSegments()
+      }
+
+      // If not already done, save subtitle file.
+      download.info.subtitle.foreach { subtitle =>
+        if (subtitle.filename.isEmpty) {
+          subtitle.raw.foreach { raw =>
+            // Use download file name, and subtitle extension.
+            val subtitleFilename = PathsEx.filename(PathsEx.atomicName(download.path.getFileName), subtitle.extension)
+            // Subtitle file is saved next to target (not temporary)
+            // download file.
+            val path = PathsEx.getAvailable(
+              download.path.resolveSibling(subtitleFilename),
+              alternative = Some((n: Int) => s".$n")
+            )
+            Files.write(path, raw.getBytes(StandardCharsets.UTF_8))
+            val msg = s"Subtitle file=<${Misc.fileContext(path)}> saved"
+            logger.info(s"${download.context} $msg")
+            download.info.addLog(LogKind.Info, msg)
+            // We can now remember saved filename, and forget raw content.
+            download.setSubtitle(Some(subtitle.copy(
+              raw = None,
+              filename = Some(path.getFileName.toString)
+            )))
+          }
+        }
       }
 
       // If 'downloaded' is already set, we are resuming an existing file
