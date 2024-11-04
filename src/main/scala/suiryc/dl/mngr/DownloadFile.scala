@@ -2,6 +2,11 @@ package suiryc.dl.mngr
 
 import akka.actor.ActorRef
 import com.typesafe.scalalogging.LazyLogging
+import org.apache.http.nio.{ContentDecoder, ContentDecoderChannel, FileContentDecoder}
+import suiryc.dl.mngr.model.{DownloadException, DownloadInfo, SegmentRange, SegmentRanges}
+import suiryc.scala.concurrent.locks.RichLock._
+import suiryc.scala.io.{FileTimes, FilesEx, PathsEx}
+
 import java.io.RandomAccessFile
 import java.nio.ByteBuffer
 import java.nio.channels.FileChannel
@@ -9,11 +14,7 @@ import java.nio.file.attribute.FileTime
 import java.nio.file._
 import java.util.Date
 import java.util.concurrent.locks.ReentrantReadWriteLock
-import org.apache.http.nio.{ContentDecoder, ContentDecoderChannel, FileContentDecoder}
 import scala.jdk.CollectionConverters._
-import suiryc.dl.mngr.model.{DownloadException, DownloadInfo, SegmentRange, SegmentRanges}
-import suiryc.scala.concurrent.locks.RichLock._
-import suiryc.scala.io.{FileTimes, FilesEx, PathsEx}
 
 
 object DownloadFile {
@@ -59,7 +60,7 @@ class DownloadFile(private var path: Path) extends LazyLogging {
    * Pending (not yet 'force'd) ranges.
    * Note: there is no need to enforce the actual download length.
    */
-  val pendingRanges = new SegmentRanges(Long.MaxValue, full = false)
+  private val pendingRanges = new SegmentRanges(Long.MaxValue, full = false)
 
   /** (Estimated) Size of pending data. */
   private var pending: Long = 0L
@@ -70,7 +71,7 @@ class DownloadFile(private var path: Path) extends LazyLogging {
    */
   private val lock = new ReentrantReadWriteLock()
 
-  /** Target path (may be renamed). */
+  /** Target path (maybe renamed). */
   def getPath: Path = path
 
   /** Temporary path. */
@@ -89,7 +90,7 @@ class DownloadFile(private var path: Path) extends LazyLogging {
     // In this case, we simply need to truncate it when we will (re-)open it.
     close(None, done = false, canDelete = restart && temporary.isDefined)
     reusedOpt.foreach(reused = _)
-    // File must exist if needed, we reuse it and we don't restart.
+    // File must exist if needed, we reuse it, and we don't restart.
     this.mustExist = mustExist && reused && !restart
     // We could also restrict truncating to 'without temporary path' cases, but
     // that is not necessary.

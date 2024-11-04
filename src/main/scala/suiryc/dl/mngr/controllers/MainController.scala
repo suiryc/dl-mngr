@@ -1606,7 +1606,7 @@ class MainController
         }
       }
 
-      // Stop active downloads if any. Otherwise we can remove now.
+      // Stop active downloads if any. Otherwise, we can remove now.
       val active = selected.filter(_.download.isActive)
       val removeNow = active.isEmpty || {
         // Ask for confirmation if necessary.

@@ -1,15 +1,11 @@
 package suiryc.dl.mngr.controllers
 
-import java.io.File
-import java.net.URI
-import java.nio.file.{Files, Path, Paths}
 import javafx.event.ActionEvent
 import javafx.fxml.{FXML, FXMLLoader}
 import javafx.scene.Node
 import javafx.scene.control._
 import javafx.scene.input.Clipboard
 import javafx.stage.{FileChooser, Modality, Stage, Window}
-import scala.annotation.unused
 import suiryc.dl.mngr.model.{Download, SegmentRange}
 import suiryc.dl.mngr.util.{Http, Icons}
 import suiryc.dl.mngr.{DownloadManager, I18N, Main, Settings}
@@ -25,6 +21,11 @@ import suiryc.scala.javafx.stage.Stages.StageLocation
 import suiryc.scala.javafx.stage.{PathChoosers, StageLocationPersistentView, Stages}
 import suiryc.scala.misc.Units
 import suiryc.scala.settings.ConfigEntry
+
+import java.io.File
+import java.net.URI
+import java.nio.file.{Files, Path, Paths}
+import scala.annotation.unused
 
 class NewDownloadController extends StageLocationPersistentView(NewDownloadController.stageLocation) {
 
