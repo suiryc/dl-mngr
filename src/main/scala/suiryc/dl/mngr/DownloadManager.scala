@@ -149,7 +149,7 @@ object DownloadManager {
 
   }
 
-  class RelaxedRedirectStrategy extends DefaultRedirectStrategy {
+  private class RelaxedRedirectStrategy extends DefaultRedirectStrategy {
 
     override protected def createLocationURI(location: String): URI = {
       try {
@@ -233,7 +233,7 @@ object DownloadManager {
     def active: SiteConnections = copy(lastActive = System.currentTimeMillis)
     def acquireConnection(): SiteConnections = active.copy(cnxCount = cnxCount + 1)
     def releaseConnection(): SiteConnections = active.copy(cnxCount = math.max(0L, cnxCount - 1))
-    def updateSsl(trust: Boolean, ask: Option[Boolean]): SiteConnections =
+    private def updateSsl(trust: Boolean, ask: Option[Boolean]): SiteConnections =
       active.copy(sslTrust = trust, sslErrorAsk = ask)
     def updateSsl(siteSettings: Main.settings.SiteSettings): SiteConnections =
       updateSsl(siteSettings.getSslTrust, siteSettings.sslErrorAsk.opt)
@@ -241,7 +241,7 @@ object DownloadManager {
       updateSsl(trust = trust, ask = Some(false)).copy(sslChanged = true)
   }
 
-  object SiteConnections {
+  private object SiteConnections {
     def apply(siteSettings: Main.settings.SiteSettings): SiteConnections = {
       SiteConnections(
         site = siteSettings.site,
@@ -270,7 +270,7 @@ object DownloadManager {
     def active: ServerConnections = copy(lastActive = System.currentTimeMillis)
     def acquireConnection(): ServerConnections = active.copy(cnxCount = cnxCount + 1)
     def releaseConnection(): ServerConnections = active.copy(cnxCount = math.max(0L, cnxCount - 1))
-    def updateSsl(trust: Boolean, ask: Option[Boolean]): ServerConnections =
+    private def updateSsl(trust: Boolean, ask: Option[Boolean]): ServerConnections =
       active.copy(sslTrust = trust, sslErrorAsk = ask)
     def updateSsl(siteSettings: Main.settings.SiteSettings): ServerConnections =
       updateSsl(siteSettings.getSslTrust, siteSettings.sslErrorAsk.opt)
@@ -278,7 +278,7 @@ object DownloadManager {
       updateSsl(trust = trust, ask = Some(false)).copy(sslChanged = true)
   }
 
-  object ServerConnections {
+  private object ServerConnections {
     def apply(perSite: SiteConnections): ServerConnections = {
       ServerConnections(
         lastActive = perSite.lastActive,
@@ -991,7 +991,7 @@ class DownloadManager extends StrictLogging {
     cnxPerServer += (host -> updated)
   }
 
-  def getSiteConnections(site: String): SiteConnections = this.synchronized {
+  private def getSiteConnections(site: String): SiteConnections = this.synchronized {
     cnxPerSite.getOrElse(site, SiteConnections(Main.settings.getSite(site)))
   }
 
@@ -1061,20 +1061,20 @@ class DownloadsJanitor(dlMngr: DownloadManager) extends Actor with StrictLogging
     case Stop => stop()
   }
 
-  def janitor(other: List[DownloadManager.LazyClient]): Unit = {
+  private def janitor(other: List[DownloadManager.LazyClient]): Unit = {
     // Move current clients to 'old' ones
     oldClients ++= clients.filter(_.isStarted)
     clients = other
   }
 
-  def start(): Unit = {
+  private def start(): Unit = {
     // Prime the pump
     scheduleBackup()
     scheduleCleanupClient()
     scheduleCleanupMngr()
   }
 
-  def trigger(f: () => Unit): Unit = {
+  private def trigger(f: () => Unit): Unit = {
     try {
       f()
     } catch {
@@ -1082,7 +1082,7 @@ class DownloadsJanitor(dlMngr: DownloadManager) extends Actor with StrictLogging
     }
   }
 
-  def backup(): Unit = {
+  private def backup(): Unit = {
     backupCancellable = None
     try {
       dlMngr.saveState()
@@ -1098,13 +1098,13 @@ class DownloadsJanitor(dlMngr: DownloadManager) extends Actor with StrictLogging
     ()
   }
 
-  def scheduleBackup(): Unit = {
+  private def scheduleBackup(): Unit = {
     if (backupCancellable.isEmpty) {
       backupCancellable = Some(Main.scheduler.scheduleOnce(Main.settings.autosaveDelay.get)(self ! Trigger(() => backup())))
     }
   }
 
-  def cleanupClient(connManager: PoolingNHttpClientConnectionManager): Unit = {
+  private def cleanupClient(connManager: PoolingNHttpClientConnectionManager): Unit = {
     // See: https://hc.apache.org/httpcomponents-client-ga/tutorial/html/connmgmt.html
     // When executing a new request on the client, pending requests past
     // timeout are failed and cached connections past keep-alive (assumed
@@ -1123,7 +1123,7 @@ class DownloadsJanitor(dlMngr: DownloadManager) extends Actor with StrictLogging
     connManager.closeIdleConnections(idleTimeout.length, idleTimeout.unit)
   }
 
-  def cleanupClient(): Unit = {
+  private def cleanupClient(): Unit = {
     cleanupClientCancellable = None
     // Cleanup all cnx managers
     oldClients.foreach { client =>
@@ -1140,7 +1140,7 @@ class DownloadsJanitor(dlMngr: DownloadManager) extends Actor with StrictLogging
     scheduleCleanupClient()
   }
 
-  def scheduleCleanupClient(): Unit = {
+  private def scheduleCleanupClient(): Unit = {
     // We want to check again later according to
     //  - connection request timeout
     //  - idle timeout
@@ -1163,19 +1163,19 @@ class DownloadsJanitor(dlMngr: DownloadManager) extends Actor with StrictLogging
     }
   }
 
-  def cleanupMngr(): Unit = {
+  private def cleanupMngr(): Unit = {
     cleanupMngrCancellable = None
     dlMngr.cleanupConnections()
     scheduleCleanupMngr()
   }
 
-  def scheduleCleanupMngr(): Unit = {
+  private def scheduleCleanupMngr(): Unit = {
     if (cleanupMngrCancellable.isEmpty) {
       cleanupMngrCancellable = Some(Main.scheduler.scheduleOnce(1.hour)(self ! Trigger(() => cleanupMngr())))
     }
   }
 
-  def stop(): Unit = {
+  private def stop(): Unit = {
     backupCancellable.foreach(_.cancel())
     cleanupClientCancellable.foreach(_.cancel())
     cleanupMngrCancellable.foreach(_.cancel())
