@@ -104,6 +104,8 @@ case class DownloadBackupInfo(
   size: Option[Long],
   /** Download size hint (informational). */
   sizeHint: Option[Long],
+  /** Download size qualifier (informational). */
+  sizeQualifier: Option[String],
   /** Range validator (if applicable) */
   rangeValidator: Option[String],
   /** Whether server accept ranges */
@@ -133,6 +135,8 @@ case class Download(
   downloadFile: DownloadFile,
   /** Download size hint (informational). */
   sizeHint: Option[Long],
+  /** Download size qualifier (informational). */
+  sizeQualifier: Option[String],
   /** Rate limiter. */
   rateLimiter: RateLimiter,
   /** Mutable info. */
@@ -275,6 +279,7 @@ case class Download(
       canResume = (isActive || info.wasActive) && !acceptRanges.contains(false),
       size = if (info.isSizeDetermined) Some(info.size.get) else None,
       sizeHint = sizeHint,
+      sizeQualifier = sizeQualifier,
       rangeValidator = info.rangeValidator,
       acceptRanges = acceptRanges,
       lastModified = Option(info.lastModified.get),

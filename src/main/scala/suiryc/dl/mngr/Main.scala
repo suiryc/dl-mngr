@@ -84,6 +84,9 @@ object Main extends JFXLauncher[MainApp] with StrictLogging {
     opt[Long]("size").action { (v, c) =>
       c.copy(size = Some(v))
     }
+    opt[String]("size-qualifier").action { (v, c) =>
+      c.copy(sizeQualifier = Some(v))
+    }
     opt[String]("unique-instance-id").action { (v, c) =>
       c.copy(uniqueInstanceId = Some(v))
     }
@@ -278,6 +281,8 @@ object Main extends JFXLauncher[MainApp] with StrictLogging {
     referrer: Option[String] = None,
     /** Size hint (informational). */
     size: Option[Long] = None,
+    /** Size qualifier (informational). */
+    sizeQualifier: Option[String] = None,
     /** Video subtitles. */
     subtitle: Option[Params.Subtitle] = None,
     /** Unique instance id to use. */
@@ -331,7 +336,7 @@ object Main extends JFXLauncher[MainApp] with StrictLogging {
     implicit val hlsKeyFormat: RootJsonFormat[HLSKey] = jsonFormat3(HLSKey)
     implicit val hlsFormat: RootJsonFormat[HLS] = jsonFormat3(HLS)
     implicit val subtitleFormat: RootJsonFormat[Subtitle] = jsonFormat5(Subtitle)
-    implicit val paramsFormat: RootJsonFormat[Params] = jsonFormat15(Params.apply)
+    implicit val paramsFormat: RootJsonFormat[Params] = jsonFormat16(Params.apply)
 
   }
 

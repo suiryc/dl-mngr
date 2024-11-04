@@ -110,7 +110,9 @@ class NewDownloadController extends StageLocationPersistentView(NewDownloadContr
     dlParams.cookie.foreach(cookieField.setText)
     dlParams.userAgent.foreach(userAgentField.setText)
     val comment = List(
-      dlParams.size.filter(_ >= 0).map(Units.storage.toHumanReadable(_)),
+      dlParams.size.filter(_ >= 0).map { size =>
+        s"${dlParams.sizeQualifier.getOrElse("")}${Units.storage.toHumanReadable(size)}"
+      },
       dlParams.comment
     ).flatten.mkString("\n")
     if (comment.nonEmpty) commentField.setText(comment)
@@ -365,7 +367,10 @@ class NewDownloadController extends StageLocationPersistentView(NewDownloadContr
         hints.uri.foreach { uri =>
           uriField.setText(uri.toString)
         }
-        if (hints.size.isDefined) dlParams = dlParams.copy(size = hints.size)
+        // For HLS, we got the size of the playlist file, which is not useful.
+        if (hints.size.isDefined && dlParams.hls.isEmpty) {
+          dlParams = dlParams.copy(size = hints.size)
+        }
         hints.filename.foreach(filenameField.setText)
       }
     }
@@ -603,8 +608,11 @@ object NewDownloadController {
     // Note: controller result is only set upon "OK" (or in automatic mode),
     // which is why we don't check which button was hit.
     controller.result.map { result =>
+      val dlParams = controller.dlParams
       val dlMngr = controller.dlMngr
       val download = result.download.getOrElse {
+        val sizeHint = controller.dlParams.size.filter(_ >= 0)
+        val sizeQualifier = Option.when(sizeHint.nonEmpty)(dlParams.sizeQualifier).flatten
         dlMngr.addDownload(
           uri = result.uri,
           referrer = result.referrer,
@@ -612,6 +620,7 @@ object NewDownloadController {
           userAgent = result.userAgent,
           save = result.path,
           sizeHint = controller.dlParams.size.filter(_ >= 0),
+          sizeQualifier = sizeQualifier,
           reused = result.reused,
           insertFirst = result.insertFirst
         )

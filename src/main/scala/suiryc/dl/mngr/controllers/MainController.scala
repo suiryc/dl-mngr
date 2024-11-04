@@ -1671,12 +1671,12 @@ class MainController
           }
 
           def displaySize: String = {
-            val size =
-              if (info.isSizeKnown) Option(info.size.get)
-              else if (download.isDone) Some(info.downloaded.get)
-              else download.sizeHint
+            val (size, qualifier) =
+              if (info.isSizeKnown) (Option(info.size.get), None)
+              else if (download.isDone) (Some(info.downloaded.get), None)
+              else (download.sizeHint, download.sizeQualifier)
             size.filter(_ >= 0).map { size =>
-              Units.storage.toHumanReadable(size)
+              s"${qualifier.getOrElse("")}${Units.storage.toHumanReadable(size)}"
             }.orNull
           }
           // Display size right now (if known or hint given)
@@ -1689,7 +1689,9 @@ class MainController
               (if (!info.isSizeUnknown) Nil else List(Strings.unknownSize)) :::
                 (if (!download.acceptRanges.contains(false)) Nil else List(Strings.resumeUnsupported)) :::
                 download.sizeHint.filter { hint =>
-                  download.isDone && (hint != info.downloaded.get)
+                  // When there is a qualifier, the hint size usually will not
+                  // match the actual size, and this is normal.
+                  download.isDone && (hint != info.downloaded.get) && download.sizeQualifier.isEmpty
                 }.map { hint =>
                   Strings.hintSizeMismatch.format(info.downloaded.get, hint)
                 }.toList

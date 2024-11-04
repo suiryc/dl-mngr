@@ -377,10 +377,17 @@ class DownloadManager extends StrictLogging {
     dlEntries = reorder(ordered) ::: reorder(rest)
   }
 
-  def addDownload(uri: URI, referrer: Option[URI], cookie: Option[String],
-    userAgent: Option[String], save: Path, sizeHint: Option[Long],
-    reused: Boolean, insertFirst: Boolean): Download =
-  {
+  def addDownload(
+    uri: URI,
+    referrer: Option[URI],
+    cookie: Option[String],
+    userAgent: Option[String],
+    save: Path,
+    sizeHint: Option[Long],
+    sizeQualifier: Option[String],
+    reused: Boolean,
+    insertFirst: Boolean
+  ): Download = {
     // Note: caller still has to 'resume' (start) the download.
     // Code being shared with real resuming, we don't open the target file here,
     // and let 'resumeDownload' follow the promise.
@@ -396,6 +403,7 @@ class DownloadManager extends StrictLogging {
       userAgent = userAgent,
       downloadFile = downloadFile,
       sizeHint = sizeHint,
+      sizeQualifier = sizeQualifier,
       rateLimiter = rateLimiter
     ).setUri(uri)
     if (reused) {
@@ -562,10 +570,20 @@ class DownloadManager extends StrictLogging {
 
               // Check actual downloaded size against given size hint.
               download.sizeHint.foreach { hint =>
-                if (hint != info.downloaded.get) {
-                  val message = s"Downloaded size=<${info.downloaded.get}> does not match hint=<$hint>"
-                  logger.info(s"${download.context} $message")
-                  download.info.addLog(LogKind.Warning, message)
+                // When there is a qualifier, the hint size usually will not
+                // match the actual size, and this is normal.
+                download.sizeQualifier match {
+                  case Some(qualifier) =>
+                    val message = s"Downloaded size=<${info.downloaded.get}> for hint=<$qualifier$hint>"
+                    logger.info(s"${download.context} $message")
+                    download.info.addLog(LogKind.Info, message)
+
+                  case None =>
+                    if (hint != info.downloaded.get) {
+                      val message = s"Downloaded size=<${info.downloaded.get}> does not match hint=<$hint>"
+                      logger.info(s"${download.context} $message")
+                      download.info.addLog(LogKind.Warning, message)
+                    }
                 }
               }
 
@@ -776,6 +794,7 @@ class DownloadManager extends StrictLogging {
           userAgent = downloadBackupInfo.userAgent,
           downloadFile = downloadFile,
           sizeHint = downloadBackupInfo.sizeHint,
+          sizeQualifier = downloadBackupInfo.sizeQualifier,
           rateLimiter = rateLimiter
         ).setUri(downloadBackupInfo.uri)
         val info = download.info
