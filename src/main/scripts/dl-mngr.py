@@ -68,7 +68,17 @@ classpath = os.pathsep.join([dirScript, os.path.join(dirScript, 'dl-mngr.jar'), 
 # cached at VM startup. In order to prefer IPv6 addresses (when client and
 # server handle both IPv4 and IPv6), the property must be set before starting.
 # (System.setProperty even as first executed code does not work)
-cmd = [javaExe, '-Xms16M', f'-Xmx{memMax}', f'-XX:MaxRAM={memMax}', '-Djava.net.preferIPv6Addresses=true', '-cp', classpath, 'suiryc.dl.mngr.Main'] + args.arguments
+# Similarly for 'file.encoding': must be set before starting.
+# Force UTF-8 default encoding: this is usually already the case in Linux, but
+# not in Windows (windows-1252). Using UTF-8 is mandatory for proper parsing of
+# stdin (JSON parser expects UTF-8 content).
+cmd = [javaExe,
+  '-Xms16M', f'-Xmx{memMax}', f'-XX:MaxRAM={memMax}',
+  '-Dfile.encoding=UTF-8',
+  '-Djava.net.preferIPv6Addresses=true',
+  '-cp', classpath,
+  'suiryc.dl.mngr.Main'
+] + args.arguments
 
 # In simple cases 'Popen' and 'communicate' is the way to go. But it waits for
 # the process to terminate, which is not what we want (especially for the first
