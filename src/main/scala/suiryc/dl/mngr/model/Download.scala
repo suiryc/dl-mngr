@@ -1,8 +1,10 @@
 package suiryc.dl.mngr.model
 
 import javafx.beans.property.{SimpleIntegerProperty, SimpleLongProperty, SimpleObjectProperty}
+import spray.json._
 import suiryc.dl.mngr.{DownloadFile, Main}
 import suiryc.dl.mngr.I18N.Strings
+import suiryc.scala.spray.json.JsonFormats
 
 import java.net.{Inet4Address, Inet6Address, InetAddress, URI}
 import java.nio.file.Path
@@ -78,7 +80,7 @@ class DownloadInfo extends ObservableLogs {
 
 }
 
-/** Info to backup for a download. */
+/** Info to back up for a download. */
 case class DownloadBackupInfo(
   /** Internal id. */
   id: UUID,
@@ -115,6 +117,11 @@ case class DownloadBackupInfo(
   /** Downloaded ranges. */
   downloadedRanges: List[SegmentRange]
 )
+
+object DownloadBackupInfo extends DefaultJsonProtocol with JsonFormats {
+  implicit val segmentRangeFormat: RootJsonFormat[SegmentRange] = jsonFormat2(SegmentRange.apply)
+  implicit val downloadBackupFormat: RootJsonFormat[DownloadBackupInfo] = jsonFormat17(DownloadBackupInfo.apply)
+}
 
 /**
  * A download properties and settings.

@@ -763,7 +763,6 @@ class DownloadManager extends StrictLogging {
     // Prepare state to save
     val downloads = dlEntries.map(_.download.backupInfo)
     import spray.json._
-    import JsonImplicits._
     val downloadsJson = downloads.toJson
     val stateJson = JsObject("downloads" -> downloadsJson)
     val state = stateJson.prettyPrint
@@ -777,7 +776,6 @@ class DownloadManager extends StrictLogging {
 
   def start(): Unit = this.synchronized {
     import spray.json._
-    import JsonImplicits._
 
     def restoreState(downloadsBackupInfo: List[DownloadBackupInfo]): Unit = {
       downloadsBackupInfo.foreach { downloadBackupInfo =>
