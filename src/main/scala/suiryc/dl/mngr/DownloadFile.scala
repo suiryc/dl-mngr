@@ -151,9 +151,9 @@ class DownloadFile(private var path: Path) extends LazyLogging {
       if (!reused) renewTemporary()
       val target = getWorkingPath
       // If not owned, make sure the file does not exist upon creating it.
-      val options = List(StandardOpenOption.WRITE) ++
-        (if (!mustExist) List(StandardOpenOption.CREATE) else Nil)
-        (if (!reused) List(StandardOpenOption.CREATE_NEW) else Nil) ++
+      val options = List(StandardOpenOption.WRITE) :::
+        (if (!mustExist) List(StandardOpenOption.CREATE) else Nil) :::
+        (if (!reused) List(StandardOpenOption.CREATE_NEW) else Nil) :::
         (if (truncate) List(StandardOpenOption.TRUNCATE_EXISTING) else Nil)
 
       try {
