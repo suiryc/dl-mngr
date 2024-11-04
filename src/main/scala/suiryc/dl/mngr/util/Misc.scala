@@ -8,6 +8,14 @@ import java.nio.file.{Files, Path}
 
 object Misc extends LazyLogging {
 
+  /** Returns filename and parent path if any. */
+  def fileContext(path: Path): String = {
+    // Keep the filename and parent path if any.
+    val count = path.getNameCount
+    if (count >= 3) path.subpath(count - 2, count).toString
+    else path.toString
+  }
+
   /**
    * Moves (or renames if possible) file.
    *

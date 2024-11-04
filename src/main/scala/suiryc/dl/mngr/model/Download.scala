@@ -4,6 +4,7 @@ import javafx.beans.property.{SimpleIntegerProperty, SimpleLongProperty, SimpleO
 import spray.json._
 import suiryc.dl.mngr.{DownloadFile, Main}
 import suiryc.dl.mngr.I18N.Strings
+import suiryc.dl.mngr.util.Misc
 import suiryc.scala.spray.json.JsonFormats
 
 import java.net.{Inet4Address, Inet6Address, InetAddress, URI}
@@ -243,12 +244,7 @@ case class Download(
     s" ${if (info.isIPv6) "ipv6" else s"ipv4"}=<${addr.getHostAddress}>"
   }.getOrElse("")
 
-  def fileContext: String = {
-    // Keep the filename and parent path if any.
-    val count = path.getNameCount
-    if (count >= 3) path.subpath(count - 2, count).toString
-    else path.toString
-  }
+  def fileContext: String = Misc.fileContext(path)
 
   def tooltip: String = {
     List(
