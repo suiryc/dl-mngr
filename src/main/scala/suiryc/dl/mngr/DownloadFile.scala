@@ -4,6 +4,7 @@ import akka.actor.ActorRef
 import com.typesafe.scalalogging.LazyLogging
 import org.apache.http.nio.{ContentDecoder, ContentDecoderChannel, FileContentDecoder}
 import suiryc.dl.mngr.model.{DownloadException, DownloadInfo, SegmentRange, SegmentRanges}
+import suiryc.dl.mngr.util.Misc
 import suiryc.scala.concurrent.locks.RichLock._
 import suiryc.scala.io.{FileTimes, FilesEx, PathsEx}
 
@@ -387,7 +388,7 @@ class DownloadFile(private var path: Path) extends LazyLogging {
     if (target != path) {
       if (isDone) {
         // If we were done the current 'path' is the real file.
-        path = move(path, target)
+        path = Misc.moveFile(path, target, dot = false)
       } else {
         // The download is not done. Is there a temporary path ?
         temporary match {
@@ -407,7 +408,7 @@ class DownloadFile(private var path: Path) extends LazyLogging {
             if ((channel == null) && reused) {
               // We will re-use the path, which is not opened yet. So we only
               // need to rename it now.
-              path = move(path, target)
+              path = Misc.moveFile(path, target, dot = false)
             } else {
               // Either file is opened, or we don't own it: we cannot safely
               // rename it, so we make it temporary and change the target.
@@ -419,34 +420,6 @@ class DownloadFile(private var path: Path) extends LazyLogging {
     }
 
     path
-  }
-
-  /**
-   * Moves (or renames if possible) file.
-   *
-   * If target already exists, a new name will be automatically chosen.
-   *
-   * @param source source path
-   * @param target target path
-   * @return actual target path
-   */
-  private def move(source: Path, target: Path): Path = {
-    @scala.annotation.tailrec
-    def loop(remainingAttempts: Int): Path = {
-      val probed = PathsEx.getAvailable(target)
-      if (probed != target) logger.warn(s"Path=<$target> already exists; saving to=<$probed> instead")
-      try {
-        Files.move(source, probed)
-        probed
-      } catch {
-        case ex: Exception =>
-          if (remainingAttempts == 0) throw ex
-          loop(remainingAttempts - 1)
-      }
-    }
-
-    // If we are competing to use the target name, try more than once.
-    loop(3)
   }
 
   def close(lastModified: Option[Date], done: Boolean, canDelete: Boolean = false): Unit = this.synchronized {
@@ -472,7 +445,7 @@ class DownloadFile(private var path: Path) extends LazyLogging {
         temporary.foreach { tempPath =>
           // We only reuse the file we write to (temporary in this case).
           // If the target file exists, rename ours.
-          path = move(tempPath, path)
+          path = Misc.moveFile(tempPath, path, dot = false)
           // We are done with the temporary path.
           temporary = None
         }
