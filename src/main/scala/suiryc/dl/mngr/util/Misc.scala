@@ -63,8 +63,13 @@ object Misc extends LazyLogging {
       }
     }
 
-    // If we are competing to use the target name, try more than once.
-    loop(3)
+    if (target == source) {
+      // Nothing to do: file is already target.
+      target
+    } else {
+      // If we are competing to use the target name, try more than once.
+      loop(3)
+    }
   }
 
 }
