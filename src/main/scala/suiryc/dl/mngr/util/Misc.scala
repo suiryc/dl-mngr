@@ -8,12 +8,32 @@ import java.nio.file.{Files, Path}
 
 object Misc extends LazyLogging {
 
+  private val DOT_NAMING = (n: Int) => s".$n"
+
   /** Returns filename and parent path if any. */
   def fileContext(path: Path): String = {
     // Keep the filename and parent path if any.
     val count = path.getNameCount
     if (count >= 3) path.subpath(count - 2, count).toString
     else path.toString
+  }
+
+  /**
+   * Finds available path.
+   *
+   * Starting from given path, find the first name that is available, adding
+   * " (n)" (or ".n") suffix.
+   *
+   * @param path path to test
+   * @param dot whether to use dot (".n") or parenthesis (" (n)") for
+   *            alternative suffix
+   */
+  def getAvailablePath(path: Path, dot: Boolean = false): Path = {
+    val alternative = if (dot) Some(DOT_NAMING) else None
+    PathsEx.getAvailable(
+      path,
+      alternative = alternative
+    )
   }
 
   /**
@@ -31,12 +51,7 @@ object Misc extends LazyLogging {
   def moveFile(source: Path, target: Path, dot: Boolean = false): Path = {
     @scala.annotation.tailrec
     def loop(remainingAttempts: Int): Path = {
-      val alternative = if (dot) {
-        Some((n: Int) => s".$n")
-      } else {
-        None
-      }
-      val probed = PathsEx.getAvailable(target, alternative = alternative)
+      val probed = getAvailablePath(target, dot = dot)
       if (probed != target) logger.warn(s"Path=<$target> already exists; saving to=<$probed> instead")
       try {
         Files.move(source, probed)

@@ -908,9 +908,9 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
             val subtitleFilename = PathsEx.filename(PathsEx.atomicName(download.path.getFileName), subtitle.extension)
             // Subtitle file is saved next to target (not temporary)
             // download file.
-            val path = PathsEx.getAvailable(
+            val path = Misc.getAvailablePath(
               download.path.resolveSibling(subtitleFilename),
-              alternative = Some((n: Int) => s".$n")
+              dot = true
             )
             Files.write(path, raw.getBytes(StandardCharsets.UTF_8))
             val msg = s"Subtitle file=<${Misc.fileContext(path)}> saved"

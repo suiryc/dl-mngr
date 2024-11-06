@@ -162,7 +162,7 @@ class DownloadFile(private var path: Path) extends LazyLogging {
       } catch {
         case _: FileAlreadyExistsException | _: AccessDeniedException =>
           // If the file already exists, find the next available name
-          val available = PathsEx.getAvailable(target)
+          val available = Misc.getAvailablePath(target)
           channel = FileChannel.open(available, options: _*)
           if (temporary.isEmpty) path = available
           else temporary = Some(available)
