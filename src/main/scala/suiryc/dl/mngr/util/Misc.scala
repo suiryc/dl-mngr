@@ -28,7 +28,7 @@ object Misc extends LazyLogging {
    *            alternative suffix
    * @return actual target path
    */
-  def moveFile(source: Path, target: Path, dot: Boolean): Path = {
+  def moveFile(source: Path, target: Path, dot: Boolean = false): Path = {
     @scala.annotation.tailrec
     def loop(remainingAttempts: Int): Path = {
       val alternative = if (dot) {

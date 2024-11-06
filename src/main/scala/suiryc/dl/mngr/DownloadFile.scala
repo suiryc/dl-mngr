@@ -388,7 +388,7 @@ class DownloadFile(private var path: Path) extends LazyLogging {
     if (target != path) {
       if (isDone) {
         // If we were done the current 'path' is the real file.
-        path = Misc.moveFile(path, target, dot = false)
+        path = Misc.moveFile(path, target)
       } else {
         // The download is not done. Is there a temporary path ?
         temporary match {
@@ -408,7 +408,7 @@ class DownloadFile(private var path: Path) extends LazyLogging {
             if ((channel == null) && reused) {
               // We will re-use the path, which is not opened yet. So we only
               // need to rename it now.
-              path = Misc.moveFile(path, target, dot = false)
+              path = Misc.moveFile(path, target)
             } else {
               // Either file is opened, or we don't own it: we cannot safely
               // rename it, so we make it temporary and change the target.
@@ -445,7 +445,7 @@ class DownloadFile(private var path: Path) extends LazyLogging {
         temporary.foreach { tempPath =>
           // We only reuse the file we write to (temporary in this case).
           // If the target file exists, rename ours.
-          path = Misc.moveFile(tempPath, path, dot = false)
+          path = Misc.moveFile(tempPath, path)
           // We are done with the temporary path.
           temporary = None
         }
