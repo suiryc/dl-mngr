@@ -904,12 +904,8 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
       download.info.subtitle.foreach { subtitle =>
         if (subtitle.filename.isEmpty) {
           subtitle.raw.foreach { raw =>
-            // Use download file name, and subtitle extension.
-            val subtitleFilename = PathsEx.filename(PathsEx.atomicName(download.path.getFileName), subtitle.extension)
-            // Subtitle file is saved next to target (not temporary)
-            // download file.
             val path = Misc.getAvailablePath(
-              download.path.resolveSibling(subtitleFilename),
+              subtitle.determinePath(download),
               dot = true
             )
             Files.write(path, raw.getBytes(StandardCharsets.UTF_8))
