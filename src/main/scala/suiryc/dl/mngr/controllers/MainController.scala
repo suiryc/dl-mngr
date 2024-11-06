@@ -1576,7 +1576,7 @@ class MainController
           download.info.subtitle.flatMap(_.filename).foreach { subtitleFilename =>
             // Subtitle file is saved next to target (not temporary)
             // download file.
-            download.downloadFile.getPath.resolveSibling(subtitleFilename).toFile.delete()
+            download.path.resolveSibling(subtitleFilename).toFile.delete()
           }
         }
 

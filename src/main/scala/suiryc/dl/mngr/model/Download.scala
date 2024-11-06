@@ -348,7 +348,7 @@ case class Download(
       cookie = cookie,
       userAgent = userAgent,
       path = downloadFile.getPath,
-      temporaryPath = downloadFile.getTemporaryPath,
+      temporaryPath = temporaryPath,
       done = isDone,
       doneError = doneError,
       canResume = (isActive || info.wasActive) && !acceptRanges.contains(false),
