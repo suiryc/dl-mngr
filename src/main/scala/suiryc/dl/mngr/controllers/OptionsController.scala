@@ -197,12 +197,10 @@ class OptionsController extends StageLocationPersistentView(OptionsController.st
         snap
       }, {
         val setting = Main.settings.downloadsExtension
-        val snap = SettingSnapshot.opt(setting).setOnRefreshDraft {
-          // Note: empty extension is allowed (disables it), so don't filter out
-          // empty string value.
-          Option(fileExtensionField.getText)
+        val snap = SettingSnapshot(setting).setOnRefreshDraft {
+          fileExtensionField.getText
         }
-        def draftToField(): Unit = fileExtensionField.setText(snap.draft.get.orNull)
+        def draftToField(): Unit = fileExtensionField.setText(snap.draft.get)
         snap.draft.listen(draftToField())
         draftToField()
         snap
@@ -618,6 +616,7 @@ class OptionsController extends StageLocationPersistentView(OptionsController.st
   }
 
   private def checkForm(): Boolean = {
+    val fileExtensionFieldOk = Option(fileExtensionField.getText).map(_.trim).getOrElse("").nonEmpty
     val maxDownloadsOk = getInt(maxDownloadsField.getEditor.getText).getOrElse(-1) > 0
     val maxCnxOk = getInt(maxCnxField.getEditor.getText).getOrElse(-1) > 0
     val maxServerCnxOk = getInt(maxServerCnxField.getEditor.getText).getOrElse(-1) > 0
@@ -663,6 +662,7 @@ class OptionsController extends StageLocationPersistentView(OptionsController.st
       else 1
     } > 0
 
+    Styles.toggleError(fileExtensionField, !fileExtensionFieldOk, Strings.mustNonEmpty)
     Styles.toggleError(maxDownloadsField, !maxDownloadsOk, Strings.positiveValueExpected)
     Styles.toggleError(maxCnxField, !maxCnxOk, Strings.positiveValueExpected)
     Styles.toggleError(maxServerCnxField, !maxServerCnxOk, Strings.positiveValueExpected)
@@ -683,7 +683,7 @@ class OptionsController extends StageLocationPersistentView(OptionsController.st
     Styles.toggleError(siteMaxCnxField, !siteMaxCnxOk, Strings.positiveValueExpected)
     Styles.toggleError(siteMaxSegmentsField, !siteMaxSegmentsOk, Strings.positiveValueExpected)
 
-    maxDownloadsOk && maxCnxOk && maxServerCnxOk &&
+    fileExtensionFieldOk && maxDownloadsOk && maxCnxOk && maxServerCnxOk &&
       maxSegmentsOk && minSegmentSizeOk && writeBufferSizeOk && proxyOk &&
       maxErrorsOk && attemptDelayOk && cnxRequestTimeoutOk && cnxTimeoutOk && socketTimeoutOk && idleTimeoutOk &&
       bufferMinSizeOk && bufferMaxSizeOk &&
