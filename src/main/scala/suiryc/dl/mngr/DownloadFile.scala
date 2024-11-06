@@ -6,7 +6,7 @@ import org.apache.http.nio.{ContentDecoder, ContentDecoderChannel, FileContentDe
 import suiryc.dl.mngr.model.{DownloadException, DownloadInfo, SegmentRange, SegmentRanges}
 import suiryc.dl.mngr.util.Misc
 import suiryc.scala.concurrent.locks.RichLock._
-import suiryc.scala.io.{FileTimes, FilesEx, PathsEx}
+import suiryc.scala.io.{FileTimes, FilesEx}
 
 import java.io.RandomAccessFile
 import java.nio.ByteBuffer

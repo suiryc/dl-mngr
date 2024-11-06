@@ -15,7 +15,6 @@ import org.apache.http.nio.conn.ManagedNHttpClientConnection
 import suiryc.dl.mngr.model._
 import suiryc.dl.mngr.util.{Http, Misc}
 import suiryc.scala.concurrent.RichFuture
-import suiryc.scala.io.PathsEx
 import suiryc.scala.misc.Units
 
 import java.nio.charset.StandardCharsets
