@@ -130,7 +130,7 @@ case class DownloadBackupInfo(
   /** Target save path. */
   path: Path,
   /** Temporary download path. */
-  temporaryPath: Option[Path],
+  temporaryPath: Path,
   /** Whether the download was done (finished with success or error). */
   done: Boolean,
   /** Done download error. */
@@ -205,13 +205,13 @@ case class Download(
 
   def path: Path = downloadFile.getPath
 
-  def temporaryPath: Option[Path] = downloadFile.getTemporaryPath
+  def temporaryPath: Path = downloadFile.getTemporaryPath
 
   refreshPaths()
 
   private def refreshPaths(): Unit = {
     info.path.set(path)
-    info.temporaryPath.set(temporaryPath.orNull)
+    info.temporaryPath.set(temporaryPath)
   }
 
   def openFile(): Unit = {

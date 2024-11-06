@@ -802,13 +802,12 @@ class MainController
           dlFolderField.setText(info.path.get.getParent.toString)
           dlFileField.setText(info.path.get.getFileName.toString)
           // Display the temporary path in a tooltip.
-          val tooltip = Option(info.temporaryPath.get).map { path =>
-            new Tooltip(
-              // Don't display the folder if it is the actual target's one.
-              if (path.getParent != info.path.get.getParent) path.toString
-              else path.getFileName.toString
-            )
-          }.orNull
+          val temporaryPath = info.temporaryPath.get
+          val tooltip = new Tooltip(
+            // Don't display the folder if it is the actual target's one.
+            if (temporaryPath.getParent != info.path.get.getParent) temporaryPath.toString
+            else temporaryPath.getFileName.toString
+          )
           List(dlFolderField, dlFileField).foreach { field =>
             field.setTooltip(tooltip)
           }

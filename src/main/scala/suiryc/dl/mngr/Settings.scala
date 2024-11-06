@@ -257,10 +257,8 @@ class Settings(path: Path) extends StrictLogging {
     sites.get(site).foreach(removeSite)
   }
 
-  def getTemporaryFile(path: Path): Option[Path] = {
-    downloadsExtension.opt.filterNot(_.trim.isEmpty).map { extension =>
-      path.resolveSibling(s"${path.getFileName.toString}.$extension")
-    }
+  def getTemporaryFile(path: Path): Path = {
+    path.resolveSibling(s"${path.getFileName.toString}.${downloadsExtension.get}")
   }
 
   class SiteSettings(val site: String) {

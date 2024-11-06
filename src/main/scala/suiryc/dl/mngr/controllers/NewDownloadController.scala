@@ -254,7 +254,7 @@ class NewDownloadController extends StageLocationPersistentView(NewDownloadContr
           val (path0, needModify) = sanitizePath(getFolder, getFilename, auto, canModify = true)
           // Then check whether target/temporary file already exists
           val temporary = Main.settings.getTemporaryFile(path0)
-          val temporaryExists = temporary.exists(_.toFile.exists)
+          val temporaryExists = temporary.toFile.exists
           if (needModify) {
             // Update (sanitized) path.
             setPath(path0)
@@ -266,11 +266,10 @@ class NewDownloadController extends StageLocationPersistentView(NewDownloadContr
               val path = findAvailablePath(path0)
               (path, Some(ConflictResolution.Rename))
             } else {
-              // We can only resume the file to which we are to write (temporary
-              // or not). Don't even consider resuming if we use pre-allocation.
-              val canResume = !Main.settings.preallocateEnabled.get &&
-                (temporary.isEmpty || temporaryExists)
-              val exists = (List(path0) ::: temporary.toList).filter { path =>
+              // We can only resume the file to which we are to write (temporary).
+              // Don't even consider resuming if we use pre-allocation.
+              val canResume = !Main.settings.preallocateEnabled.get && temporaryExists
+              val exists = (List(path0) :+ temporary).filter { path =>
                 path.toFile.exists || dlMngr.getDownloads.exists { download =>
                   path == download.downloadFile.getPath
                 }
@@ -307,7 +306,7 @@ class NewDownloadController extends StageLocationPersistentView(NewDownloadContr
               // Upon restarting, delete existing files
               if (resolution == ConflictResolution.Restart) {
                 path.toFile.delete()
-                temporary.foreach(_.toFile.delete())
+                temporary.toFile.delete()
               }
               Result(
                 download = None,
@@ -480,7 +479,7 @@ class NewDownloadController extends StageLocationPersistentView(NewDownloadContr
     //  - the target name already exists
     //  - the temporary filename already exists: we need to own it
     //  - another download already uses the target name
-    !Files.exists(path) && !Main.settings.getTemporaryFile(path).exists(Files.exists(_)) && !dlMngr.getDownloads.exists { download =>
+    !Files.exists(path) && !Files.exists(Main.settings.getTemporaryFile(path)) && !dlMngr.getDownloads.exists { download =>
       path == download.downloadFile.getPath
     }
   }

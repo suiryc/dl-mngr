@@ -26,7 +26,7 @@ object DownloadFile {
     reuse(path, Main.settings.getTemporaryFile(path), mustExist = true)
   }
 
-  def reuse(path: Path, temporary: Option[Path], mustExist: Boolean): DownloadFile = {
+  def reuse(path: Path, temporary: Path, mustExist: Boolean): DownloadFile = {
     val downloadFile = new DownloadFile(path)
     downloadFile.temporary = temporary
     downloadFile.mustExist = mustExist
@@ -51,7 +51,7 @@ class DownloadFile(private var path: Path) extends LazyLogging {
   private var truncate: Boolean = false
 
   /** The temporary file to download into. */
-  private var temporary: Option[Path] = _
+  private var temporary: Path = _
   renewTemporary()
 
   /** The channel to write to. */
@@ -76,20 +76,16 @@ class DownloadFile(private var path: Path) extends LazyLogging {
   def getPath: Path = path
 
   /** Temporary path. */
-  def getTemporaryPath: Option[Path] = temporary
+  def getTemporaryPath: Path = temporary
 
-  /** Working path (temporary or target). */
-  def getWorkingPath: Path = temporary.getOrElse(path)
+  /** Working path (temporary until done, or target). */
+  def getWorkingPath: Path = if (isDone) path else temporary
 
   private def renewTemporary(): Unit = temporary = Main.settings.getTemporaryFile(path)
 
   /** Resets. */
   def reset(mustExist: Boolean, reusedOpt: Option[Boolean], restart: Boolean): Unit = this.synchronized {
-    // Notes:
-    // We only allow to delete temporary path. Having created a file also means
-    // we reserved its name, so don't delete the real target if we created it.
-    // In this case, we simply need to truncate it when we will (re-)open it.
-    close(None, done = false, canDelete = restart && temporary.isDefined)
+    close(None, done = false, canDelete = restart)
     reusedOpt.foreach(reused = _)
     // File must exist if needed, we reuse it, and we don't restart.
     this.mustExist = mustExist && reused && !restart
@@ -150,7 +146,6 @@ class DownloadFile(private var path: Path) extends LazyLogging {
       // If we don't re-use an existing file, re-compute temporary path if any.
       // (useful if target was renamed in-between)
       if (!reused) renewTemporary()
-      val target = getWorkingPath
       // If not owned, make sure the file does not exist upon creating it.
       val options = List(StandardOpenOption.WRITE) :::
         (if (!mustExist) List(StandardOpenOption.CREATE) else Nil) :::
@@ -158,14 +153,12 @@ class DownloadFile(private var path: Path) extends LazyLogging {
         (if (truncate) List(StandardOpenOption.TRUNCATE_EXISTING) else Nil)
 
       try {
-        channel = FileChannel.open(target, options: _*)
+        channel = FileChannel.open(temporary, options: _*)
       } catch {
         case _: FileAlreadyExistsException | _: AccessDeniedException =>
           // If the file already exists, find the next available name
-          val available = Misc.getAvailablePath(target)
-          channel = FileChannel.open(available, options: _*)
-          if (temporary.isEmpty) path = available
-          else temporary = Some(available)
+          temporary = Misc.getAvailablePath(temporary)
+          channel = FileChannel.open(temporary, options: _*)
       }
       // The file was created if applicable, so it must exist now.
       mustExist = true
@@ -390,31 +383,13 @@ class DownloadFile(private var path: Path) extends LazyLogging {
         // If we were done the current 'path' is the real file.
         path = Misc.moveFile(path, target)
       } else {
-        // The download is not done. Is there a temporary path ?
-        temporary match {
-          case Some(tmp) =>
-            // There is a temporary path, so we only need to set the target path.
-            path = target
-            if (target == tmp) {
-              // The temporary path is now the actual target.
-              temporary = None
-            } else if ((channel == null) && !reused) {
-              // We won't re-use the temporary path, which is not opened yet.
-              // We can re-compute it now (may be displayed in UI).
-              renewTemporary()
-            }
-
-          case None =>
-            if ((channel == null) && reused) {
-              // We will re-use the path, which is not opened yet. So we only
-              // need to rename it now.
-              path = Misc.moveFile(path, target)
-            } else {
-              // Either file is opened, or we don't own it: we cannot safely
-              // rename it, so we make it temporary and change the target.
-              temporary = Some(path)
-              path = target
-            }
+        // The download is not done.
+        // Set the new target path.
+        path = target
+        if ((channel == null) && !reused) {
+          // We won't re-use the temporary path, which is not opened yet.
+          // We can re-compute it now (maybe displayed in UI).
+          renewTemporary()
         }
       }
     }
@@ -442,13 +417,9 @@ class DownloadFile(private var path: Path) extends LazyLogging {
         FilesEx.setTimes(getWorkingPath, fileTimes)
       }
       if (done) {
-        temporary.foreach { tempPath =>
-          // We only reuse the file we write to (temporary in this case).
-          // If the target file exists, rename ours.
-          path = Misc.moveFile(tempPath, path)
-          // We are done with the temporary path.
-          temporary = None
-        }
+        // We only reuse the (temporary) file we write to.
+        // If the target file exists, rename ours.
+        path = Misc.moveFile(temporary, path)
       } else if (delete) {
         getWorkingPath.toFile.delete()
         ()
