@@ -397,7 +397,6 @@ class DownloadFile(private var path: Path) extends LazyLogging {
   }
 
   def close(lastModified: Option[Date], done: Boolean, canDelete: Boolean = false): Unit = this.synchronized {
-    isDone = done
     if (channel != null) {
       flush(force = true)
       // If not done, and file is empty (or caller allows deletion), delete it.
@@ -424,6 +423,7 @@ class DownloadFile(private var path: Path) extends LazyLogging {
         ()
       }
     }
+    isDone = done
   }
 
 }
