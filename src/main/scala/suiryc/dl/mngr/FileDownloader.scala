@@ -1271,6 +1271,8 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
     if (state.isComplete && state.failed.nonEmpty) state = state.copy(failed = None)
 
     // Close the file and handle any issue.
+    // Note: upon stopping, 'failed' is set with a 'stopped' DownloadException
+    // that will be properly handled by caller.
     val closeError = try {
       download.closeFile(lastModified, done = state.failed.isEmpty)
       // Ensure path (still) exists when applicable.

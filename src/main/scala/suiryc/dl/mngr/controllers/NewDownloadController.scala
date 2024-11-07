@@ -241,6 +241,8 @@ class NewDownloadController extends StageLocationPersistentView(NewDownloadContr
             )
           }
           r.map { resolution =>
+            // Note: upon 'restart', the existing download resetting will
+            // delete existing file when applicable.
             Result(
               download = download,
               restart = resolution == ConflictResolution.Restart,
@@ -551,6 +553,8 @@ object NewDownloadController {
       userAgent = download.userAgent,
       path = download.downloadFile.getPath,
       // Reused is true since we have an existing download
+      // (note: in this case, we actually don't use this field because a
+      // download already exists, and we keep it as-is)
       reused = true,
       restart = restart,
       insertFirst = false,

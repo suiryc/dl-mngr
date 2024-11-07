@@ -747,11 +747,12 @@ class DownloadManager extends StrictLogging {
 
     def restoreState(downloadsBackupInfo: List[DownloadBackupInfo]): Unit = {
       downloadsBackupInfo.foreach { downloadBackupInfo =>
-        val mustExist = downloadBackupInfo.downloadedRanges.nonEmpty
+        // Belt and suspenders: download is supposed to be created if we
+        // already did download something.
         val downloadFile = DownloadFile.reuse(
           downloadBackupInfo.path,
           downloadBackupInfo.temporaryPath,
-          mustExist = mustExist
+          created = downloadBackupInfo.created || downloadBackupInfo.downloadedRanges.nonEmpty
         )
         val download = Download(
           id = downloadBackupInfo.id,

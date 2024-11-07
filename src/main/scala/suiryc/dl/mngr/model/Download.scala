@@ -102,6 +102,8 @@ case class DownloadBackupInfo(
   path: Path,
   /** Temporary download path. */
   temporaryPath: Path,
+  /** Whether the download file was created. */
+  created: Boolean,
   /** Whether the download was done (finished with success or error). */
   done: Boolean,
   /** Done download error. */
@@ -129,7 +131,7 @@ case class DownloadBackupInfo(
 object DownloadBackupInfo extends DefaultJsonProtocol with JsonFormats {
   implicit val segmentRangeFormat: RootJsonFormat[SegmentRange] = jsonFormat2(SegmentRange.apply)
   implicit val subtitlesBackupFormat: RootJsonFormat[SubtitleInfo] = jsonFormat3(SubtitleInfo.apply)
-  implicit val downloadBackupFormat: RootJsonFormat[DownloadBackupInfo] = jsonFormat18(DownloadBackupInfo.apply)
+  implicit val downloadBackupFormat: RootJsonFormat[DownloadBackupInfo] = jsonFormat19(DownloadBackupInfo.apply)
 }
 
 /**
@@ -177,6 +179,8 @@ case class Download(
   def path: Path = downloadFile.getPath
 
   def temporaryPath: Path = downloadFile.getTemporaryPath
+
+  def created: Boolean = downloadFile.getCreated
 
   refreshPaths()
 
@@ -299,7 +303,7 @@ case class Download(
   def resume(restart: Boolean): Unit = {
     if (restart) info.restart()
     val reason = if (restart) "re-started" else "resumed"
-    downloadFile.reset(mustExist = info.hasDownloaded, restart = restart)
+    downloadFile.reset(restart = restart)
     // Belt and suspenders:
     // The current download should have properly been failed/stopped already.
     // We still try to fail the promise, and in case it had not yet been
@@ -319,6 +323,7 @@ case class Download(
       userAgent = userAgent,
       path = downloadFile.getPath,
       temporaryPath = temporaryPath,
+      created = created,
       done = isDone,
       doneError = doneError,
       canResume = (isActive || info.wasActive) && !acceptRanges.contains(false),
