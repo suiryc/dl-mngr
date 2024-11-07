@@ -84,9 +84,8 @@ class DownloadFile(private var path: Path) extends LazyLogging {
   private def renewTemporary(): Unit = temporary = Main.settings.getTemporaryFile(path)
 
   /** Resets. */
-  def reset(mustExist: Boolean, reusedOpt: Option[Boolean], restart: Boolean): Unit = this.synchronized {
+  def reset(mustExist: Boolean, restart: Boolean): Unit = this.synchronized {
     close(None, done = false, canDelete = restart)
-    reusedOpt.foreach(reused = _)
     // File must exist if needed, we reuse it, and we don't restart.
     this.mustExist = mustExist && reused && !restart
     // We could also restrict truncating to 'without temporary path' cases, but

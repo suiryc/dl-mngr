@@ -406,7 +406,7 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
     if (state.download.canResume) {
       // The download manager does follow the downloads. So we need to go
       // through it to resume the download.
-      dlMngr.resumeDownload(state.download.id, reusedOpt = None, restart = false)
+      dlMngr.resumeDownload(state.download.id, restart = false)
       state
     } else trySegment(state)
   }

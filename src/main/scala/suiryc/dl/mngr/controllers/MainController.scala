@@ -1141,7 +1141,7 @@ class MainController
     resumeDownload.setGraphic(Icons.download().pane)
     resumeDownload.setOnAction { _ =>
       selectedDownloadsData.filter(_.download.canResume(restart = false)).foreach { data =>
-        getState.dlMngr.resumeDownload(data.download.id, reusedOpt = None, restart = false, tryCnx = false)
+        getState.dlMngr.resumeDownload(data.download.id, restart = false, tryCnx = false)
       }
       getState.dlMngr.tryConnection()
     }
@@ -1149,7 +1149,7 @@ class MainController
     restartDownload.setGraphic(Icons.undo().pane)
     restartDownload.setOnAction { _ =>
       selectedDownloadsData.filter(_.download.canResume(restart = true)).foreach { data =>
-        getState.dlMngr.resumeDownload(data.download.id, reusedOpt = None, restart = true, tryCnx = false)
+        getState.dlMngr.resumeDownload(data.download.id, restart = true, tryCnx = false)
       }
       getState.dlMngr.tryConnection()
     }
@@ -1352,7 +1352,7 @@ class MainController
 
   def onDownloadsResumeAll(@unused event: ActionEvent): Unit = {
     getDownloadsData.filter(_.download.canResume(restart = false)).foreach { data =>
-      getState.dlMngr.resumeDownload(data.download.id, reusedOpt = None, restart = false, tryCnx = false)
+      getState.dlMngr.resumeDownload(data.download.id, restart = false, tryCnx = false)
     }
     getState.dlMngr.tryConnection()
   }

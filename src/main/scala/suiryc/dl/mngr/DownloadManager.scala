@@ -179,10 +179,10 @@ object DownloadManager {
     /** Actor handling the download. */
     dler: ActorRef
   ) {
-    def resume(reusedOpt: Option[Boolean], restart: Boolean): DownloadEntry = {
+    def resume(restart: Boolean): DownloadEntry = {
       // Belt and suspenders: make sure 'done' is completed.
       done.tryFailure(DownloadException("Download is being resumed"))
-      download.resume(reusedOpt, restart)
+      download.resume(restart)
       copy(done = Promise())
     }
   }
@@ -472,11 +472,11 @@ class DownloadManager extends StrictLogging {
     }
   }
 
-  def resumeDownload(id: UUID, reusedOpt: Option[Boolean], restart: Boolean, tryCnx: Boolean = true): Unit = {
+  def resumeDownload(id: UUID, restart: Boolean, tryCnx: Boolean = true): Unit = {
     if (!stopping) {
       getDownloadEntry(id).foreach { dlEntry =>
         if (dlEntry.download.canResume(restart)) {
-          val download = updateDownloadEntry(dlEntry.resume(reusedOpt, restart)).download
+          val download = updateDownloadEntry(dlEntry.resume(restart)).download
           download.info.state.setValue(DownloadState.Pending)
           followDownload(download)
           dlEntry.dler ! FileDownloader.DownloadResume(restart = restart)
@@ -490,7 +490,7 @@ class DownloadManager extends StrictLogging {
     if (!stopping) {
       getDownloadEntry(id).foreach { dlEntry =>
         val add = if (dlEntry.download.canResume) {
-          resumeDownload(id, reusedOpt = None, restart = false, tryCnx = false)
+          resumeDownload(id, restart = false, tryCnx = false)
           true
         } else dlEntry.download.isActive
         if (add) dlEntry.dler ! FileDownloader.AddConnection
@@ -817,7 +817,7 @@ class DownloadManager extends StrictLogging {
         info.lastModified.set(downloadBackupInfo.lastModified.orNull)
         info.downloaded.set(downloadBackupInfo.downloadedRanges.map(_.length).sum)
         addDownload(download, insertFirst = false)
-        if (downloadBackupInfo.canResume) resumeDownload(download.id, reusedOpt = None, restart = false, tryCnx = false)
+        if (downloadBackupInfo.canResume) resumeDownload(download.id, restart = false, tryCnx = false)
       }
       tryConnection()
     }

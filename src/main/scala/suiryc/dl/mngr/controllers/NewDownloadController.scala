@@ -636,7 +636,7 @@ object NewDownloadController {
           insertFirst = result.insertFirst
         )
       }
-      if (result.start) dlMngr.resumeDownload(download.id, reusedOpt = Some(result.reused), restart = result.restart)
+      if (result.start) dlMngr.resumeDownload(download.id, restart = result.restart)
       if (result.download.isEmpty) mainController.addDownload(download.id, result.insertFirst, result.select)
       download
     }

@@ -296,10 +296,10 @@ case class Download(
     ).mkString("\n")
   }
 
-  def resume(reusedOpt: Option[Boolean], restart: Boolean): Unit = {
+  def resume(restart: Boolean): Unit = {
     if (restart) info.restart()
     val reason = if (restart) "re-started" else "resumed"
-    downloadFile.reset(mustExist = info.hasDownloaded, reusedOpt = reusedOpt, restart = restart)
+    downloadFile.reset(mustExist = info.hasDownloaded, restart = restart)
     // Belt and suspenders:
     // The current download should have properly been failed/stopped already.
     // We still try to fail the promise, and in case it had not yet been
