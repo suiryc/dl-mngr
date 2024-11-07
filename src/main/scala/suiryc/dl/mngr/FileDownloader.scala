@@ -1398,11 +1398,19 @@ class ResponseConsumer(
     // Depending on returned headers, caller will properly determine whether
     // server accept ranges.
     //
+    // After first segment response, we know whether server supports ranges or
+    // not.
+    // When resuming a download from existing file, the download is seen as
+    // "started" because content was already downloaded, but "acceptRanges"
+    // is still unknown until first segment is tried. Since we don't know yet
+    // whether server does support ranges, client behaves as for the first cnx.
+    // This is also a first try for this new download entry.
+    //
     // In case the server somehow understands we requested a range, does not
     // support this feature and instead responds with the dedicated 416 error
     // (Requested Range Not Satisfiable), report range failure to caller: it
     // will remember server does not support ranges before retrying.
-    val firstCnx = !download.isStarted && download.acceptRanges.isEmpty
+    val firstCnx = !download.isStarted || download.acceptRanges.isEmpty
     val isRange = (position > 0) || range.isDefined
     val failure = if (statusLine.getStatusCode / 100 != 2) {
       // Request failed with HTTP code other than 2xx
