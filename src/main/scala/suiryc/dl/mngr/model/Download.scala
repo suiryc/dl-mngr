@@ -81,6 +81,7 @@ class DownloadInfo extends ObservableLogs {
     lastModified.set(null)
     size.set(Long.MinValue)
     downloaded.set(0)
+    doneError = None
   }
 
 }
