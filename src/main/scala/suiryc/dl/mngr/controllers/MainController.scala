@@ -801,15 +801,17 @@ class MainController
           dlServerLink.setText(info.actualUri.get.getHost)
           dlFolderField.setText(info.path.get.getParent.toString)
           dlFileField.setText(info.path.get.getFileName.toString)
-          // Display the temporary path in a tooltip.
-          val temporaryPath = info.temporaryPath.get
-          val tooltip = new Tooltip(
-            // Don't display the folder if it is the actual target's one.
-            if (temporaryPath.getParent != info.path.get.getParent) temporaryPath.toString
-            else temporaryPath.getFileName.toString
-          )
-          List(dlFolderField, dlFileField).foreach { field =>
-            field.setTooltip(tooltip)
+          // Display the temporary path, if created, in a tooltip.
+          if (download.created) {
+            val temporaryPath = info.temporaryPath.get
+            val tooltip = new Tooltip(
+              // Don't display the folder if it is the actual target's one.
+              if (temporaryPath.getParent != info.path.get.getParent) temporaryPath.toString
+              else temporaryPath.getFileName.toString
+            )
+            List(dlFolderField, dlFileField).foreach { field =>
+              field.setTooltip(tooltip)
+            }
           }
           dlSizeLabel.setText {
             if (info.isSizeKnown) {
