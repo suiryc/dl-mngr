@@ -21,7 +21,6 @@ import suiryc.dl.mngr.model._
 import suiryc.dl.mngr.util.Http
 import suiryc.scala.io.PathsEx
 
-import java.io.FileInputStream
 import java.net.URI
 import java.nio.charset.StandardCharsets
 import java.nio.file.{Files, Path}
@@ -56,10 +55,6 @@ object DownloadManager {
   // or
   //  - shutdown the connection manager: the working thread will finish, and
   //    we are then expected to never use the client again
-
-  // Some sites return a positive response with small content
-  // indicating the original resource pointed by the URL did expire.
-  private val CONTENT_INVALID = Set("Expired", "error_expired")
 
   class LazyClient(trustAll: Boolean) extends StrictLogging {
 
@@ -589,35 +584,6 @@ class DownloadManager extends StrictLogging {
                 }
               }
 
-              // Check actual content does not apear invalid (indicating
-              // resource expiration etc.).
-              val path = download.path
-              val invalid = Files.exists(path) && {
-                try {
-                  lazy val content = {
-                    val is = new FileInputStream(path.toFile)
-                    val b = LazyList.continually(is.read()).takeWhile(_ != -1).map(_.toByte).toArray
-                    is.close()
-                    b
-                  }
-                  CONTENT_INVALID.exists { s =>
-                    val b = s.getBytes(StandardCharsets.UTF_8)
-                    (info.downloaded.get == b.size) && {
-                      content.sameElements(b)
-                    }
-                  }
-                } catch {
-                  case _: Exception =>
-                    // We don't care
-                    false
-                }
-              }
-              if (invalid) {
-                val message = s"Download uri=<${download.uri}> content appears invalid (expired, ...)"
-                logger.error(s"${download.context} $message")
-                info.addLog(LogKind.Error, message)
-                info.doneError = Some(message)
-              }
               DownloadState.Done
           }
           info.state.setValue(state)

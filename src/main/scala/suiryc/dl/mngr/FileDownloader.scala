@@ -17,6 +17,8 @@ import suiryc.dl.mngr.util.Http
 import suiryc.scala.concurrent.RichFuture
 import suiryc.scala.misc.Units
 
+import java.io.FileInputStream
+import java.nio.charset.StandardCharsets
 import java.nio.file.{Files, NoSuchFileException}
 import scala.concurrent.Promise
 import scala.concurrent.duration._
@@ -51,6 +53,10 @@ import scala.util.{Failure, Success}
 // FileDownloader takes care of re-downloading them.
 
 object FileDownloader {
+
+  // Some sites return a positive response with small content
+  // indicating the original resource pointed by the URL did expire.
+  private val CONTENT_INVALID = Set("Expired", "error_expired")
 
   sealed trait FileDownloaderMsg
   // Request to stop download.
@@ -1329,11 +1335,50 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
         logger.info(s"${download.context} Download uri=<${download.uri}> done: success${
           lastModified.map(v => s" (file date=<$v>)").getOrElse("")
         }")
+        // Check whether downloaded content appears invalid.
+        // Do this before completing promise (so that download manager knows
+        // whether download is ok or not).
+        checkDoneError(state)
         info.promise.trySuccess(())
-        // Time to stop ourself, unless download is done with error (in which
+        // Time to stop ourselves, unless download is done with error (in which
         // case user has to restart or remove it explicitly).
         if (info.doneError.isEmpty) context.stop(self)
         state
+    }
+  }
+
+  private def checkDoneError(state: State): Unit = {
+    val download = state.download
+    val info = download.info
+
+    // Check actual content does not appear invalid (indicating
+    // resource expiration etc.).
+    val path = download.path
+    val invalid = Files.exists(path) && {
+      try {
+        lazy val content = {
+          val is = new FileInputStream(path.toFile)
+          val b = LazyList.continually(is.read()).takeWhile(_ != -1).map(_.toByte).toArray
+          is.close()
+          b
+        }
+        CONTENT_INVALID.exists { s =>
+          val b = s.getBytes(StandardCharsets.UTF_8)
+          (info.downloaded.get == b.size) && {
+            content.sameElements(b)
+          }
+        }
+      } catch {
+        case _: Exception =>
+          // We don't care
+          false
+      }
+    }
+    if (invalid) {
+      val message = s"Download uri=<${download.uri}> content appears invalid (expired, ...)"
+      logger.error(s"${download.context} $message")
+      info.addLog(LogKind.Error, message)
+      info.doneError = Some(message)
     }
   }
 
