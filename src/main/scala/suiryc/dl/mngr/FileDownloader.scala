@@ -484,7 +484,7 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
     val data = state.segmentConsumers(consumer)
     val range0 = data.range
     val range = range0.copy(end = end)
-    logger.info(s"${state.download.context(range0)} Change active segment range end from=<${range0.end}> to=<${range.end}>")
+    logger.info(s"${state.download.context(range0)} Change active segment range end from=<${range0.endStr}> to=<${range.endStr}>")
     data.responseConsumer.end = end
     state.updateConsumerData(consumer) { data =>
       data.copy(

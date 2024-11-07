@@ -277,8 +277,7 @@ case class Download(
   def context: String = s"[id=$id]"
 
   def context(range: SegmentRange): String = {
-    if (range.isInfinite) s"$context[range=${range.start}-∞]"
-    else if (range.length > 0) s"$context[range=${range.start}-${range.end}]"
+    if (range.length > 0) s"$context[range=${range.start}-${range.endStr}]"
     else context
   }
 

@@ -7,7 +7,8 @@ case class SegmentRange(start: Long, end: Long) {
   def isInfinite: Boolean = end == Long.MaxValue
   def length: Long = if (isInfinite) Long.MaxValue else end + 1 - start
   def isDefined: Boolean = isInfinite || (length > 0)
-  override def toString: String = if (isInfinite) s"[$start,∞]" else s"[$start,$end]"
+  def endStr: String = if (isInfinite) "∞" else end.toString
+  override def toString: String = s"[$start,$endStr]"
 }
 
 object SegmentRange {
