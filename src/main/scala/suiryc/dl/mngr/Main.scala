@@ -6,6 +6,7 @@ import monix.execution.Scheduler
 import spray.json._
 import suiryc.dl.mngr.I18N.Strings
 import suiryc.dl.mngr.controllers.MainController
+import suiryc.dl.mngr.util.Misc
 import suiryc.scala.akka.{AkkaResources, CoreSystem}
 import suiryc.scala.io.SystemStreams
 import suiryc.scala.javafx.{JFXApplication, JFXLauncher}
@@ -100,6 +101,7 @@ object Main extends JFXLauncher[MainApp] with StrictLogging {
       println(
         s"""$versionedName
            |buildTime: $buildTimeString
+           |javaVersion: ${Misc.javaVersionInfo}
            |scalaVersion: ${Info.scalaVersion}
            |sbtVersion: ${Info.sbtVersion}
            """.stripMargin)

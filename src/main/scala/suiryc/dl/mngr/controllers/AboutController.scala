@@ -6,7 +6,7 @@ import javafx.scene.Node
 import javafx.scene.control.{ButtonType, Dialog, Label, TableColumn, TableView}
 import javafx.scene.text.Font
 import javafx.stage.Window
-import suiryc.dl.mngr.util.Icons
+import suiryc.dl.mngr.util.{Icons, Misc}
 import suiryc.dl.mngr.{I18N, Info, Main}
 import suiryc.scala.javafx.scene.Graphics
 import suiryc.scala.javafx.scene.text.Fonts
@@ -18,6 +18,9 @@ class AboutController {
 
   @FXML
   protected var versionLabel: Label = _
+
+  @FXML
+  protected var javaVersionLabel: Label = _
 
   @FXML
   protected var scalaVersionLabel: Label = _
@@ -41,6 +44,7 @@ class AboutController {
     import scala.Ordering.Double.TotalOrdering
 
     versionLabel.setText(Info.version)
+    javaVersionLabel.setText(Misc.javaVersionInfo)
     scalaVersionLabel.setText(Info.scalaVersion)
     sbtVersionLabel.setText(Info.sbtVersion)
     gitCommitLabel.setText(Info.commitId.orNull)

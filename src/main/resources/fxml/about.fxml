@@ -9,7 +9,6 @@
 <?import javafx.scene.layout.RowConstraints?>
 <?import javafx.scene.layout.VBox?>
 
-
 <VBox maxHeight="-Infinity" maxWidth="-Infinity" spacing="5.0" xmlns="http://javafx.com/javafx/11.0.1" xmlns:fx="http://javafx.com/fxml/1" fx:controller="suiryc.dl.mngr.controllers.AboutController">
    <children>
       <GridPane hgap="5.0" vgap="5.0" VBox.vgrow="NEVER">
@@ -19,6 +18,7 @@
         </columnConstraints>
         <rowConstraints>
           <RowConstraints minHeight="20.0" vgrow="SOMETIMES" />
+            <RowConstraints minHeight="20.0" vgrow="SOMETIMES" />
           <RowConstraints minHeight="20.0" vgrow="SOMETIMES" />
           <RowConstraints minHeight="20.0" vgrow="SOMETIMES" />
             <RowConstraints minHeight="20.0" vgrow="SOMETIMES" />
@@ -27,14 +27,16 @@
          <children>
             <Label text="%Version:" />
             <Label fx:id="versionLabel" GridPane.columnIndex="1" />
-            <Label text="%Scala version:" GridPane.rowIndex="1" />
-            <Label fx:id="scalaVersionLabel" GridPane.columnIndex="1" GridPane.rowIndex="1" />
-            <Label text="%SBT version:" GridPane.rowIndex="2" />
-            <Label fx:id="sbtVersionLabel" GridPane.columnIndex="1" GridPane.rowIndex="2" />
-            <Label text="%Git commit:" GridPane.rowIndex="3" />
-            <Label fx:id="gitCommitLabel" GridPane.columnIndex="1" GridPane.rowIndex="3" />
-            <Label text="%Build time:" GridPane.rowIndex="4" />
-            <Label fx:id="buildTimeLabel" GridPane.columnIndex="1" GridPane.rowIndex="4" />
+            <Label text="%Java version:" GridPane.rowIndex="1" />
+            <Label fx:id="javaVersionLabel" GridPane.columnIndex="1" GridPane.rowIndex="1" />
+            <Label text="%Scala version:" GridPane.rowIndex="2" />
+            <Label fx:id="scalaVersionLabel" GridPane.columnIndex="1" GridPane.rowIndex="2" />
+            <Label text="%SBT version:" GridPane.rowIndex="3" />
+            <Label fx:id="sbtVersionLabel" GridPane.columnIndex="1" GridPane.rowIndex="3" />
+            <Label text="%Git commit:" GridPane.rowIndex="4" />
+            <Label fx:id="gitCommitLabel" GridPane.columnIndex="1" GridPane.rowIndex="4" />
+            <Label text="%Build time:" GridPane.rowIndex="5" />
+            <Label fx:id="buildTimeLabel" GridPane.columnIndex="1" GridPane.rowIndex="5" />
          </children>
       </GridPane>
       <TableView fx:id="dependenciesTable" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" prefHeight="300.0" prefWidth="400.0" VBox.vgrow="ALWAYS">

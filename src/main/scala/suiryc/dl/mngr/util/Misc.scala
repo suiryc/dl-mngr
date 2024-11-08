@@ -10,6 +10,10 @@ object Misc extends LazyLogging {
 
   private val DOT_NAMING = (n: Int) => s".$n"
 
+  lazy val javaVersionInfo: String = {
+    s"${System.getProperty("java.version")} (${System.getProperty("java.vm.name")})"
+  }
+
   /** Returns filename and parent path if any. */
   def fileContext(path: Path): String = {
     // Keep the filename and parent path if any.
