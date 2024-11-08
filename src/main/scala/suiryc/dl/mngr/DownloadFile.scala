@@ -122,6 +122,16 @@ class DownloadFile(private var path: Path) extends LazyLogging {
     }
   }
 
+  /** Creates temporary directory path. */
+  def createDirectory(): Boolean = {
+    // Nothing to do if already created.
+    if (!created) {
+      temporary = Misc.createDirectory(temporary)
+      created = true
+      true
+    } else false
+  }
+
   /**
    * Creates the channel (if not already done).
    *

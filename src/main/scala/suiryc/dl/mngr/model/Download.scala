@@ -59,6 +59,12 @@ class DownloadInfo extends ObservableLogs {
   /** Whether server accept ranges. */
   var acceptRanges: SimpleObjectProperty[Option[Boolean]] = new SimpleObjectProperty(None)
 
+  /** Stream segments. */
+  var streamSegments: List[StreamSegment] = Nil
+
+  /** HLS. */
+  var hls: Option[HLSInfo] = None
+
   /** Associated subtitles. */
   var subtitle: Option[SubtitleInfo] = None
 
@@ -124,6 +130,10 @@ case class DownloadBackupInfo(
   lastModified: Option[Date],
   /** Downloaded ranges. */
   downloadedRanges: List[SegmentRange],
+  /** Streams segments. */
+  streamSegments: List[StreamSegment],
+  /** HLS. */
+  hls: Option[HLSInfo],
   /** Subtitles. */
   subtitle: Option[SubtitleInfo]
 )
@@ -131,7 +141,7 @@ case class DownloadBackupInfo(
 object DownloadBackupInfo extends DefaultJsonProtocol with JsonFormats {
   implicit val segmentRangeFormat: RootJsonFormat[SegmentRange] = jsonFormat2(SegmentRange.apply)
   implicit val subtitlesBackupFormat: RootJsonFormat[SubtitleInfo] = jsonFormat3(SubtitleInfo.apply)
-  implicit val downloadBackupFormat: RootJsonFormat[DownloadBackupInfo] = jsonFormat19(DownloadBackupInfo.apply)
+  implicit val downloadBackupFormat: RootJsonFormat[DownloadBackupInfo] = jsonFormat21(DownloadBackupInfo.apply)
 }
 
 /**
@@ -171,6 +181,11 @@ case class Download(
     this
   }
 
+  def setHLS(hls: Option[HLSInfo]): Download = {
+    info.hls = hls
+    this
+  }
+
   def setSubtitle(subtitle: Option[SubtitleInfo]): Download = {
     info.subtitle = subtitle
     this
@@ -189,8 +204,21 @@ case class Download(
     info.temporaryPath.set(temporaryPath)
   }
 
+  /** Creates temporary directory path. */
+  def createDirectory(): Unit = {
+    // Belt and suspenders: we only expect to be called for HLS download.
+    if (info.hls.nonEmpty && downloadFile.createDirectory()) {
+      refreshPaths()
+    }
+  }
+
+  /** Opens target file. */
   def openFile(): Unit = {
-    if (downloadFile.createChannel()) refreshPaths()
+    // Belt and suspenders: we only expect to be called for regular file
+    // download, not HLS.
+    if (info.hls.isEmpty && downloadFile.createChannel()) {
+      refreshPaths()
+    }
   }
 
   def setSize(size: Long): Unit = {
@@ -334,6 +362,8 @@ case class Download(
       acceptRanges = acceptRanges,
       lastModified = Option(info.lastModified.get),
       downloadedRanges = downloadFile.getDownloadedRanges(info),
+      streamSegments = info.streamSegments,
+      hls = info.hls,
       subtitle = info.subtitle
     )
   }

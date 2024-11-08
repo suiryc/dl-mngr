@@ -541,10 +541,11 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
       if (can) state = state.updateForceable(_ - 1)
       can
     }
-    // We can only start a new segment if ranges are accepted and we did not yet
-    // reached max number of segments (and a TrySegment is not currently
+    // We can only start a new segment if ranges are accepted, and we did not
+    // yet reach max number of segments (and a TrySegment is not currently
     // scheduled).
-    val canTry = !state.stopping && (forced || (state.trySegment.isEmpty && !state.hasTooManyErrors))
+    // For HLS download, we also only need to prepare it for now.
+    val canTry = !state.stopping && download.info.hls.isEmpty && (forced || (state.trySegment.isEmpty && !state.hasTooManyErrors))
     lazy val canAddSegment = {
       // Note: actually if size is unknown only one segment can be running.
       // This is taken care of when searching for a new segment to start.
@@ -585,6 +586,18 @@ class FileDownloader(dlMngr: DownloadManager, dl: Download) extends Actor with S
       }
     } else {
       // We cannot try a new segment.
+
+      // For HLS, this is when it is prepared.
+      download.info.hls.foreach { hls =>
+        hls.prepare(logger, download)
+        // This is also when we can save associated subtitle file.
+        download.info.subtitle.foreach { subtitle =>
+          subtitle.prepare(logger, download)
+        }
+        // For now, this is all we do for HLS.
+        state = done(state)
+      }
+
       // We also end up here if first connection request is ongoing (no response
       // yet); may happen if a TryConnection is triggered.
       if (canTry && !download.info.isSizeDetermined && state.segmentConsumers.nonEmpty) {
