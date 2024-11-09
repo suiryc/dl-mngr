@@ -1,16 +1,11 @@
 package suiryc.dl.mngr.controllers
 
-import java.nio.file.Paths
 import javafx.collections.FXCollections
 import javafx.event.ActionEvent
 import javafx.fxml.{FXML, FXMLLoader}
 import javafx.scene.Node
 import javafx.scene.control._
-import javafx.stage.{DirectoryChooser, Stage, Window}
-import scala.annotation.unused
-import scala.concurrent.duration._
-import scala.jdk.CollectionConverters._
-import scala.util.Try
+import javafx.stage.{DirectoryChooser, FileChooser, Stage, Window}
 import suiryc.dl.mngr.util.{Http, Icons}
 import suiryc.dl.mngr.{I18N, Main, Settings}
 import suiryc.scala.concurrent.duration.Durations
@@ -23,7 +18,14 @@ import suiryc.scala.javafx.stage.Stages.StageLocation
 import suiryc.scala.javafx.stage.{PathChoosers, StageLocationPersistentView, Stages}
 import suiryc.scala.misc.Units
 import suiryc.scala.settings._
+import suiryc.scala.sys.{Command, OS}
 import suiryc.scala.util.I18NLocale
+
+import java.nio.file.Paths
+import scala.annotation.unused
+import scala.concurrent.duration._
+import scala.jdk.CollectionConverters._
+import scala.util.Try
 
 class OptionsController extends StageLocationPersistentView(OptionsController.stageLocation) {
 
@@ -47,6 +49,12 @@ class OptionsController extends StageLocationPersistentView(OptionsController.st
 
   @FXML
   protected var removeCompletedField: CheckBox = _
+
+  @FXML
+  protected var ffmpegPathField: TextField = _
+
+  @FXML
+  protected var ffmpegPathSelectButton: Button = _
 
   @FXML
   protected var maxDownloadsField: Spinner[Option[Int]] = _
@@ -205,7 +213,16 @@ class OptionsController extends StageLocationPersistentView(OptionsController.st
         draftToField()
         snap
       }, booleanSettingSnapshot(removeCompletedField, Main.settings.removeCompleted)
-      , intSettingSnapshot(maxDownloadsField, Main.settings.downloadsMax, isCnxLimit = true)
+      , {
+        val setting = Main.settings.ffmpegPath
+        val snap = SettingSnapshot.opt(setting).setOnRefreshDraft {
+          Option(ffmpegPathField.getText).filter(_.trim.nonEmpty).map(Paths.get(_))
+        }
+        def draftToField(): Unit = ffmpegPathField.setText(snap.draft.get.map(_.toString).orNull)
+        snap.draft.listen(draftToField())
+        draftToField()
+        snap
+      }, intSettingSnapshot(maxDownloadsField, Main.settings.downloadsMax, isCnxLimit = true)
       , intSettingSnapshot(maxCnxField, Main.settings.cnxMax, isCnxLimit = true)
       , intSettingSnapshot(maxServerCnxField, Main.settings.cnxServerMax, isCnxLimit = true)
       , intSettingSnapshot(maxSegmentsField, Main.settings.sitesDefault.segmentsMax, isCnxLimit = true)
@@ -322,6 +339,7 @@ class OptionsController extends StageLocationPersistentView(OptionsController.st
     val dependencies = List(
       languageChoice.getSelectionModel.selectedItemProperty, debugField.selectedProperty,
       downloadFolderField.textProperty, fileExtensionField.textProperty, removeCompletedField.selectedProperty,
+      ffmpegPathField.textProperty,
       maxDownloadsField.getEditor.textProperty, maxCnxField.getEditor.textProperty,
       maxServerCnxField.getEditor.textProperty, maxSegmentsField.getEditor.textProperty, minSegmentSizeField.getEditor.textProperty,
       preallocateField.selectedProperty, preallocateZeroField.selectedProperty, writeBufferSizeField.getEditor.textProperty,
@@ -399,6 +417,32 @@ class OptionsController extends StageLocationPersistentView(OptionsController.st
     PathChoosers.setInitialPath(directoryChooser, Option(downloadFolderField.getText).map(Paths.get(_).toFile).orNull)
     Option(directoryChooser.showDialog(stage)).foreach { selectedFolder =>
       downloadFolderField.setText(selectedFolder.toString)
+    }
+  }
+
+  def onFfmpegPathSelect(@unused event: ActionEvent): Unit = {
+    val fileChooser = new FileChooser()
+    fileChooser.setTitle("ffmpeg")
+    // By default, filter exact binary name.
+    if (OS.isWindows) {
+      fileChooser.getExtensionFilters.add(
+        new FileChooser.ExtensionFilter("ffmpeg", "ffmpeg.exe")
+      )
+    } else {
+      fileChooser.getExtensionFilters.add(
+        new FileChooser.ExtensionFilter("ffmpeg", "ffmpeg")
+      )
+    }
+    // And add catch-all filter.
+    fileChooser.getExtensionFilters.add(
+      new FileChooser.ExtensionFilter("*.*", "*.*")
+    )
+    // Setting may be empty (ffmpeg not used).
+    Option(ffmpegPathField.getText).map(Paths.get(_).toFile).foreach { file =>
+      PathChoosers.setInitialPath(fileChooser, file)
+    }
+    Option(fileChooser.showOpenDialog(stage)).foreach { selectedFile =>
+      ffmpegPathField.setText(selectedFile.toString)
     }
   }
 
@@ -617,6 +661,9 @@ class OptionsController extends StageLocationPersistentView(OptionsController.st
 
   private def checkForm(): Boolean = {
     val fileExtensionFieldOk = Option(fileExtensionField.getText).map(_.trim).getOrElse("").nonEmpty
+    val ffmpegPathOk = Option(ffmpegPathField.getText).filter(_.trim.nonEmpty).forall { ffmpegPath =>
+      Command.locate(ffmpegPath).isDefined
+    }
     val maxDownloadsOk = getInt(maxDownloadsField.getEditor.getText).getOrElse(-1) > 0
     val maxCnxOk = getInt(maxCnxField.getEditor.getText).getOrElse(-1) > 0
     val maxServerCnxOk = getInt(maxServerCnxField.getEditor.getText).getOrElse(-1) > 0
@@ -663,6 +710,7 @@ class OptionsController extends StageLocationPersistentView(OptionsController.st
     } > 0
 
     Styles.toggleError(fileExtensionField, !fileExtensionFieldOk, Strings.mustNonEmpty)
+    Styles.toggleError(ffmpegPathField, !ffmpegPathOk, Strings.mustExist)
     Styles.toggleError(maxDownloadsField, !maxDownloadsOk, Strings.positiveValueExpected)
     Styles.toggleError(maxCnxField, !maxCnxOk, Strings.positiveValueExpected)
     Styles.toggleError(maxServerCnxField, !maxServerCnxOk, Strings.positiveValueExpected)
@@ -683,7 +731,7 @@ class OptionsController extends StageLocationPersistentView(OptionsController.st
     Styles.toggleError(siteMaxCnxField, !siteMaxCnxOk, Strings.positiveValueExpected)
     Styles.toggleError(siteMaxSegmentsField, !siteMaxSegmentsOk, Strings.positiveValueExpected)
 
-    fileExtensionFieldOk && maxDownloadsOk && maxCnxOk && maxServerCnxOk &&
+    fileExtensionFieldOk && ffmpegPathOk && maxDownloadsOk && maxCnxOk && maxServerCnxOk &&
       maxSegmentsOk && minSegmentSizeOk && writeBufferSizeOk && proxyOk &&
       maxErrorsOk && attemptDelayOk && cnxRequestTimeoutOk && cnxTimeoutOk && socketTimeoutOk && idleTimeoutOk &&
       bufferMinSizeOk && bufferMaxSizeOk &&

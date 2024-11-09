@@ -37,6 +37,7 @@ object Settings {
   private val KEY_ENABLED = "enabled"
   private val KEY_ERROR = "error"
   private val KEY_EXTENSION = "extension"
+  private val KEY_FFMPEG = "ffmpeg"
   private val KEY_FILESYSTEM = "filesystem"
   private val KEY_FLUSH = "flush"
   private val KEY_IDLE = "idle"
@@ -131,6 +132,9 @@ class Settings(path: Path) extends StrictLogging {
     ConfigEntry.from(settings, prefix ++ Seq(KEY_DOWNLOADS, KEY_AUTO_SAVE))
   val removeCompleted: ConfigEntry[Boolean] =
     ConfigEntry.from[Boolean](settings, prefix ++ Seq(KEY_DOWNLOADS, KEY_REMOVE_COMPLETED))
+
+  val ffmpegPath: ConfigEntry[Path] =
+    ConfigEntry.from[Path](settings, prefix ++ Seq(KEY_FFMPEG, KEY_PATH))
 
   val rateLimitValue: ConfigEntry[Long] =
     ConfigEntry.from(settings, prefix ++ Seq(KEY_DOWNLOADS, KEY_RATE_LIMIT, KEY_VALUE))

@@ -43,6 +43,8 @@
                   <RowConstraints minHeight="-Infinity" vgrow="NEVER" />
                   <RowConstraints minHeight="-Infinity" vgrow="NEVER" />
                   <RowConstraints minHeight="-Infinity" vgrow="NEVER" />
+                  <RowConstraints minHeight="-Infinity" vgrow="NEVER" />
+                  <RowConstraints minHeight="-Infinity" vgrow="NEVER" />
               </rowConstraints>
                <children>
                   <Label text="%Language:" />
@@ -65,25 +67,38 @@
                   <TextField fx:id="fileExtensionField" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" GridPane.columnIndex="1" GridPane.rowIndex="4" />
                   <CheckBox fx:id="removeCompletedField" mnemonicParsing="false" text="%Remove completed" GridPane.columnSpan="2" GridPane.rowIndex="5" />
                   <Separator GridPane.columnSpan="2" GridPane.rowIndex="6" />
-                  <Label text="%Downloads max:" GridPane.rowIndex="7" />
-                  <Spinner fx:id="maxDownloadsField" editable="true" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" GridPane.columnIndex="1" GridPane.rowIndex="7" />
-                  <Label text="%Max connections:" GridPane.rowIndex="8" />
-                  <Spinner fx:id="maxCnxField" editable="true" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" GridPane.columnIndex="1" GridPane.rowIndex="8" />
-                  <Label text="%Max server connections:" GridPane.rowIndex="9" />
-                  <Spinner fx:id="maxServerCnxField" editable="true" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" GridPane.columnIndex="1" GridPane.rowIndex="9" />
-                  <Label text="%Max segments:" GridPane.rowIndex="10" />
-                  <Spinner fx:id="maxSegmentsField" editable="true" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" GridPane.columnIndex="1" GridPane.rowIndex="10" />
-                  <Label text="%Min segment size:" GridPane.rowIndex="11" />
-                  <Spinner fx:id="minSegmentSizeField" editable="true" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" GridPane.columnIndex="1" GridPane.rowIndex="11" />
-                  <Separator GridPane.columnSpan="2" GridPane.rowIndex="12" />
-                  <HBox spacing="10.0" GridPane.columnSpan="2" GridPane.rowIndex="13">
+                  <Label text="ffmpeg" GridPane.rowIndex="7" />
+                  <HBox alignment="CENTER_LEFT" maxWidth="1.7976931348623157E308" spacing="10.0" GridPane.columnIndex="1" GridPane.rowIndex="7">
+                     <children>
+                        <TextField fx:id="ffmpegPathField" maxWidth="1.7976931348623157E308" HBox.hgrow="ALWAYS" />
+                        <Button fx:id="ffmpegPathSelectButton" mnemonicParsing="false" onAction="#onFfmpegPathSelect">
+                           <styleClass>
+                              <String fx:value="icon-save" />
+                              <String fx:value="button-square-icon" />
+                           </styleClass>
+                        </Button>
+                     </children>
+                  </HBox>
+                  <Separator GridPane.columnSpan="2" GridPane.rowIndex="8" />
+                  <Label text="%Downloads max:" GridPane.rowIndex="9" />
+                  <Spinner fx:id="maxDownloadsField" editable="true" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" GridPane.columnIndex="1" GridPane.rowIndex="9" />
+                  <Label text="%Max connections:" GridPane.rowIndex="10" />
+                  <Spinner fx:id="maxCnxField" editable="true" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" GridPane.columnIndex="1" GridPane.rowIndex="10" />
+                  <Label text="%Max server connections:" GridPane.rowIndex="11" />
+                  <Spinner fx:id="maxServerCnxField" editable="true" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" GridPane.columnIndex="1" GridPane.rowIndex="11" />
+                  <Label text="%Max segments:" GridPane.rowIndex="12" />
+                  <Spinner fx:id="maxSegmentsField" editable="true" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" GridPane.columnIndex="1" GridPane.rowIndex="12" />
+                  <Label text="%Min segment size:" GridPane.rowIndex="13" />
+                  <Spinner fx:id="minSegmentSizeField" editable="true" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" GridPane.columnIndex="1" GridPane.rowIndex="13" />
+                  <Separator GridPane.columnSpan="2" GridPane.rowIndex="14" />
+                  <HBox spacing="10.0" GridPane.columnSpan="2" GridPane.rowIndex="15">
                      <children>
                         <CheckBox fx:id="preallocateField" mnemonicParsing="false" text="%Preallocate space" />
                         <CheckBox fx:id="preallocateZeroField" mnemonicParsing="false" text="%Preallocate with zeros" />
                      </children>
                   </HBox>
-                  <Label text="%Write buffer size:" GridPane.rowIndex="14" />
-                  <Spinner fx:id="writeBufferSizeField" editable="true" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" GridPane.columnIndex="1" GridPane.rowIndex="14" />
+                  <Label text="%Write buffer size:" GridPane.rowIndex="16" />
+                  <Spinner fx:id="writeBufferSizeField" editable="true" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" GridPane.columnIndex="1" GridPane.rowIndex="16" />
                </children>
                <padding>
                   <Insets bottom="15.0" left="15.0" right="15.0" top="15.0" />
