@@ -76,14 +76,14 @@
   -fx-fill: color-warning;
 }
 
+.icon-square-xmark .svg-path {
+  -fx-fill: color-failure;
+}
+
 .icon-stop .svg-path {
   -fx-fill: color-neutral;
 }
 
 .icon-undo .svg-path {
   -fx-fill: color-neutral;
-}
-
-.icon-xmark-square .svg-path {
-  -fx-fill: color-failure;
 }

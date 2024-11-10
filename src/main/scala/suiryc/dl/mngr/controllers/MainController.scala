@@ -1794,7 +1794,7 @@ class MainController
                 } else {
                   // Note: the parent table cell has a tooltip, preventing any
                   // sub-node (like this icon) tooltip to be use-able.
-                  Icons.xmarkSquare().pane
+                  Icons.squareXmark().pane
                 }
 
               case DownloadState.Stopped =>

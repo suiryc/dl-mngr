@@ -147,6 +147,15 @@ object Icons extends IconBuilders {
     )
   }
 
+  // Font Awesome 6.
+  // https://fontawesome.com/icons/square-xmark?f=classic&s=solid
+  val squareXmark: Builder = iconBuilder(s"${PREFIX}square-xmark") { (styleClass, targetSvgSize) =>
+    val params = SVGGroupParams(svgWidth = 448, svgHeight = 512, targetSvgSize = targetSvgSize, targetSize = targetSvgSize, styleClass = styleClass)
+    SVGGroup(params,
+      svgPath("M64 32C28.7 32 0 60.7 0 96L0 416c0 35.3 28.7 64 64 64l320 0c35.3 0 64-28.7 64-64l0-320c0-35.3-28.7-64-64-64L64 32zm79 143c9.4-9.4 24.6-9.4 33.9 0l47 47 47-47c9.4-9.4 24.6-9.4 33.9 0s9.4 24.6 0 33.9l-47 47 47 47c9.4 9.4 9.4 24.6 0 33.9s-24.6 9.4-33.9 0l-47-47-47 47c-9.4 9.4-24.6 9.4-33.9 0s-9.4-24.6 0-33.9l47-47-47-47c-9.4-9.4-9.4-24.6 0-33.9z")
+    )
+  }
+
   // Font Awesome 5.
   // https://fontawesome.com/v5/icons/stop?f=classic&s=solid
   val stop: Builder = iconBuilder(s"${PREFIX}stop") { (styleClass, targetSvgSize) =>
@@ -183,17 +192,8 @@ object Icons extends IconBuilders {
     )
   }
 
-  // Font Awesome 6.
-  // https://fontawesome.com/icons/square-xmark?f=classic&s=solid
-  val xmarkSquare: Builder = iconBuilder(s"${PREFIX}xmark-square") { (styleClass, targetSvgSize) =>
-    val params = SVGGroupParams(svgWidth = 448, svgHeight = 512, targetSvgSize = targetSvgSize, targetSize = targetSvgSize, styleClass = styleClass)
-    SVGGroup(params,
-      svgPath("M64 32C28.7 32 0 60.7 0 96L0 416c0 35.3 28.7 64 64 64l320 0c35.3 0 64-28.7 64-64l0-320c0-35.3-28.7-64-64-64L64 32zm79 143c9.4-9.4 24.6-9.4 33.9 0l47 47 47-47c9.4-9.4 24.6-9.4 33.9 0s9.4 24.6 0 33.9l-47 47 47 47c9.4 9.4 9.4 24.6 0 33.9s-24.6 9.4-33.9 0l-47-47-47 47c-9.4 9.4-24.6 9.4-33.9 0s-9.4-24.6 0-33.9l47-47-47-47c-9.4-9.4-9.4-24.6 0-33.9z")
-    )
-  }
-
   val icons: Map[String, Builder] = List(bug, checkSquare, cog, download, eraser,
-    exclamationTriangle, infoCircle, minus, save, signOut, stop, sync, tachometer, undo, xmarkSquare).map { builder =>
+    exclamationTriangle, infoCircle, minus, save, signOut, squareXmark, stop, sync, tachometer, undo).map { builder =>
     builder().params.styleClass.head -> builder
   }.toMap
 
