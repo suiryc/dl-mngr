@@ -508,8 +508,8 @@ class DownloadManager extends StrictLogging {
   def removeDownload(id: UUID): Unit = this.synchronized {
     getDownloadEntry(id).foreach { dlEntry =>
       val download = dlEntry.download
-      if (download.isActive) {
-        throw new Exception("Cannot remove download which is active")
+      if (download.canStop) {
+        throw new Exception("Cannot remove download which needs to be stopped first")
       }
       // If download is not successfully done, add a general log entry.
       if (!download.isDone || download.doneError.nonEmpty) {
@@ -703,7 +703,7 @@ class DownloadManager extends StrictLogging {
   def stop(): Future[Unit] = this.synchronized {
     stopping = true
     dlEntries.foreach { dlEntry =>
-      dlEntry.download.info.wasActive = dlEntry.download.isActive
+      dlEntry.download.info.couldStop = dlEntry.download.canStop
       stopDownload(dlEntry)
     }
     checkDone()

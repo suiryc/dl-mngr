@@ -1569,8 +1569,8 @@ class MainController
       val selected = selectedDownloadsData
 
       def doRemove(): Unit = {
-        // We don't remove 'active' downloads
-        val removable = selected.filter(!_.download.isActive)
+        // We don't remove downloads that needs to be stopped.
+        val removable = selected.filterNot(_.download.canStop)
 
         def removeSubtitle(download: Download): Unit = {
           // Delete subtitle file if applicable.
@@ -1621,15 +1621,15 @@ class MainController
         }
       }
 
-      // Stop active downloads if any. Otherwise, we can remove now.
-      val active = selected.filter(_.download.isActive)
-      val removeNow = active.isEmpty || {
+      // Stop downloads that need it. Otherwise, we can remove now.
+      val needStop = selected.filter(_.download.canStop)
+      val removeNow = needStop.isEmpty || {
         // Ask for confirmation if necessary.
         val stop = force || Dialogs.confirmation(
           owner = Some(stage),
           title = None,
           headerText = Some(Strings.stopDlsOnRemove),
-          contentText = Some(active.map(_.path.get.getFileName).mkString("\n")),
+          contentText = Some(needStop.map(_.path.get.getFileName).mkString("\n")),
           buttons = List(ButtonType.OK, ButtonType.CANCEL),
           defaultButton = Some(ButtonType.OK)
         ).contains(ButtonType.OK)
@@ -1642,7 +1642,7 @@ class MainController
           // if it takes too long.
           // Report and don't do anything if there was a failure.
           Future.sequence {
-            active.flatMap { dlEntry =>
+            needStop.flatMap { dlEntry =>
               state.dlMngr.stopDownload(dlEntry.download.id)
             }
           }.map(_ => ()).withTimeout(Settings.DL_STOP_TIMEOUT).onComplete {

@@ -49,8 +49,8 @@ class DownloadInfo extends ObservableLogs {
   /** Done download error. */
   var doneError: Option[String] = None
 
-  /** Whether download was active when download manager stopping was requested. */
-  var wasActive: Boolean = false
+  /** Whether download could be stopped when download manager stopping was requested. */
+  var couldStop: Boolean = false
 
   /** Remaining segment ranges. */
   var remainingRanges: Option[SegmentRanges] = None
@@ -284,6 +284,7 @@ case class Download(
   def isActive: Boolean = isRunning || isPending
   def isDone: Boolean = state == DownloadState.Done
   def isFailed: Boolean = state == DownloadState.Failure
+  // Download 'can be stopped' when it is doing something or waiting to.
   def canStop: Boolean = isActive
   def canResume(restart: Boolean): Boolean = if (restart) canRestart else canResume
   // We cannot resume if ranges are not supported.
@@ -354,7 +355,7 @@ case class Download(
       created = created,
       done = isDone,
       doneError = doneError,
-      canResume = (isActive || info.wasActive) && !acceptRanges.contains(false),
+      canResume = (canStop || info.couldStop) && !acceptRanges.contains(false),
       size = if (info.isSizeDetermined) Some(info.size.get) else None,
       sizeHint = sizeHint,
       sizeQualifier = sizeQualifier,
