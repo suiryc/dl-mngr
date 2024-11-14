@@ -49,9 +49,7 @@ case class HLSInfo(
   }
 
   private def prepare(logger: Logger, download: Download, raw: String): Unit = {
-    if (!download.temporaryPath.toFile.exists()) {
-      download.temporaryPath.toFile.mkdirs()
-    }
+    download.createDirectory()
 
     // Write keys in local files, and remember them.
     val keyFilenames = keys.zipWithIndex.map { case (key, keyIdx) =>
