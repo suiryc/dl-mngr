@@ -14,6 +14,11 @@ import java.util.{Date, UUID}
 import scala.concurrent.Promise
 
 object DownloadState extends Enumeration {
+  // Stopped: download was not done nor failed, and stopped.
+  // Pending: download is waiting for available connection(s).
+  // Running: content is being downloaded.
+  // Done: download is fully complete.
+  // Failure: download failed before completion.
   val Stopped, Pending, Running, Done, Failure = Value
 }
 
@@ -281,11 +286,12 @@ case class Download(
   def isStopped: Boolean = state == DownloadState.Stopped
   def isPending: Boolean = state == DownloadState.Pending
   def isRunning: Boolean = state == DownloadState.Running
-  def isActive: Boolean = isRunning || isPending
+  // Download is using or waiting for network connection(s).
+  def isNetworkActive: Boolean = isRunning || isPending
   def isDone: Boolean = state == DownloadState.Done
   def isFailed: Boolean = state == DownloadState.Failure
   // Download 'can be stopped' when it is doing something or waiting to.
-  def canStop: Boolean = isActive
+  def canStop: Boolean = isNetworkActive
   def canResume(restart: Boolean): Boolean = if (restart) canRestart else canResume
   // We cannot resume if ranges are not supported.
   def canResume: Boolean = !acceptRanges.contains(false) && (isFailed || isStopped)

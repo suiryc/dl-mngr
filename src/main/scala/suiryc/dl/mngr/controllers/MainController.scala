@@ -487,7 +487,7 @@ class MainController
       event.getCharacter match {
         case "+" =>
           selectedDownloadsData.filter { data =>
-            data.download.isActive || data.download.canResume
+            data.download.isNetworkActive || data.download.canResume
           }.foreach { data =>
             getState.dlMngr.addDownloadConnection(data.download.id)
           }

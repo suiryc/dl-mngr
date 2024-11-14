@@ -489,7 +489,7 @@ class DownloadManager extends StrictLogging {
         val add = if (dlEntry.download.canResume) {
           resumeDownload(id, restart = false, tryCnx = false)
           true
-        } else dlEntry.download.isActive
+        } else dlEntry.download.isNetworkActive
         if (add) dlEntry.dler ! FileDownloader.AddConnection
       }
     }
@@ -660,7 +660,7 @@ class DownloadManager extends StrictLogging {
         val head = dls.head
         val tail = dls.tail
         val promise = Promise[Unit]()
-        if (sid.contains(head.download.id) || !head.download.isActive) promise.trySuccess(())
+        if (sid.contains(head.download.id) || !head.download.isNetworkActive) promise.trySuccess(())
         else head.dler ! FileDownloader.TryConnection(promise)
         promise.future.onComplete { _ =>
           loop(tail)
