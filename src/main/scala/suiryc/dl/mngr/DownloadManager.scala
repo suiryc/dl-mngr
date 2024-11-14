@@ -586,11 +586,18 @@ class DownloadManager extends StrictLogging {
                 }
               }
 
-              DownloadState.Done
+              if (info.hls.nonEmpty) {
+                processDownload(download)
+                DownloadState.Processing
+              } else {
+                DownloadState.Done
+              }
           }
           info.state.setValue(state)
-          // This entry is now 'done'.
-          dlEntry.done.tryComplete(result)
+          if (state == DownloadState.Done) {
+            // This entry is now 'done'.
+            dlEntry.done.tryComplete(result)
+          }
           // Now that the state changed, give other downloads a chance to start and/or
           // get another connection.
           tryConnection(Some(id))
@@ -601,7 +608,68 @@ class DownloadManager extends StrictLogging {
         }
 
       case None =>
-        logger.error(s"Could not properly end missing download entry id=<$id>. Result: $result")
+        logger.error(s"Could not properly handle missing entry id=<$id> download done. Result: $result")
+    }
+  }
+
+  private def processDownload(download: Download): Unit = {
+    download.info.hls.foreach { hls =>
+      hls.process(download).onComplete { result =>
+        processDone(download.id, result)
+      }
+    }
+  }
+
+  private def processDone(id: UUID, result: Try[Unit]): Unit = this.synchronized {
+    // We should find the entry.
+    getDownloadEntry(id) match {
+      case Some(dlEntry) =>
+        val download = dlEntry.download
+        val info = download.info
+        val failureOpt = result.failed.toOption.map {
+          case ex: DownloadException => ex
+          case ex: Exception => DownloadException(message = ex.getMessage, cause = ex)
+        }: @nowarn
+        // Determine final state, and add general log entry.
+        val state = failureOpt match {
+          case Some(ex) =>
+            // Stopping the download is not a true failure.
+            if (ex.stopped) DownloadState.Stopped
+            else {
+              val logEntry = LogEntry(
+                kind = LogKind.Error,
+                message =  s"Download file=<${download.fileContext}> processing failed",
+                tooltip = Some(download.tooltip),
+                error = Some(ex)
+              )
+              Main.controller.addLog(logEntry)
+              DownloadState.Failure
+            }
+
+          case None =>
+            val logEntry = LogEntry(
+              kind = LogKind.Info,
+              message =  s"Download file=<${download.fileContext}> processing done",
+              tooltip = Some(download.tooltip)
+            )
+            download.info.addLog(logEntry)
+            Main.controller.addLog(logEntry)
+
+            info.hls.foreach { hls =>
+              download.setHLS(Some(hls.copy(processed = true)))
+            }
+            DownloadState.Done
+        }
+        info.state.setValue(state)
+        // This entry is now 'done'.
+        dlEntry.done.tryComplete(result)
+        checkDone()
+        // When a download is done, it is also a good time to (force) save
+        // our state.
+        if (!stopping) saveState()
+
+      case None =>
+        logger.error(s"Could not properly handle missing entry id=<$id> processing done. Result: $result")
     }
   }
 
@@ -770,6 +838,9 @@ class DownloadManager extends StrictLogging {
           .setSubtitle(downloadBackupInfo.subtitle)
         val info = download.info
         info.doneError = downloadBackupInfo.doneError
+        if (downloadBackupInfo.canResume && downloadBackupInfo.hls.exists(!_.processed)) {
+          info.state.set(DownloadState.Processing)
+        }
         if (downloadBackupInfo.done) info.state.set(DownloadState.Done)
         val remainingRanges = downloadBackupInfo.size.flatMap { size =>
           info.size.set(size)

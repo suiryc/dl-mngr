@@ -60,6 +60,10 @@
   -fx-fill: color-success;
 }
 
+.icon-cogs .svg-path {
+  -fx-fill: color-success;
+}
+
 .icon-exclamation-triangle .svg-path {
   -fx-fill: color-failure;
 }

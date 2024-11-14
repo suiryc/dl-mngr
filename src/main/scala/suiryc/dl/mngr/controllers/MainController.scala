@@ -1732,6 +1732,7 @@ class MainController
               // when running. But the "indeterminate state" animation consumes
               // more CPU (and apparently too much under Linux).
               info.state.get match {
+                case DownloadState.Processing => 1.0
                 case DownloadState.Done => 1.0
                 case _ => 0.0
               }
@@ -1785,6 +1786,9 @@ class MainController
               case DownloadState.Downloading =>
                 val styleClass = if (download.activeSegments == 0) List("icon-download-started") else List("icon-download-running")
                 Icons.download(styleClass = styleClass).pane
+
+              case DownloadState.Processing =>
+                Icons.cogs().pane
 
               case DownloadState.Done =>
                 if (info.doneError.isEmpty) {

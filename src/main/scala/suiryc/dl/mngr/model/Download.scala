@@ -17,9 +17,10 @@ object DownloadState extends Enumeration {
   // Stopped: download was not done nor failed, and stopped.
   // Pending: download is waiting for available connection(s).
   // Downloading: content is being downloaded.
+  // Processing: content has been downloaded and is being processed.
   // Done: download is fully complete.
   // Failure: download failed before completion.
-  val Stopped, Pending, Downloading, Done, Failure = Value
+  val Stopped, Pending, Downloading, Processing, Done, Failure = Value
 }
 
 class DownloadInfo extends ObservableLogs {
@@ -217,6 +218,12 @@ case class Download(
     }
   }
 
+  /** Refreshes available path. */
+  def refreshAvailablePath(): Unit = {
+    downloadFile.refreshAvailablePath()
+    refreshPaths()
+  }
+
   /** Opens target file. */
   def openFile(): Unit = {
     // Belt and suspenders: we only expect to be called for regular file
@@ -286,9 +293,10 @@ case class Download(
   def isStopped: Boolean = state == DownloadState.Stopped
   def isPending: Boolean = state == DownloadState.Pending
   def isDownloading: Boolean = state == DownloadState.Downloading
+  def isProcessing: Boolean = state == DownloadState.Processing
   // Download is 'busy' when it is doing something, which e.g. requires
   // confirmation and action to stop.
-  def isBusy: Boolean = isDownloading
+  def isBusy: Boolean = isDownloading || isProcessing
   // Download is using or waiting for network connection(s).
   def isNetworkActive: Boolean = isDownloading || isPending
   def isDone: Boolean = state == DownloadState.Done

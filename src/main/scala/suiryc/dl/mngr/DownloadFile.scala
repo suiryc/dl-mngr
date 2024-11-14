@@ -132,6 +132,11 @@ class DownloadFile(private var path: Path) extends LazyLogging {
     } else false
   }
 
+  /** Refreshes available path. */
+  def refreshAvailablePath(): Unit = {
+    path = Misc.getAvailablePath(path)
+  }
+
   /**
    * Creates the channel (if not already done).
    *

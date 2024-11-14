@@ -629,7 +629,8 @@ object NewDownloadController {
             raw = Some(hlsParams.raw),
             keys = hlsParams.keys.map { keyParams =>
               HLSInfo.Key(keyParams.raw)
-            }
+            },
+            processed = false
           )
         }
         val subtitle = dlParams.subtitle.map { subtitleParams =>

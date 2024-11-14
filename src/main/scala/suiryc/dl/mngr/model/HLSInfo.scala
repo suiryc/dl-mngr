@@ -2,14 +2,18 @@ package suiryc.dl.mngr.model
 
 import com.typesafe.scalalogging.Logger
 import spray.json._
+import suiryc.dl.mngr.Main
 import suiryc.dl.mngr.util.HLSParser.TagValue
 import suiryc.dl.mngr.util.{HLSParser, Http}
+import suiryc.scala.concurrent.RichFuture
 import suiryc.scala.spray.json.JsonFormats
+import suiryc.scala.sys.Command
 
 import java.net.URI
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.util.Base64
+import scala.concurrent.Future
 import scala.io.Source
 
 
@@ -18,7 +22,7 @@ object HLSInfo extends DefaultJsonProtocol with JsonFormats {
   case class Key(raw: Option[String])
 
   implicit val hlsKeyFormat: RootJsonFormat[Key] = jsonFormat1(Key.apply)
-  implicit val hlsInfoFormat: RootJsonFormat[HLSInfo] = jsonFormat3(HLSInfo.apply)
+  implicit val hlsInfoFormat: RootJsonFormat[HLSInfo] = jsonFormat4(HLSInfo.apply)
 
 }
 
@@ -28,7 +32,9 @@ case class HLSInfo(
   /** HLS raw content (if not already saved). */
   raw: Option[String],
   /** HLS keys (if not already saved). */
-  keys: List[HLSInfo.Key]
+  keys: List[HLSInfo.Key],
+  /** Whether HLS was processed. */
+  processed: Boolean
 ) {
 
   /**
@@ -141,6 +147,50 @@ case class HLSInfo(
       keys = Nil
     )))
     ()
+  }
+
+  /**
+   * Processes stream segments.
+   *
+   * Calls ffmpeg to mux stream segments into mp4 file.
+   */
+  def process(download: Download): Future[Unit] = {
+    download.refreshAvailablePath()
+    Main.settings.ffmpegPath.opt match {
+      case Some(ffmpegPath) =>
+        val temporaryPath = download.temporaryPath
+        val cmd = List(
+          ffmpegPath.toString,
+          "-protocol_whitelist",
+          "http,https,tls,tcp,file,crypto",
+          // For local files only:
+          //"file,crypto",
+          "-allowed_extensions",
+          "ALL",
+          "-i",
+          temporaryPath.resolve("absolute.m3u8").toString,
+          "-bsf:a",
+          "aac_adtstoasc",
+          "-c",
+          "copy",
+          download.path.toString
+        )
+        RichFuture.blockingAsync {
+          Command.execute(
+            cmd = cmd,
+            workingDirectory = Some(temporaryPath.toFile),
+            captureStdout = true,
+            captureStderr = true,
+            skipResult = false
+          )
+          ()
+        }
+
+      case None =>
+        Future.failed {
+          new Exception("ffmpeg path is not configured")
+        }
+    }
   }
 
 }
