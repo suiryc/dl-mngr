@@ -120,7 +120,7 @@ class NewDownloadController extends StageLocationPersistentView(NewDownloadContr
     // Take into account given file(name)
     dlParams.file.map { filename =>
       // First sanitize filename.
-      if (Paths.get(PathsEx.sanitizePath(filename)).isAbsolute) {
+      var path = if (Paths.get(PathsEx.sanitizePath(filename)).isAbsolute) {
         // The given filename actually is an absolute path.
         // Separate the folder from the filename.
         val split = filename.split(File.separatorChar)
@@ -140,6 +140,12 @@ class NewDownloadController extends StageLocationPersistentView(NewDownloadContr
           canModify = false
         )._1
       }
+      // Then set proper extension for HLS.
+      if (dlParams.hls.isDefined) {
+        val (base, _) = path.baseAndExt
+        path = Paths.get(PathsEx.filename(base, "mp4"))
+      }
+      path
     } match {
       case Some(path) => setPath(path)
       case None       => updateFilename(None)
