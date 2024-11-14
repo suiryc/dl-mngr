@@ -711,7 +711,7 @@ class DownloadManager extends StrictLogging {
   }
 
   private def checkDone(): Unit = {
-    if (stopping && dlEntries.forall(!_.download.isDownloading)) {
+    if (stopping && dlEntries.forall(!_.download.isBusy)) {
       janitor ! DownloadsJanitor.Stop
       // Note: even though clients will be freed by janitor, we still want to
       // wait for them to finish.

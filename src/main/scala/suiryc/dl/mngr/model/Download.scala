@@ -286,12 +286,15 @@ case class Download(
   def isStopped: Boolean = state == DownloadState.Stopped
   def isPending: Boolean = state == DownloadState.Pending
   def isDownloading: Boolean = state == DownloadState.Downloading
+  // Download is 'busy' when it is doing something, which e.g. requires
+  // confirmation and action to stop.
+  def isBusy: Boolean = isDownloading
   // Download is using or waiting for network connection(s).
   def isNetworkActive: Boolean = isDownloading || isPending
   def isDone: Boolean = state == DownloadState.Done
   def isFailed: Boolean = state == DownloadState.Failure
   // Download 'can be stopped' when it is doing something or waiting to.
-  def canStop: Boolean = isNetworkActive
+  def canStop: Boolean = isNetworkActive || isBusy
   def canResume(restart: Boolean): Boolean = if (restart) canRestart else canResume
   // We cannot resume if ranges are not supported.
   def canResume: Boolean = !acceptRanges.contains(false) && (isFailed || isStopped)
