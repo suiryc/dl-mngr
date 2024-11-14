@@ -493,7 +493,7 @@ class MainController
           }
 
         case "-" =>
-          selectedDownloadsData.filter(_.download.isRunning).foreach { data =>
+          selectedDownloadsData.filter(_.download.isDownloading).foreach { data =>
             getState.dlMngr.removeDownloadConnection(data.download.id)
           }
 
@@ -975,7 +975,7 @@ class MainController
       else s"${
         resume.get(DownloadState.Pending)
       } + ${
-        resume.get(DownloadState.Running)
+        resume.get(DownloadState.Downloading)
       } + ${
         resume.get(DownloadState.Done)
       } / ${resume.total}"
@@ -986,7 +986,7 @@ class MainController
         val text = List(
           DownloadState.Stopped,
           DownloadState.Pending,
-          DownloadState.Running,
+          DownloadState.Downloading,
           DownloadState.Done,
           DownloadState.Failure
         ).foldLeft("") { (text, state) =>
@@ -1022,7 +1022,7 @@ class MainController
   }
 
   private val refreshAllDlSpeed: () => Unit = { () =>
-    val rate = Units.storage.toHumanReadable(getDownloadsData.filter(_.download.isRunning).map(_.rateHandler.currentRate).sum)
+    val rate = Units.storage.toHumanReadable(getDownloadsData.filter(_.download.isDownloading).map(_.rateHandler.currentRate).sum)
     val limit = Main.settings.rateLimitValue.get
     val sLimit = if (limit > 0) {
       s"$limit ${Main.settings.rateLimitUnit.get}/s"
@@ -1732,7 +1732,6 @@ class MainController
               // when running. But the "indeterminate state" animation consumes
               // more CPU (and apparently too much under Linux).
               info.state.get match {
-                case DownloadState.Running => 0.0
                 case DownloadState.Done => 1.0
                 case _ => 0.0
               }
@@ -1755,14 +1754,14 @@ class MainController
           // Rate value is computed often (depends on rate handler time slice),
           // but displayed less often.
           new BindingsEx.Builder(jfxThrottler).add(data.rate) {
-            if (download.isRunning) {
+            if (download.isDownloading) {
               val rate = data.rateValue.get
               s"${Units.storage.toHumanReadable(rate)}/s"
             } else {
               null
             }
           }.add(data.eta) {
-            if (download.isRunning) {
+            if (download.isDownloading) {
               Option(info.size.get).filter(_ > 0).map { size =>
                 val remaining = size - info.downloaded.get
                 val rate = data.rateValue.get
@@ -1783,7 +1782,7 @@ class MainController
               case DownloadState.Pending =>
                 Icons.hourglass().pane
 
-              case DownloadState.Running =>
+              case DownloadState.Downloading =>
                 val styleClass = if (download.activeSegments == 0) List("icon-download-started") else List("icon-download-running")
                 Icons.download(styleClass = styleClass).pane
 
@@ -1805,7 +1804,7 @@ class MainController
             }
           }
           BindingsEx.jfxBind(data.segments, info.state, info.segments, info.maxSegments) {
-            if (download.isRunning) {
+            if (download.isDownloading) {
               s"${info.segments.get}/${info.maxSegments.get}"
             } else {
               null
@@ -1967,7 +1966,7 @@ object MainController {
     private var rateUpdateCancellable: Option[Cancelable] = None
 
     private def refreshRateUpdate(state: DownloadState.Value): Unit = this.synchronized {
-      val running = state == DownloadState.Running
+      val running = state == DownloadState.Downloading
       rateUpdateCancellable match {
         case Some(cancellable) =>
           if (!running) {
@@ -1994,7 +1993,7 @@ object MainController {
     val rateHandler = new RateHandler(download.rateLimiter, download.info.downloaded.get, 4.seconds)
     val rateValue = new SimpleLongProperty()
     BindingsEx.bind(rateValue, rateHandler.timeSlice, Main.scheduler, info.downloaded, info.state, rateUpdate) {
-      if (download.isRunning) {
+      if (download.isDownloading) {
         rateHandler.update(info.downloaded.get)
       } else {
         0L

@@ -16,10 +16,10 @@ import scala.concurrent.Promise
 object DownloadState extends Enumeration {
   // Stopped: download was not done nor failed, and stopped.
   // Pending: download is waiting for available connection(s).
-  // Running: content is being downloaded.
+  // Downloading: content is being downloaded.
   // Done: download is fully complete.
   // Failure: download failed before completion.
-  val Stopped, Pending, Running, Done, Failure = Value
+  val Stopped, Pending, Downloading, Done, Failure = Value
 }
 
 class DownloadInfo extends ObservableLogs {
@@ -285,9 +285,9 @@ case class Download(
   def isStarted: Boolean = info.isSizeDetermined || (info.downloaded.get > 0)
   def isStopped: Boolean = state == DownloadState.Stopped
   def isPending: Boolean = state == DownloadState.Pending
-  def isRunning: Boolean = state == DownloadState.Running
+  def isDownloading: Boolean = state == DownloadState.Downloading
   // Download is using or waiting for network connection(s).
-  def isNetworkActive: Boolean = isRunning || isPending
+  def isNetworkActive: Boolean = isDownloading || isPending
   def isDone: Boolean = state == DownloadState.Done
   def isFailed: Boolean = state == DownloadState.Failure
   // Download 'can be stopped' when it is doing something or waiting to.

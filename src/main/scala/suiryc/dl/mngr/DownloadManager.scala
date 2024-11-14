@@ -498,7 +498,7 @@ class DownloadManager extends StrictLogging {
   def removeDownloadConnection(id: UUID): Unit = {
     if (!stopping) {
       getDownloadEntry(id).foreach { dlEntry =>
-        if (dlEntry.download.isRunning) {
+        if (dlEntry.download.isDownloading) {
           dlEntry.dler ! FileDownloader.RemoveConnection
         }
       }
@@ -711,7 +711,7 @@ class DownloadManager extends StrictLogging {
   }
 
   private def checkDone(): Unit = {
-    if (stopping && dlEntries.forall(!_.download.isRunning)) {
+    if (stopping && dlEntries.forall(!_.download.isDownloading)) {
       janitor ! DownloadsJanitor.Stop
       // Note: even though clients will be freed by janitor, we still want to
       // wait for them to finish.
@@ -898,10 +898,10 @@ class DownloadManager extends StrictLogging {
 
     val reasonOpt = {
       // The 'running downloads' limit applies to downloads that are not yet running
-      if (force || download.isRunning) None
+      if (force || download.isDownloading) None
       else {
         val limit = Main.settings.downloadsMax.get
-        val running = dlEntries.count(_.download.isRunning)
+        val running = dlEntries.count(_.download.isDownloading)
         if (running >= limit) Some(s"number of running downloads limit=<$limit>")
         else None
       }
@@ -929,7 +929,7 @@ class DownloadManager extends StrictLogging {
     }
     if (reasonOpt.isEmpty) {
       // Note: in case it fails, (try to) open file before updating counters.
-      download.info.state.setValue(DownloadState.Running)
+      download.info.state.setValue(DownloadState.Downloading)
       download.openFile()
       // Don't count connection when requested.
       if (count) {
