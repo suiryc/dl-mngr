@@ -472,7 +472,13 @@ class DownloadManager extends StrictLogging {
   def resumeDownload(id: UUID, restart: Boolean, tryCnx: Boolean = true): Unit = {
     if (!stopping) {
       getDownloadEntry(id).foreach { dlEntry =>
-        if (dlEntry.download.canResume(restart)) {
+        val download = dlEntry.download
+        if (download.info.downloadDone) {
+          // Content download already done.
+          val r = Success(())
+          download.info.promise.tryComplete(r)
+          downloadDone(download.id, r)
+        } else if (download.canResume(restart)) {
           val download = updateDownloadEntry(dlEntry.resume(restart)).download
           download.info.state.setValue(DownloadState.Pending)
           followDownload(download)
@@ -560,6 +566,7 @@ class DownloadManager extends StrictLogging {
               }
 
             case None =>
+              info.downloadDone = true
               val logEntry = LogEntry(
                 kind = LogKind.Info,
                 message =  s"Download file=<${download.fileContext}> done",
@@ -838,10 +845,8 @@ class DownloadManager extends StrictLogging {
           .setHLS(downloadBackupInfo.hls)
           .setSubtitle(downloadBackupInfo.subtitle)
         val info = download.info
+        info.downloadDone = downloadBackupInfo.downloadDone
         info.doneError = downloadBackupInfo.doneError
-        if (downloadBackupInfo.canResume && downloadBackupInfo.hls.exists(!_.processed)) {
-          info.state.set(DownloadState.Processing)
-        }
         if (downloadBackupInfo.done) info.state.set(DownloadState.Done)
         val remainingRanges = downloadBackupInfo.size.value.flatMap { size =>
           info.size.set(size)

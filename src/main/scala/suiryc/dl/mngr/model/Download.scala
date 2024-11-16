@@ -52,6 +52,9 @@ class DownloadInfo extends ObservableLogs {
   /** How many bytes are already downloaded. */
   val downloaded: SimpleLongProperty = new SimpleLongProperty(0)
 
+  /** Whether content downloading is done. */
+  var downloadDone: Boolean = false
+
   /** Done download error. */
   var doneError: Option[String] = None
 
@@ -141,6 +144,8 @@ case class DownloadBackupInfo(
   userAgent: Option[String],
   /** Paths information. */
   paths: DownloadBackupPathsInfo,
+  /** Whether content downloading as done. */
+  downloadDone: Boolean,
   /** Whether the download (content and processing) was done (finished with success or error). */
   done: Boolean,
   /** Done download error. */
@@ -167,7 +172,7 @@ object DownloadBackupInfo extends DefaultJsonProtocol with JsonFormats {
   implicit val downloadBackupPathsFormat: RootJsonFormat[DownloadBackupPathsInfo] = jsonFormat4(DownloadBackupPathsInfo.apply)
   implicit val downloadBackupSizeFormat: RootJsonFormat[DownloadBackupSizeInfo] = jsonFormat3(DownloadBackupSizeInfo.apply)
   implicit val downloadBackupRangesFormat: RootJsonFormat[DownloadBackupRangesInfo] = jsonFormat3(DownloadBackupRangesInfo.apply)
-  implicit val downloadBackupFormat: RootJsonFormat[DownloadBackupInfo] = jsonFormat15(DownloadBackupInfo.apply)
+  implicit val downloadBackupFormat: RootJsonFormat[DownloadBackupInfo] = jsonFormat16(DownloadBackupInfo.apply)
 }
 
 /**
@@ -395,6 +400,7 @@ case class Download(
         temporary = temporaryPath,
         temporaryCreated = temporaryCreated
       ),
+      downloadDone = info.downloadDone,
       done = isDone,
       doneError = doneError,
       canResume = (canStop || info.couldStop) && !acceptRanges.contains(false),
