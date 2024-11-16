@@ -666,7 +666,7 @@ class DownloadManager extends StrictLogging {
   private def processDownload(dlEntry: DownloadEntry): Unit = {
     val download = dlEntry.download
     download.info.hls.foreach { hls =>
-      val (simpleProcess, fr) = hls.process(download)
+      val (simpleProcess, fr) = hls.process(logger, download)
       updateDownloadEntry(dlEntry.processingStart(simpleProcess))
       fr.onComplete { result =>
         processDone(download.id, result)
@@ -699,6 +699,8 @@ class DownloadManager extends StrictLogging {
                 tooltip = Some(download.tooltip),
                 error = Some(ex)
               )
+              logger.error(s"${download.context} ${logEntry.message}", logEntry.error.orNull)
+              download.info.addLog(logEntry)
               Main.controller.addLog(logEntry)
               DownloadState.Failure
             }
@@ -709,6 +711,7 @@ class DownloadManager extends StrictLogging {
               message =  s"Download file=<${download.fileContext}> processing done",
               tooltip = Some(download.tooltip)
             )
+            logger.info(s"${download.context} ${logEntry.message}")
             download.info.addLog(logEntry)
             Main.controller.addLog(logEntry)
 
