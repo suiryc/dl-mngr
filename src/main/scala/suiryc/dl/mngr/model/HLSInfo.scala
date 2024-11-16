@@ -155,9 +155,9 @@ case class HLSInfo(
    * Calls ffmpeg to mux stream segments into mp4 file.
    */
   def process(download: Download): Future[Unit] = {
-    download.refreshAvailablePath()
     Main.settings.ffmpegPath.opt match {
       case Some(ffmpegPath) =>
+        download.createTargetPath()
         val temporaryPath = download.temporaryPath
         val cmd = List(
           ffmpegPath.toString,
@@ -167,6 +167,8 @@ case class HLSInfo(
           //"file,crypto",
           "-allowed_extensions",
           "ALL",
+          // Overwrite output (we pre-created it, to reserve the name).
+          "-y",
           "-i",
           temporaryPath.resolve("absolute.m3u8").toString,
           "-bsf:a",

@@ -822,7 +822,8 @@ class DownloadManager extends StrictLogging {
         val downloadFile = DownloadFile.reuse(
           downloadBackupInfo.paths.target,
           downloadBackupInfo.paths.temporary,
-          created = downloadBackupInfo.paths.temporaryCreated || downloadBackupInfo.ranges.downloaded.nonEmpty
+          created = downloadBackupInfo.paths.temporaryCreated || downloadBackupInfo.ranges.downloaded.nonEmpty,
+          createdTarget = downloadBackupInfo.paths.targetCreated
         )
         val download = Download(
           id = downloadBackupInfo.id,

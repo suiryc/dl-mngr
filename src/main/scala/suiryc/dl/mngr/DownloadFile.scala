@@ -23,13 +23,14 @@ object DownloadFile {
   def reuse(path: Path): DownloadFile = {
     // Note: we are called because the working path exists and user asked to
     // resume downloading the existing file.
-    reuse(path, Main.settings.getTemporaryFile(path), created = true)
+    reuse(path, Main.settings.getTemporaryFile(path), created = true, createdTarget = false)
   }
 
-  def reuse(path: Path, temporary: Path, created: Boolean): DownloadFile = {
+  def reuse(path: Path, temporary: Path, created: Boolean, createdTarget: Boolean): DownloadFile = {
     val downloadFile = new DownloadFile(path)
     downloadFile.temporary = temporary
     downloadFile.created = created
+    downloadFile.createdTarget = createdTarget
     downloadFile
   }
 
@@ -48,6 +49,9 @@ class DownloadFile(private var path: Path) extends LazyLogging {
    * temporary file was created then renamed to target.
    */
   private var created: Boolean = false
+
+  /** Whether target path was created. */
+  private var createdTarget: Boolean = false
 
   /** The temporary file to download into. */
   private var temporary: Path = _
@@ -90,6 +94,9 @@ class DownloadFile(private var path: Path) extends LazyLogging {
    * temporary file was created then renamed to target.
    */
   def getCreated: Boolean = created
+
+  /** Whether target path was created. */
+  def getCreatedTarget: Boolean = createdTarget
 
   /** Resets. */
   def reset(restart: Boolean): Unit = this.synchronized {
@@ -144,9 +151,22 @@ class DownloadFile(private var path: Path) extends LazyLogging {
     } else false
   }
 
-  /** Refreshes available path. */
-  def refreshAvailablePath(): Unit = {
-    path = Misc.getAvailablePath(path)
+  /** Creates (reserves name) target path. */
+  def createTarget(): Boolean = {
+    if (!createdTarget) {
+      val options = List(StandardOpenOption.WRITE, StandardOpenOption.CREATE_NEW)
+      try {
+        FileChannel.open(path, options: _*).close()
+      } catch {
+        case _: FileAlreadyExistsException | _: AccessDeniedException =>
+          // If the file already exists, find the next available name
+          path = Misc.getAvailablePath(path)
+          FileChannel.open(path, options: _*).close()
+      }
+      // The file was created.
+      createdTarget = true
+      true
+    } else false
   }
 
   /**
@@ -437,6 +457,7 @@ class DownloadFile(private var path: Path) extends LazyLogging {
       if (done) {
         // If the target file exists, rename ours.
         path = Misc.moveFile(temporary, path)
+        createdTarget = true
       }
       // Then apply last modified time when applicable.
       // Note: do this after renaming file, because we do this on the working

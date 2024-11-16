@@ -101,6 +101,8 @@ class DownloadInfo extends ObservableLogs {
 case class DownloadBackupPathsInfo(
   /** Target save path. */
   target: Path,
+  /** Whether the target path was created. */
+  targetCreated: Boolean,
   /** Temporary download path. */
   temporary: Path,
   /** Whether the temporary path was created. */
@@ -162,7 +164,7 @@ case class DownloadBackupInfo(
 object DownloadBackupInfo extends DefaultJsonProtocol with JsonFormats {
   implicit val segmentRangeFormat: RootJsonFormat[SegmentRange] = jsonFormat2(SegmentRange.apply)
   implicit val subtitlesBackupFormat: RootJsonFormat[SubtitleInfo] = jsonFormat3(SubtitleInfo.apply)
-  implicit val downloadBackupPathsFormat: RootJsonFormat[DownloadBackupPathsInfo] = jsonFormat3(DownloadBackupPathsInfo.apply)
+  implicit val downloadBackupPathsFormat: RootJsonFormat[DownloadBackupPathsInfo] = jsonFormat4(DownloadBackupPathsInfo.apply)
   implicit val downloadBackupSizeFormat: RootJsonFormat[DownloadBackupSizeInfo] = jsonFormat3(DownloadBackupSizeInfo.apply)
   implicit val downloadBackupRangesFormat: RootJsonFormat[DownloadBackupRangesInfo] = jsonFormat3(DownloadBackupRangesInfo.apply)
   implicit val downloadBackupFormat: RootJsonFormat[DownloadBackupInfo] = jsonFormat15(DownloadBackupInfo.apply)
@@ -217,6 +219,8 @@ case class Download(
 
   def path: Path = downloadFile.getPath
 
+  def targetCreated: Boolean = downloadFile.getCreatedTarget
+
   def temporaryPath: Path = downloadFile.getTemporaryPath
 
   def temporaryCreated: Boolean = downloadFile.getCreated
@@ -236,9 +240,9 @@ case class Download(
     }
   }
 
-  /** Refreshes available path. */
-  def refreshAvailablePath(): Unit = {
-    downloadFile.refreshAvailablePath()
+  /** Creates (reserves) target path. */
+  def createTargetPath(): Unit = {
+    downloadFile.createTarget()
     refreshPaths()
   }
 
@@ -387,6 +391,7 @@ case class Download(
       userAgent = userAgent,
       paths = DownloadBackupPathsInfo(
         target = downloadFile.getPath,
+        targetCreated = targetCreated,
         temporary = temporaryPath,
         temporaryCreated = temporaryCreated
       ),
