@@ -802,7 +802,7 @@ class MainController
           dlFolderField.setText(info.path.get.getParent.toString)
           dlFileField.setText(info.path.get.getFileName.toString)
           // Display the temporary path, if created, in a tooltip.
-          if (download.temporaryCreated) {
+          if (!download.isDone && download.temporaryCreated) {
             val temporaryPath = info.temporaryPath.get
             val tooltip = new Tooltip(
               // Don't display the folder if it is the actual target's one.
