@@ -12,7 +12,7 @@ import suiryc.scala.sys.process.{DummyProcess, SimpleProcess}
 
 import java.net.URI
 import java.nio.charset.StandardCharsets
-import java.nio.file.Files
+import java.nio.file.{DirectoryNotEmptyException, Files}
 import java.util.Base64
 import scala.concurrent.Future
 import scala.io.Source
@@ -155,9 +155,10 @@ case class HLSInfo(
    *
    * Calls ffmpeg to mux stream segments into mp4 file.
    */
-  def process(download: Download): (SimpleProcess, Future[Unit]) = {
+  def process(logger: Logger, download: Download): (SimpleProcess, Future[Unit]) = {
     Main.settings.ffmpegPath.opt match {
       case Some(ffmpegPath) =>
+        import CoreSystem.Blocking.dispatcher
         download.createTargetPath()
         val temporaryPath = download.temporaryPath
         val cmd = List(
@@ -178,14 +179,41 @@ case class HLSInfo(
           "copy",
           download.path.toString
         )
-        val (simpleProcess, fr) = Command.executeAsync(
+        val (simpleProcess, fr0) = Command.executeAsync(
           cmd = cmd,
           workingDirectory = Some(temporaryPath.toFile),
           captureStdout = true,
           captureStderr = true,
           skipResult = false
         )
-        (simpleProcess, fr.map(_ => ())(CoreSystem.Blocking.dispatcher))
+        val fr = fr0.map { _ =>
+          // Processing was a success.
+          // We can clean up temporary folder.
+          List(
+            "stream.m3u8",
+            "original.m3u8",
+            "absolute.m3u8"
+          ).foreach { name =>
+            Files.deleteIfExists(download.temporaryPath.resolve(name))
+          }
+          // And delete the folder if empty (should be).
+          try {
+            Files.deleteIfExists(download.temporaryPath)
+          } catch {
+            case _: DirectoryNotEmptyException =>
+              // Let folder as-is, and log.
+              val logEntry = LogEntry(
+                kind = LogKind.Warning,
+                message = s"Cannot clean non-empty directory=<${download.temporaryPath}>",
+                tooltip = Some(download.tooltip)
+              )
+              logger.info(s"${download.context} ${logEntry.message}")
+              download.info.addLog(logEntry)
+              Main.controller.addLog(logEntry)
+          }
+          ()
+        }
+        (simpleProcess, fr)
 
       case None =>
         val f = Future.failed {
