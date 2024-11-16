@@ -40,7 +40,13 @@ class DownloadFile(private var path: Path) extends LazyLogging {
   /** Whether download was done (success). */
   private var isDone: Boolean = false
 
-  /** Whether file was created. */
+  /**
+   * Whether working path was created.
+   *
+   * Most of the time, this means whether the temporary path was created.
+   * Special case: once done for nominal (non-HLS) download, 'true' means
+   * temporary file was created then renamed to target.
+   */
   private var created: Boolean = false
 
   /** The temporary file to download into. */
@@ -76,7 +82,13 @@ class DownloadFile(private var path: Path) extends LazyLogging {
 
   private def renewTemporary(): Unit = temporary = Main.settings.getTemporaryFile(path)
 
-  /** Whether (working) path was created. */
+  /**
+   * Whether working path was created.
+   *
+   * Most of the time, this means whether the temporary path was created.
+   * Special case: once done for nominal (non-HLS) download, 'true' means
+   * temporary file was created then renamed to target.
+   */
   def getCreated: Boolean = created
 
   /** Resets. */

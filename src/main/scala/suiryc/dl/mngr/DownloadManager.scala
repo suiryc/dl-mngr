@@ -820,9 +820,9 @@ class DownloadManager extends StrictLogging {
         // Belt and suspenders: download is supposed to be created if we
         // already did download something.
         val downloadFile = DownloadFile.reuse(
-          downloadBackupInfo.path,
-          downloadBackupInfo.temporaryPath,
-          created = downloadBackupInfo.created || downloadBackupInfo.downloadedRanges.nonEmpty
+          downloadBackupInfo.paths.target,
+          downloadBackupInfo.paths.temporary,
+          created = downloadBackupInfo.paths.temporaryCreated || downloadBackupInfo.ranges.downloaded.nonEmpty
         )
         val download = Download(
           id = downloadBackupInfo.id,
@@ -830,8 +830,8 @@ class DownloadManager extends StrictLogging {
           cookie = downloadBackupInfo.cookie,
           userAgent = downloadBackupInfo.userAgent,
           downloadFile = downloadFile,
-          sizeHint = downloadBackupInfo.sizeHint,
-          sizeQualifier = downloadBackupInfo.sizeQualifier,
+          sizeHint = downloadBackupInfo.size.hint,
+          sizeQualifier = downloadBackupInfo.size.qualifier,
           rateLimiter = rateLimiter
         ).setUri(downloadBackupInfo.uri)
           .setHLS(downloadBackupInfo.hls)
@@ -842,21 +842,21 @@ class DownloadManager extends StrictLogging {
           info.state.set(DownloadState.Processing)
         }
         if (downloadBackupInfo.done) info.state.set(DownloadState.Done)
-        val remainingRanges = downloadBackupInfo.size.flatMap { size =>
+        val remainingRanges = downloadBackupInfo.size.value.flatMap { size =>
           info.size.set(size)
           if (size >= 0) {
             val remainingRanges = new SegmentRanges(size)
-            downloadBackupInfo.downloadedRanges.foreach(remainingRanges.remove)
+            downloadBackupInfo.ranges.downloaded.foreach(remainingRanges.remove)
             Some(remainingRanges)
           } else {
             None
           }
         }
         info.remainingRanges = remainingRanges
-        info.rangeValidator = downloadBackupInfo.rangeValidator
-        info.acceptRanges.set(downloadBackupInfo.acceptRanges)
+        info.rangeValidator = downloadBackupInfo.ranges.validator
+        info.acceptRanges.set(downloadBackupInfo.ranges.accept)
         info.lastModified.set(downloadBackupInfo.lastModified.orNull)
-        info.downloaded.set(downloadBackupInfo.downloadedRanges.map(_.length).sum)
+        info.downloaded.set(downloadBackupInfo.ranges.downloaded.map(_.length).sum)
         addDownload(download, insertFirst = false)
         if (downloadBackupInfo.canResume) resumeDownload(download.id, restart = false, tryCnx = false)
       }

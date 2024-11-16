@@ -25,7 +25,7 @@ object DownloadState extends Enumeration {
 
 class DownloadInfo extends ObservableLogs {
   // Note: some info changes need to be listened to (through Property).
-  /** Promise completed once the download is 'finished' (success or failure). */
+  /** Promise completed once the content download is 'finished' (success or failure). */
   var promise: Promise[Unit] = Promise()
   /** Remote URI to download from. */
   var uri: URI = _
@@ -98,6 +98,33 @@ class DownloadInfo extends ObservableLogs {
 
 }
 
+case class DownloadBackupPathsInfo(
+  /** Target save path. */
+  target: Path,
+  /** Temporary download path. */
+  temporary: Path,
+  /** Whether the temporary path was created. */
+  temporaryCreated: Boolean
+)
+
+case class DownloadBackupSizeInfo(
+  /** Download size. */
+  value: Option[Long],
+  /** Download size hint (informational). */
+  hint: Option[Long],
+  /** Download size qualifier (informational). */
+  qualifier: Option[String]
+)
+
+case class DownloadBackupRangesInfo(
+  /** Range validator (if applicable) */
+  validator: Option[String],
+  /** Whether server accept ranges */
+  accept: Option[Boolean],
+  /** Downloaded ranges. */
+  downloaded: List[SegmentRange]
+)
+
 /** Info to back up for a download. */
 case class DownloadBackupInfo(
   /** Internal id. */
@@ -110,32 +137,20 @@ case class DownloadBackupInfo(
   cookie: Option[String],
   /** User agent. */
   userAgent: Option[String],
-  /** Target save path. */
-  path: Path,
-  /** Temporary download path. */
-  temporaryPath: Path,
-  /** Whether the download file was created. */
-  created: Boolean,
-  /** Whether the download was done (finished with success or error). */
+  /** Paths information. */
+  paths: DownloadBackupPathsInfo,
+  /** Whether the download (content and processing) was done (finished with success or error). */
   done: Boolean,
   /** Done download error. */
   doneError: Option[String],
   /** Whether the download can be resumed upon starting application. */
   canResume: Boolean,
-  /** Download size. */
-  size: Option[Long],
-  /** Download size hint (informational). */
-  sizeHint: Option[Long],
-  /** Download size qualifier (informational). */
-  sizeQualifier: Option[String],
-  /** Range validator (if applicable) */
-  rangeValidator: Option[String],
-  /** Whether server accept ranges */
-  acceptRanges: Option[Boolean],
+  /** Download size info. */
+  size: DownloadBackupSizeInfo,
+  /** Download ranges info. */
+  ranges: DownloadBackupRangesInfo,
   /** File last modified time on server */
   lastModified: Option[Date],
-  /** Downloaded ranges. */
-  downloadedRanges: List[SegmentRange],
   /** Streams segments. */
   streamSegments: List[StreamSegment],
   /** HLS. */
@@ -147,7 +162,10 @@ case class DownloadBackupInfo(
 object DownloadBackupInfo extends DefaultJsonProtocol with JsonFormats {
   implicit val segmentRangeFormat: RootJsonFormat[SegmentRange] = jsonFormat2(SegmentRange.apply)
   implicit val subtitlesBackupFormat: RootJsonFormat[SubtitleInfo] = jsonFormat3(SubtitleInfo.apply)
-  implicit val downloadBackupFormat: RootJsonFormat[DownloadBackupInfo] = jsonFormat21(DownloadBackupInfo.apply)
+  implicit val downloadBackupPathsFormat: RootJsonFormat[DownloadBackupPathsInfo] = jsonFormat3(DownloadBackupPathsInfo.apply)
+  implicit val downloadBackupSizeFormat: RootJsonFormat[DownloadBackupSizeInfo] = jsonFormat3(DownloadBackupSizeInfo.apply)
+  implicit val downloadBackupRangesFormat: RootJsonFormat[DownloadBackupRangesInfo] = jsonFormat3(DownloadBackupRangesInfo.apply)
+  implicit val downloadBackupFormat: RootJsonFormat[DownloadBackupInfo] = jsonFormat15(DownloadBackupInfo.apply)
 }
 
 /**
@@ -201,7 +219,7 @@ case class Download(
 
   def temporaryPath: Path = downloadFile.getTemporaryPath
 
-  def created: Boolean = downloadFile.getCreated
+  def temporaryCreated: Boolean = downloadFile.getCreated
 
   refreshPaths()
 
@@ -367,19 +385,25 @@ case class Download(
       referrer = referrer,
       cookie = cookie,
       userAgent = userAgent,
-      path = downloadFile.getPath,
-      temporaryPath = temporaryPath,
-      created = created,
+      paths = DownloadBackupPathsInfo(
+        target = downloadFile.getPath,
+        temporary = temporaryPath,
+        temporaryCreated = temporaryCreated
+      ),
       done = isDone,
       doneError = doneError,
       canResume = (canStop || info.couldStop) && !acceptRanges.contains(false),
-      size = if (info.isSizeDetermined) Some(info.size.get) else None,
-      sizeHint = sizeHint,
-      sizeQualifier = sizeQualifier,
-      rangeValidator = info.rangeValidator,
-      acceptRanges = acceptRanges,
+      size = DownloadBackupSizeInfo(
+        value = if (info.isSizeDetermined) Some(info.size.get) else None,
+        hint = sizeHint,
+        qualifier = sizeQualifier
+      ),
+      ranges = DownloadBackupRangesInfo(
+        validator = info.rangeValidator,
+        accept = acceptRanges,
+        downloaded = downloadFile.getDownloadedRanges(info)
+      ),
       lastModified = Option(info.lastModified.get),
-      downloadedRanges = downloadFile.getDownloadedRanges(info),
       streamSegments = info.streamSegments,
       hls = info.hls,
       subtitle = info.subtitle
