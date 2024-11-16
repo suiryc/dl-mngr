@@ -5,9 +5,10 @@ import spray.json._
 import suiryc.dl.mngr.Main
 import suiryc.dl.mngr.util.HLSParser.TagValue
 import suiryc.dl.mngr.util.{HLSParser, Http}
-import suiryc.scala.concurrent.RichFuture
+import suiryc.scala.akka.CoreSystem
 import suiryc.scala.spray.json.JsonFormats
 import suiryc.scala.sys.Command
+import suiryc.scala.sys.process.{DummyProcess, SimpleProcess}
 
 import java.net.URI
 import java.nio.charset.StandardCharsets
@@ -154,7 +155,7 @@ case class HLSInfo(
    *
    * Calls ffmpeg to mux stream segments into mp4 file.
    */
-  def process(download: Download): Future[Unit] = {
+  def process(download: Download): (SimpleProcess, Future[Unit]) = {
     Main.settings.ffmpegPath.opt match {
       case Some(ffmpegPath) =>
         download.createTargetPath()
@@ -177,21 +178,20 @@ case class HLSInfo(
           "copy",
           download.path.toString
         )
-        RichFuture.blockingAsync {
-          Command.execute(
-            cmd = cmd,
-            workingDirectory = Some(temporaryPath.toFile),
-            captureStdout = true,
-            captureStderr = true,
-            skipResult = false
-          )
-          ()
-        }
+        val (simpleProcess, fr) = Command.executeAsync(
+          cmd = cmd,
+          workingDirectory = Some(temporaryPath.toFile),
+          captureStdout = true,
+          captureStderr = true,
+          skipResult = false
+        )
+        (simpleProcess, fr.map(_ => ())(CoreSystem.Blocking.dispatcher))
 
       case None =>
-        Future.failed {
+        val f = Future.failed {
           new Exception("ffmpeg path is not configured")
         }
+        (new DummyProcess(failed = true), f)
     }
   }
 

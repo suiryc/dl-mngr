@@ -20,6 +20,7 @@ import suiryc.dl.mngr.I18N.Strings
 import suiryc.dl.mngr.model._
 import suiryc.dl.mngr.util.Http
 import suiryc.scala.io.PathsEx
+import suiryc.scala.sys.process.SimpleProcess
 
 import java.net.URI
 import java.nio.charset.StandardCharsets
@@ -28,7 +29,7 @@ import java.util.UUID
 import scala.annotation.nowarn
 import scala.concurrent.{Future, Promise}
 import scala.concurrent.duration._
-import scala.util.Try
+import scala.util.{Success, Try}
 
 
 object DownloadManager {
@@ -172,14 +173,42 @@ object DownloadManager {
     /** Promise completed when download is done (state changed). */
     done: Promise[Unit],
     /** Actor handling the download. */
-    dler: ActorRef
+    dler: ActorRef,
+    /** Processing, when applicable. */
+    simpleProcess: Option[SimpleProcess],
+    /** Whether (processing) stopping was triggered. */
+    stopping: Boolean
   ) {
+
     def resume(restart: Boolean): DownloadEntry = {
       // Belt and suspenders: make sure 'done' is completed.
       done.tryFailure(DownloadException("Download is being resumed"))
       download.resume(restart)
-      copy(done = Promise())
+      copy(
+        done = Promise(),
+        stopping = false
+      )
     }
+
+    def processingStart(simpleProcess: SimpleProcess): DownloadEntry = {
+      copy(simpleProcess = Some(simpleProcess))
+    }
+
+    def stopProcess(): DownloadEntry = {
+      simpleProcess.map { sp =>
+        sp.destroy()
+        copy(stopping = true)
+      }.getOrElse(this)
+    }
+
+    def processingDone(): (DownloadEntry, Boolean) = {
+      val updated = copy(
+        simpleProcess = None,
+        stopping = false
+      )
+      (updated, stopping)
+    }
+
   }
 
   protected trait Connections {
@@ -415,7 +444,13 @@ class DownloadManager extends StrictLogging {
 
   def addDownload(download: Download, insertFirst: Boolean): Download = {
     val dler = actorOf(Props(new FileDownloader(dlMngr = this, dl = download)))
-    val dlEntry = DownloadEntry(download = download, done = Promise(), dler = dler)
+    val dlEntry = DownloadEntry(
+      download = download,
+      done = Promise(),
+      dler = dler,
+      simpleProcess = None,
+      stopping = true
+    )
     val msgPrefix = s"Download file=<${download.fileContext}>"
     if (download.isDone) {
       logger.info(s"${download.context} Download uri=<${download.uri}> referrer=<${download.referrer.getOrElse("")}> file=<${download.path}> done")
@@ -458,8 +493,17 @@ class DownloadManager extends StrictLogging {
   }
 
   private def stopDownload(dlEntry: DownloadEntry): Future[Unit] = {
-    if (dlEntry.download.canStop) {
-      dlEntry.dler ! FileDownloader.DownloadStop
+    val download = dlEntry.download
+    if (download.canStop) {
+      if (download.isProcessing) {
+        // Stop processing.
+        this.synchronized {
+          updateDownloadEntry(dlEntry.stopProcess())
+        }
+      } else {
+        // Stop content download.
+        dlEntry.dler ! FileDownloader.DownloadStop
+      }
       // If stopping was done, this is a success (not a 'real' failure).
       dlEntry.done.future.recover {
         case ex: DownloadException if ex.stopped => ()
@@ -594,7 +638,7 @@ class DownloadManager extends StrictLogging {
               }
 
               if (info.hls.nonEmpty) {
-                processDownload(download)
+                processDownload(dlEntry)
                 DownloadState.Processing
               } else {
                 DownloadState.Done
@@ -619,9 +663,12 @@ class DownloadManager extends StrictLogging {
     }
   }
 
-  private def processDownload(download: Download): Unit = {
+  private def processDownload(dlEntry: DownloadEntry): Unit = {
+    val download = dlEntry.download
     download.info.hls.foreach { hls =>
-      hls.process(download).onComplete { result =>
+      val (simpleProcess, fr) = hls.process(download)
+      updateDownloadEntry(dlEntry.processingStart(simpleProcess))
+      fr.onComplete { result =>
         processDone(download.id, result)
       }
     }
@@ -630,12 +677,15 @@ class DownloadManager extends StrictLogging {
   private def processDone(id: UUID, result: Try[Unit]): Unit = this.synchronized {
     // We should find the entry.
     getDownloadEntry(id) match {
-      case Some(dlEntry) =>
+      case Some(dlEntry0) =>
+        val (dlEntry, stopped) = dlEntry0.processingDone()
+        updateDownloadEntry(dlEntry)
         val download = dlEntry.download
         val info = download.info
+        // Ensure we take into account 'download stopping'.
         val failureOpt = result.failed.toOption.map {
-          case ex: DownloadException => ex
-          case ex: Exception => DownloadException(message = ex.getMessage, cause = ex)
+          case ex: DownloadException => ex.copy(stopped = stopped || ex.stopped)
+          case ex: Exception => DownloadException(message = ex.getMessage, cause = ex, stopped = stopped)
         }: @nowarn
         // Determine final state, and add general log entry.
         val state = failureOpt match {
