@@ -332,7 +332,7 @@ case class Download(
   def canStop: Boolean = isNetworkActive || isBusy
   def canResume(restart: Boolean): Boolean = if (restart) canRestart else canResume
   // We cannot resume if ranges are not supported.
-  def canResume: Boolean = !acceptRanges.contains(false) && (isFailed || isStopped)
+  def canResume: Boolean = (info.downloadDone || !acceptRanges.contains(false)) && (isFailed || isStopped)
   // We can restart upon failure, if stopped and ranges are not supported, or if done with error.
   def canRestart: Boolean = isFailed || (isStopped && acceptRanges.contains(false)) || (isDone && doneError.nonEmpty)
 
