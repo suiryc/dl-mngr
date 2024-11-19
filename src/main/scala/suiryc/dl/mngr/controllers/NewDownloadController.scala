@@ -630,6 +630,7 @@ object NewDownloadController {
             keys = hlsParams.keys.map { keyParams =>
               HLSInfo.Key(keyParams.raw)
             },
+            created = Nil,
             processed = false
           )
         }

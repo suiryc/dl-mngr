@@ -23,7 +23,7 @@ object HLSInfo extends DefaultJsonProtocol with JsonFormats {
   case class Key(raw: Option[String])
 
   implicit val hlsKeyFormat: RootJsonFormat[Key] = jsonFormat1(Key.apply)
-  implicit val hlsInfoFormat: RootJsonFormat[HLSInfo] = jsonFormat4(HLSInfo.apply)
+  implicit val hlsInfoFormat: RootJsonFormat[HLSInfo] = jsonFormat5(HLSInfo.apply)
 
 }
 
@@ -34,6 +34,8 @@ case class HLSInfo(
   raw: Option[String],
   /** HLS keys (if not already saved). */
   keys: List[HLSInfo.Key],
+  /** Created filenames (to clean up once done). */
+  created: List[String],
   /** Whether HLS was processed. */
   processed: Boolean
 ) {
@@ -145,7 +147,12 @@ case class HLSInfo(
     download.info.streamSegments = segments
     download.setHLS(Some(copy(
       raw = None,
-      keys = Nil
+      keys = Nil,
+      created = created ::: keyFilenames.flatten ::: List(
+        "stream.m3u8",
+        "original.m3u8",
+        "absolute.m3u8"
+      )
     )))
     ()
   }
@@ -189,11 +196,7 @@ case class HLSInfo(
         val fr = fr0.map { _ =>
           // Processing was a success.
           // We can clean up temporary folder.
-          List(
-            "stream.m3u8",
-            "original.m3u8",
-            "absolute.m3u8"
-          ).foreach { name =>
+          created.foreach { name =>
             Files.deleteIfExists(download.temporaryPath.resolve(name))
           }
           // And delete the folder if empty (should be).
