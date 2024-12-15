@@ -273,6 +273,8 @@ object Main extends JFXLauncher[MainApp] with StrictLogging {
     correlationId: Option[String] = None,
     /** Filename. */
     file: Option[String] = None,
+    /** HTTP headers. */
+    headers: Option[List[Params.Header]] = None,
     /** Video HLS. */
     hls: Option[Params.HLS] = None,
     /** Whether to capture console I/O. */
@@ -306,14 +308,28 @@ object Main extends JFXLauncher[MainApp] with StrictLogging {
     def merge(other: Params): Params = {
       // Convert objects to JSON, then merge fields: 'other' overrides ours.
       // And convert back to Params.
-      val fields = (this:Params).toJson.asJsObject.fields ++
-        other.toJson.asJsObject.fields
+      val thisFields = (this:Params).toJson.asJsObject.fields
+      val otherFields = other.toJson.asJsObject.fields
+      var fields = thisFields ++ otherFields
+      // Concatenate collections present in both.
+      List("headers").foreach { fieldName =>
+        if (thisFields.contains(fieldName) && otherFields.contains(fieldName)) {
+          val elements = thisFields(fieldName).asInstanceOf[JsArray].elements ++
+            otherFields(fieldName).asInstanceOf[JsArray].elements
+          fields += (fieldName -> JsArray(elements))
+        }
+      }
       JsObject(fields).convertTo[Params]
     }
 
   }
 
   object Params extends DefaultJsonProtocol {
+
+    case class Header(
+      name: String,
+      value: String
+    )
 
     case class HLSKey(
       method: String,
@@ -335,10 +351,11 @@ object Main extends JFXLauncher[MainApp] with StrictLogging {
       name: Option[String]
     )
 
+    implicit val headerFormat: RootJsonFormat[Header] = jsonFormat2(Header)
     implicit val hlsKeyFormat: RootJsonFormat[HLSKey] = jsonFormat3(HLSKey)
     implicit val hlsFormat: RootJsonFormat[HLS] = jsonFormat3(HLS)
     implicit val subtitleFormat: RootJsonFormat[Subtitle] = jsonFormat5(Subtitle)
-    implicit val paramsFormat: RootJsonFormat[Params] = jsonFormat16(Params.apply)
+    implicit val paramsFormat: RootJsonFormat[Params] = jsonFormat17(Params.apply)
 
   }
 

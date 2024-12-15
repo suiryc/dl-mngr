@@ -4,6 +4,7 @@ import javafx.beans.property.{SimpleIntegerProperty, SimpleLongProperty, SimpleO
 import spray.json._
 import suiryc.dl.mngr.{DownloadFile, Main}
 import suiryc.dl.mngr.I18N.Strings
+import suiryc.dl.mngr.Main.Params
 import suiryc.dl.mngr.util.Misc
 import suiryc.scala.io.PathsEx
 import suiryc.scala.spray.json.JsonFormats
@@ -142,6 +143,8 @@ case class DownloadBackupInfo(
   cookie: Option[String],
   /** User agent. */
   userAgent: Option[String],
+  /** HTTP headers. */
+  headers: List[Params.Header],
   /** Paths information. */
   paths: DownloadBackupPathsInfo,
   /** Whether content downloading as done. */
@@ -172,7 +175,7 @@ object DownloadBackupInfo extends DefaultJsonProtocol with JsonFormats {
   implicit val downloadBackupPathsFormat: RootJsonFormat[DownloadBackupPathsInfo] = jsonFormat4(DownloadBackupPathsInfo.apply)
   implicit val downloadBackupSizeFormat: RootJsonFormat[DownloadBackupSizeInfo] = jsonFormat3(DownloadBackupSizeInfo.apply)
   implicit val downloadBackupRangesFormat: RootJsonFormat[DownloadBackupRangesInfo] = jsonFormat3(DownloadBackupRangesInfo.apply)
-  implicit val downloadBackupFormat: RootJsonFormat[DownloadBackupInfo] = jsonFormat16(DownloadBackupInfo.apply)
+  implicit val downloadBackupFormat: RootJsonFormat[DownloadBackupInfo] = jsonFormat17(DownloadBackupInfo.apply)
 }
 
 /**
@@ -190,6 +193,8 @@ case class Download(
   cookie: Option[String],
   /** User agent. */
   userAgent: Option[String],
+  /** HTTP headers. */
+  headers: List[Params.Header],
   /** Download file handler (I/O). */
   downloadFile: DownloadFile,
   /** Download size hint (informational). */
@@ -394,6 +399,7 @@ case class Download(
       referrer = referrer,
       cookie = cookie,
       userAgent = userAgent,
+      headers = headers,
       paths = DownloadBackupPathsInfo(
         target = downloadFile.getPath,
         targetCreated = targetCreated,

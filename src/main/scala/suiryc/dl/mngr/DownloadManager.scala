@@ -17,6 +17,7 @@ import org.apache.http.nio.conn.{NoopIOSessionStrategy, SchemeIOSessionStrategy}
 import org.apache.http.nio.conn.ssl.SSLIOSessionStrategy
 import org.apache.http.ssl.SSLContextBuilder
 import suiryc.dl.mngr.I18N.Strings
+import suiryc.dl.mngr.Main.Params
 import suiryc.dl.mngr.model._
 import suiryc.dl.mngr.util.Http
 import suiryc.scala.io.PathsEx
@@ -406,6 +407,7 @@ class DownloadManager extends StrictLogging {
     referrer: Option[URI],
     cookie: Option[String],
     userAgent: Option[String],
+    headers: List[Params.Header],
     save: Path,
     sizeHint: Option[Long],
     sizeQualifier: Option[String],
@@ -427,6 +429,7 @@ class DownloadManager extends StrictLogging {
       referrer = referrer,
       cookie = cookie,
       userAgent = userAgent,
+      headers = headers,
       downloadFile = downloadFile,
       sizeHint = sizeHint,
       sizeQualifier = sizeQualifier,
@@ -890,6 +893,7 @@ class DownloadManager extends StrictLogging {
           referrer = downloadBackupInfo.referrer,
           cookie = downloadBackupInfo.cookie,
           userAgent = downloadBackupInfo.userAgent,
+          headers = downloadBackupInfo.headers,
           downloadFile = downloadFile,
           sizeHint = downloadBackupInfo.size.hint,
           sizeQualifier = downloadBackupInfo.size.qualifier,

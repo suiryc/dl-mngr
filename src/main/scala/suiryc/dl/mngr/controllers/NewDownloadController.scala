@@ -649,6 +649,7 @@ object NewDownloadController {
           referrer = result.referrer,
           cookie = result.cookie,
           userAgent = result.userAgent,
+          headers = dlParams.headers.getOrElse(Nil),
           save = result.path,
           sizeHint = dlParams.size.filter(_ >= 0),
           sizeQualifier = sizeQualifier,

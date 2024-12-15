@@ -168,8 +168,26 @@ case class HLSInfo(
         import CoreSystem.Blocking.dispatcher
         download.createTargetPath()
         val temporaryPath = download.temporaryPath
-        val cmd = List(
-          ffmpegPath.toString,
+        var cmd = List(
+          ffmpegPath.toString//,
+          //"-loglevel", "debug"
+        )
+        if (download.headers.nonEmpty) {
+          val s = download.headers.map { header =>
+            s"${header.name}: ${header.value}"
+          }.mkString("", "\r\n", "\r\n")
+          cmd = cmd ::: List("-headers", s)
+        }
+        download.referrer.foreach { v =>
+          cmd = cmd ::: List("-referer", v.toString)
+        }
+        download.userAgent.foreach { v =>
+          cmd = cmd ::: List("-user_agent", v)
+        }
+        download.cookie.foreach { v =>
+          cmd = cmd ::: List("-cookies", v)
+        }
+        cmd = cmd ::: List(
           "-protocol_whitelist",
           "http,https,tls,tcp,file,crypto",
           // For local files only:
@@ -179,11 +197,18 @@ case class HLSInfo(
           // Overwrite output (we pre-created it, to reserve the name).
           "-y",
           "-i",
-          temporaryPath.resolve("absolute.m3u8").toString,
+          // Indicating HTTP headers/referrer/user-agent/cookies only works
+          // when the given input *is* 'http(s)'. Passing a file prevents
+          // ffmpeg from using HTTP options if the HLS segments are http(s).
+          // See: https://trac.ffmpeg.org/ticket/7695
+          //temporaryPath.resolve("absolute.m3u8").toString,
+          uri.toString,
           "-bsf:a",
           "aac_adtstoasc",
           "-c",
-          "copy",
+          "copy"
+        )
+        cmd = cmd ::: List(
           download.path.toString
         )
         val (simpleProcess, fr0) = Command.executeAsync(
