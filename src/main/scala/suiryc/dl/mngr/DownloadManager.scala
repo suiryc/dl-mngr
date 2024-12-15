@@ -920,6 +920,7 @@ class DownloadManager extends StrictLogging {
         info.acceptRanges.set(downloadBackupInfo.ranges.accept)
         info.lastModified.set(downloadBackupInfo.lastModified.orNull)
         info.downloaded.set(downloadBackupInfo.ranges.downloaded.map(_.length).sum)
+        info.streamSegments = downloadBackupInfo.streamSegments
         addDownload(download, insertFirst = false)
         if (downloadBackupInfo.canResume) resumeDownload(download.id, restart = false, tryCnx = false)
       }
