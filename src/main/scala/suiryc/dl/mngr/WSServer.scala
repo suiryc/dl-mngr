@@ -169,7 +169,7 @@ object WSServer extends StrictLogging {
 
     private def processMessage(msg: String): Future[String] = {
       val paramsOpt = try {
-        Right(msg.parseJson.convertTo[Main.Params])
+        Right(Main.Params.fromJson(msg))
       } catch {
         case ex: Exception => Left(ex)
       }

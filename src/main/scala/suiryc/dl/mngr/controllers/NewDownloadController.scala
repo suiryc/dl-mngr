@@ -623,14 +623,19 @@ object NewDownloadController {
       val download = result.download.getOrElse {
         val sizeHint = dlParams.size.filter(_ >= 0)
         val sizeQualifier = Option.when(sizeHint.nonEmpty)(dlParams.sizeQualifier).flatten
-        val hls = dlParams.hls.map { hlsParams =>
+        val streams = dlParams.hls.getOrElse(Nil)
+        val hls = Option.when(streams.nonEmpty) {
           HLSInfo(
-            uri = Http.getURI(hlsParams.url),
-            raw = Some(hlsParams.raw),
-            keys = hlsParams.keys.map { keyParams =>
-              HLSInfo.Key(keyParams.raw)
+            streams = streams.map { hlsParams =>
+              HLSInfo.Stream(
+                uri = Http.getURI(hlsParams.url),
+                raw = Some(hlsParams.raw),
+                keys = hlsParams.keys.map { keyParams =>
+                  HLSInfo.Key(keyParams.raw)
+                },
+                created = Nil
+              )
             },
-            created = Nil,
             processed = false
           )
         }

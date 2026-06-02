@@ -14,6 +14,7 @@ import java.net.URI
 import java.nio.charset.StandardCharsets
 import java.nio.file.{DirectoryNotEmptyException, Files}
 import java.util.Base64
+import scala.annotation.unused
 import scala.concurrent.Future
 import scala.io.Source
 
@@ -22,23 +23,33 @@ object HLSInfo extends DefaultJsonProtocol with JsonFormats {
 
   case class Key(raw: Option[String])
 
+  case class Stream(
+    /** Stream uri. */
+    uri: URI,
+    /** Stream raw content (if not already saved). */
+    raw: Option[String],
+    /** Stream keys (if not already saved). */
+    keys: List[HLSInfo.Key],
+    /** Created filenames (to clean up once done). */
+    created: List[String]
+  )
+
   implicit val hlsKeyFormat: RootJsonFormat[Key] = jsonFormat1(Key.apply)
-  implicit val hlsInfoFormat: RootJsonFormat[HLSInfo] = jsonFormat5(HLSInfo.apply)
+  implicit val hlsStreamFormat: RootJsonFormat[Stream] = jsonFormat4(Stream.apply)
+  implicit val hlsInfoFormat: RootJsonFormat[HLSInfo] = jsonFormat2(HLSInfo.apply)
 
 }
 
 case class HLSInfo(
-  /** HLS uri. */
-  uri: URI,
-  /** HLS raw content (if not already saved). */
-  raw: Option[String],
-  /** HLS keys (if not already saved). */
-  keys: List[HLSInfo.Key],
-  /** Created filenames (to clean up once done). */
-  created: List[String],
+  /** Streams. */
+  streams: List[HLSInfo.Stream],
   /** Whether HLS was processed. */
   processed: Boolean
 ) {
+
+  private def streamsIndex: Seq[(HLSInfo.Stream, Int)] = streams.zipWithIndex
+
+  private def streamFilePrefix(@unused stream: HLSInfo.Stream, idx: Int) = s"s$idx-"
 
   /**
    * Prepares HLS processing.
@@ -52,18 +63,26 @@ case class HLSInfo(
    *  - drop raw HLS content (which has now been prepared
    */
   def prepare(logger: Logger, download: Download): Unit = {
-    raw.foreach { raw =>
-      prepare(logger, download, raw)
+    streamsIndex.foreach { case (stream, idx) =>
+      prepare(logger, download, stream, idx)
     }
   }
 
-  private def prepare(logger: Logger, download: Download, raw: String): Unit = {
+  private def prepare(logger: Logger, download: Download, stream: HLSInfo.Stream, idx: Int): Unit = {
+    stream.raw.foreach { raw =>
+      prepare(logger, download, stream, idx, raw)
+    }
+  }
+
+  private def prepare(logger: Logger, download: Download, stream: HLSInfo.Stream, idx: Int, raw: String): Unit = {
     download.createDirectory()
 
+    val filenamePrefix = streamFilePrefix(stream, idx)
+
     // Write keys in local files, and remember them.
-    val keyFilenames = keys.zipWithIndex.map { case (key, keyIdx) =>
+    val keyFilenames = stream.keys.zipWithIndex.map { case (key, keyIdx) =>
       key.raw.map { rawKey =>
-        val filename = s"%04d.key".format(keyIdx)
+        val filename = s"$filenamePrefix-%04d.key".format(keyIdx)
         Files.write(
           download.temporaryPath.resolve(filename),
           Base64.getDecoder.decode(rawKey)
@@ -88,8 +107,8 @@ case class HLSInfo(
               case "EXTINF" =>
                 // Next line is a segment URI. It may be relative to the HLS
                 // URI.
-                val segmentUri = uri.resolve(Http.getURI(lines.next()))
-                val filename = "%05d.ts".format(segments.length)
+                val segmentUri = stream.uri.resolve(Http.getURI(lines.next()))
+                val filename = s"$filenamePrefix-%05d.ts".format(segments.length)
                 val segment = StreamSegment(segmentUri, filename)
                 loop(
                   m3u8 ::: List(line, filename),
@@ -103,7 +122,7 @@ case class HLSInfo(
                     // Change this key URI.
                     val changed = tag.changeAttribute("URI", TagValue(keyURI, quoted = true)).toString
                     val changedAbsolute = tag.findAttribute("URI").map { attr =>
-                      val keyURI = uri.resolve(Http.getURI(attr.value.value)).toString
+                      val keyURI = stream.uri.resolve(Http.getURI(attr.value.value)).toString
                       tag.changeAttribute("URI", TagValue(keyURI, quoted = true)).toString
                     }.getOrElse(line)
                     loop(m3u8 :+ changed, absolute :+ changedAbsolute, segments)
@@ -127,16 +146,16 @@ case class HLSInfo(
     }
     val (m3u8, absolute, segments) = loop(Nil, Nil, Nil)
     Files.write(
-      download.temporaryPath.resolve("stream.m3u8"),
+      download.temporaryPath.resolve(s"$filenamePrefix-stream.m3u8"),
       m3u8.getBytes(StandardCharsets.UTF_8)
     )
     // Also save original and absolute stream info.
     Files.write(
-      download.temporaryPath.resolve("original.m3u8"),
+      download.temporaryPath.resolve(s"$filenamePrefix-original.m3u8"),
       raw.getBytes(StandardCharsets.UTF_8)
     )
     Files.write(
-      download.temporaryPath.resolve("absolute.m3u8"),
+      download.temporaryPath.resolve(s"$filenamePrefix-absolute.m3u8"),
       absolute.getBytes(StandardCharsets.UTF_8)
     )
 
@@ -146,13 +165,21 @@ case class HLSInfo(
 
     download.info.streamSegments = segments
     download.setHLS(Some(copy(
-      raw = None,
-      keys = Nil,
-      created = created ::: keyFilenames.flatten ::: List(
-        "stream.m3u8",
-        "original.m3u8",
-        "absolute.m3u8"
-      )
+      streams = streams.map { s =>
+        if (s eq stream) {
+          stream.copy(
+            raw = None,
+            keys = Nil,
+            created = stream.created ::: keyFilenames.flatten ::: List(
+              s"$filenamePrefix-stream.m3u8",
+              s"$filenamePrefix-original.m3u8",
+              s"$filenamePrefix-absolute.m3u8"
+            )
+          )
+        } else {
+          s
+        }
+      }
     )))
     ()
   }
@@ -195,20 +222,24 @@ case class HLSInfo(
           "-allowed_extensions",
           "ALL",
           // Overwrite output (we pre-created it, to reserve the name).
-          "-y",
-          "-i",
-          // Indicating HTTP headers/referrer/user-agent/cookies only works
-          // when the given input *is* 'http(s)'. Passing a file prevents
-          // ffmpeg from using HTTP options if the HLS segments are http(s).
-          // See: https://trac.ffmpeg.org/ticket/7695
-          //temporaryPath.resolve("absolute.m3u8").toString,
-          uri.toString,
+          "-y"
+        )
+        streamsIndex.foreach { case (stream, _) =>
+          cmd = cmd ::: List(
+            "-i",
+            // Indicating HTTP headers/referrer/user-agent/cookies only works
+            // when the given input *is* 'http(s)'. Passing a file prevents
+            // ffmpeg from using HTTP options if the HLS segments are http(s).
+            // See: https://trac.ffmpeg.org/ticket/7695
+            //temporaryPath.resolve(s"${streamFilePrefix(stream, idx)}absolute.m3u8").toString,
+            stream.uri.toString
+          )
+        }
+        cmd = cmd ::: List(
           "-bsf:a",
           "aac_adtstoasc",
           "-c",
-          "copy"
-        )
-        cmd = cmd ::: List(
+          "copy",
           download.path.toString
         )
         val (simpleProcess, fr0) = Command.executeAsync(
@@ -221,7 +252,7 @@ case class HLSInfo(
         val fr = fr0.map { _ =>
           // Processing was a success.
           // We can clean up temporary folder.
-          created.foreach { name =>
+          streams.flatMap(_.created).foreach { name =>
             Files.deleteIfExists(download.temporaryPath.resolve(name))
           }
           // And delete the folder if empty (should be).

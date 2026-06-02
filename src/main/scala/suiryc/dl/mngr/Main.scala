@@ -186,7 +186,7 @@ object Main extends JFXLauncher[MainApp] with StrictLogging {
     if (params.withJson) {
       val line = Option(StdIn.readLine()).map(_.trim).filterNot(_.isEmpty).getOrElse("{}")
       try {
-        params.merge(line.parseJson.convertTo[Params])
+        params.merge(Params.fromJson(line))
       } catch {
         case ex: Exception =>
           logger.error(s"Invalid JSON input=<$line>", ex)
@@ -275,8 +275,8 @@ object Main extends JFXLauncher[MainApp] with StrictLogging {
     file: Option[String] = None,
     /** HTTP headers. */
     headers: Option[List[Params.Header]] = None,
-    /** Video HLS. */
-    hls: Option[Params.HLS] = None,
+    /** Video/audio HLS. */
+    hls: Option[List[Params.HLS]] = None,
     /** Whether to capture console I/O. */
     ioCapture: Option[Boolean] = Some(true),
     /** Whether params are passed as JSON (after command line). */
@@ -312,7 +312,7 @@ object Main extends JFXLauncher[MainApp] with StrictLogging {
       val otherFields = other.toJson.asJsObject.fields
       var fields = thisFields ++ otherFields
       // Concatenate collections present in both.
-      List("headers").foreach { fieldName =>
+      List("headers", "hls").foreach { fieldName =>
         if (thisFields.contains(fieldName) && otherFields.contains(fieldName)) {
           val elements = thisFields(fieldName).asInstanceOf[JsArray].elements ++
             otherFields(fieldName).asInstanceOf[JsArray].elements
@@ -356,6 +356,23 @@ object Main extends JFXLauncher[MainApp] with StrictLogging {
     implicit val hlsFormat: RootJsonFormat[HLS] = jsonFormat3(HLS)
     implicit val subtitleFormat: RootJsonFormat[Subtitle] = jsonFormat5(Subtitle)
     implicit val paramsFormat: RootJsonFormat[Params] = jsonFormat17(Params.apply)
+
+    def fromJson(s: String): Params = {
+      // First try to convert to expected object.
+      val json = s.parseJson.asJsObject
+      Try(json.convertTo[Params]).recover { _ =>
+        // Upon failure, try to cope with previous/legacy fields/format.
+        var fields = json.fields
+        fields.get("hls").foreach {
+          case _: JsArray =>
+            // latest format
+          case v =>
+            // Single value: convert to array
+            fields = fields + ("hls" -> JsArray(v))
+        }
+        JsObject(fields).convertTo[Params]
+      }.get
+    }
 
   }
 
