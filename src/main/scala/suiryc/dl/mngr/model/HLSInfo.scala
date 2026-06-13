@@ -159,13 +159,15 @@ case class HLSInfo(
       absolute.getBytes(StandardCharsets.UTF_8)
     )
 
-    val msg = "HLS prepared"
+    val msg = s"HLS stream=<$idx> prepared"
     logger.info(s"${download.context} $msg")
     download.info.addLog(LogKind.Info, msg)
 
     download.info.streamSegments = segments
     download.setHLS(Some(copy(
-      streams = streams.map { s =>
+      // Reminder: 'streams' is immutable here, so update the actual HLS streams
+      // in download.info.
+      streams = download.info.hls.map(_.streams).getOrElse(streams).map { s =>
         if (s eq stream) {
           stream.copy(
             raw = None,
