@@ -171,7 +171,7 @@ object DownloadManager {
   case class DownloadEntry(
     /** Download. */
     download: Download,
-    /** Promise completed when download is done (state changed). */
+    /** Promise completed when download is 'done' (state changed once finished with success/error or stopped). */
     done: Promise[Unit],
     /** Actor handling the download. */
     dler: ActorRef,
@@ -648,7 +648,7 @@ class DownloadManager extends StrictLogging {
               }
           }
           info.state.setValue(state)
-          if (state == DownloadState.Done) {
+          if (state != DownloadState.Processing) {
             // This entry is now 'done'.
             dlEntry.done.tryComplete(result)
           }
