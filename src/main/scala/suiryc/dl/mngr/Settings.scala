@@ -72,7 +72,9 @@ object Settings {
   val defaultDownloadPath: Path = {
     val downloadFolder = RichFile.userHome.toPath.resolve("Downloads")
     val downloadPath = if (OS.isLinux) {
-      val r = Command.execute(Seq("xdg-user-dir", "DOWNLOAD"))
+      // DO NOT USE stdin when executing command: Main class is initializing the
+      // app, and has yet to read stdin.
+      val r = Command.execute(Seq("xdg-user-dir", "DOWNLOAD"), stdinSource = None)
       if (r.exitCode == 0) Paths.get(r.stdout)
       else downloadFolder
     } else {
